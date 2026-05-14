@@ -1,5 +1,11 @@
 const money = (value) => `${Number(value).toLocaleString("ko-KR")}원`;
 
+const TOSS_CLIENT_KEY = "test_gck_docs_Ovk5rk1EwkEbP0W43n07xlzm";
+const TOSS_PENDING_PAYMENT_KEY = "motf.pendingPayment";
+const TOSS_CUSTOMER_KEY = "motf-demo-customer_001";
+let tossWidgets = null;
+let tossWidgetOrderId = null;
+
 const photo = (id, params = "auto=format&fit=crop&w=1200&q=82") =>
   `https://images.unsplash.com/${id}?${params}`;
 
@@ -432,15 +438,18 @@ const state = {
   ],
   activeChatId: "river-chat",
   rating: 5,
+  pendingPayment: null,
+  paymentResult: null,
 };
 
 const routeParents = {
-  landing: "landing",
   stayDetail: "stays",
   booking: "stays",
   storeDetail: "market",
   productDetail: "market",
   cart: "market",
+  payment: "",
+  paymentResult: "",
   review: "mypage",
   complete: "",
 };
@@ -481,6 +490,8 @@ function renderRoute(route) {
   if (route === "storeDetail") renderStoreDetail();
   if (route === "productDetail") renderProductDetail();
   if (route === "cart") renderCart();
+  if (route === "payment") renderPayment();
+  if (route === "paymentResult") renderPaymentResult();
   if (route === "community") renderCommunity();
   if (route === "chat") renderChat();
   if (route === "mypage") renderMypage();
@@ -840,6 +851,405 @@ function renderCart() {
   refreshIcons();
 }
 
+function paymentBackRoute() {
+  if (!state.pendingPayment) return "stays";
+  return state.pendingPayment.type === "stay" ? "booking" : "cart";
+}
+
+function paymentHomeRoute() {
+  if (!state.paymentResult) return "stays";
+  return state.paymentResult.type === "stay" ? "stays" : "market";
+}
+
+function makePaymentId(prefix) {
+  return `${prefix}-${Date.now()}`;
+}
+
+function getBaseUrl() {
+  return `${window.location.origin}${window.location.pathname}`;
+}
+
+function getStoredPendingPayment() {
+  try {
+    const rawPayment = window.localStorage.getItem(TOSS_PENDING_PAYMENT_KEY);
+    return rawPayment ? JSON.parse(rawPayment) : null;
+  } catch {
+    return null;
+  }
+}
+
+function savePendingPayment(payment) {
+  window.localStorage.setItem(TOSS_PENDING_PAYMENT_KEY, JSON.stringify(payment));
+}
+
+function clearPendingPayment() {
+  window.localStorage.removeItem(TOSS_PENDING_PAYMENT_KEY);
+}
+
+function normalizePhone(value) {
+  return String(value || "").replace(/\D/g, "").slice(0, 20);
+}
+
+function setTossWidgetStatus(message, isError = false) {
+  const status = qs("#tossWidgetStatus");
+  if (!status) return;
+  status.textContent = message;
+  status.style.color = isError ? "#b74332" : "#556575";
+}
+
+function loadTossSdk() {
+  if (window.TossPayments) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const existingScript = document.querySelector('script[src="https://js.tosspayments.com/v2/standard"]');
+    if (existingScript) {
+      existingScript.addEventListener("load", resolve, { once: true });
+      existingScript.addEventListener("error", reject, { once: true });
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = "https://js.tosspayments.com/v2/standard";
+    script.async = true;
+    script.onload = resolve;
+    script.onerror = reject;
+    document.head.appendChild(script);
+  });
+}
+
+function createStayPendingPayment() {
+  const amount = bookingAmount();
+  const people = Number(qs("#bookingPeople").value);
+  return {
+    type: "stay",
+    title: `${state.selectedStay.name} 예약`,
+    itemName: state.selectedRoom.name,
+    amount: amount.total,
+    orderId: makePaymentId("stay"),
+    customerName: qs("#bookingName").value || "대표자",
+    customerPhone: qs("#bookingPhone").value || "010-0000-0000",
+    stayName: state.selectedStay.name,
+    roomName: state.selectedRoom.name,
+    date: qs("#stayDate").value,
+    people,
+    lines: [
+      ["객실 금액", amount.roomFee],
+      ["시설 이용료", amount.facilityFee],
+      ["추가 인원", amount.extraFee],
+      ["moTF 중개 수수료", amount.serviceFee],
+    ],
+  };
+}
+
+function createOrderPendingPayment() {
+  const itemSnapshots = state.cart.map((item) => {
+    const found = findProduct(item.productId);
+    return {
+      name: found.product.name,
+      qty: item.qty,
+      price: found.product.price,
+      storeName: found.store.name,
+    };
+  });
+  const productTotal = cartTotal();
+  return {
+    type: "market",
+    title: "공판장 주문",
+    itemName: itemSnapshots.length === 1 ? itemSnapshots[0].name : `${itemSnapshots[0].name} 외 ${itemSnapshots.length - 1}개`,
+    amount: productTotal + 15000,
+    orderId: makePaymentId("market"),
+    customerName: "MT 대표자",
+    customerPhone: "010-0000-0000",
+    storeName: itemSnapshots[0].storeName,
+    pickupTime: qs("#pickupTime").value,
+    pickupPlace: qs("#pickupPlace").value,
+    items: itemSnapshots,
+    lines: [
+      ["상품 금액", productTotal],
+      ["수령/배송 준비비", 15000],
+    ],
+  };
+}
+
+function renderPayment() {
+  const payment = state.pendingPayment;
+  if (!payment) {
+    qs("#paymentSummary").innerHTML = `<div class="empty-state">결제할 내역이 없습니다.</div>`;
+    return;
+  }
+  routeParents.payment = payment.type === "stay" ? "stays" : "market";
+  qs("#paymentBackBtn").dataset.route = paymentBackRoute();
+  qs("#paymentSummary").innerHTML = `
+    <div class="summary-line"><span>결제 대상</span><strong>${payment.title}</strong></div>
+    <div class="summary-line"><span>상품명</span><strong>${payment.itemName}</strong></div>
+    ${payment.lines.map(([label, value]) => `<div class="summary-line"><span>${label}</span><strong>${money(value)}</strong></div>`).join("")}
+    <div class="summary-line"><span>주문번호</span><strong>${payment.orderId}</strong></div>
+    <div class="summary-line total"><span>총 결제 금액</span><strong>${money(payment.amount)}</strong></div>
+  `;
+  renderTossWidgets(payment);
+  refreshIcons();
+}
+
+async function renderTossWidgets(payment) {
+  const paymentMethods = qs("#tossPaymentMethods");
+  const agreement = qs("#tossAgreement");
+  if (!paymentMethods || !agreement) return;
+
+  if (tossWidgets && tossWidgetOrderId === payment.orderId) return;
+
+  paymentMethods.innerHTML = "";
+  agreement.innerHTML = "";
+  setTossWidgetStatus("토스 결제위젯을 불러오는 중입니다.");
+
+  try {
+    await loadTossSdk();
+    const tossPayments = window.TossPayments(TOSS_CLIENT_KEY);
+    tossWidgets = tossPayments.widgets({ customerKey: TOSS_CUSTOMER_KEY });
+    tossWidgetOrderId = payment.orderId;
+    await tossWidgets.setAmount({
+      currency: "KRW",
+      value: payment.amount,
+    });
+    await Promise.all([
+      tossWidgets.renderPaymentMethods({
+        selector: "#tossPaymentMethods",
+        variantKey: "DEFAULT",
+      }),
+      tossWidgets.renderAgreement({
+        selector: "#tossAgreement",
+        variantKey: "AGREEMENT",
+      }),
+    ]);
+    setTossWidgetStatus("결제수단과 약관을 확인한 뒤 결제를 진행할 수 있습니다.");
+  } catch (error) {
+    tossWidgets = null;
+    tossWidgetOrderId = null;
+    setTossWidgetStatus(error.message || "토스 결제위젯을 불러오지 못했습니다.", true);
+  }
+}
+
+async function requestTossPayment() {
+  const payment = state.pendingPayment;
+  if (!payment) {
+    toast("결제할 내역이 없습니다.");
+    return;
+  }
+
+  savePendingPayment(payment);
+
+  try {
+    await loadTossSdk();
+    if (!tossWidgets || tossWidgetOrderId !== payment.orderId) {
+      await renderTossWidgets(payment);
+    }
+    if (!tossWidgets) {
+      throw new Error("토스 결제위젯이 아직 준비되지 않았습니다.");
+    }
+    const baseUrl = getBaseUrl();
+    await tossWidgets.requestPayment({
+      orderId: payment.orderId,
+      orderName: payment.itemName,
+      successUrl: `${baseUrl}?tossResult=success`,
+      failUrl: `${baseUrl}?tossResult=fail`,
+      customerName: payment.customerName,
+      customerMobilePhone: normalizePhone(payment.customerPhone),
+    });
+  } catch (error) {
+    state.paymentResult = {
+      status: "fail",
+      type: payment.type,
+      eyebrow: "결제창 실행 실패",
+      title: "토스 결제창을 열지 못했습니다",
+      text: error.message || "브라우저나 네트워크 상태를 확인한 뒤 다시 시도해주세요.",
+      icon: "x",
+      className: "fail",
+      orderId: payment.orderId,
+      itemName: payment.itemName,
+      amount: payment.amount,
+      backRoute: paymentBackRoute(),
+    };
+    navigate("paymentResult");
+  }
+}
+
+function handleTossRedirect() {
+  const params = new URLSearchParams(window.location.search);
+  const tossResult = params.get("tossResult");
+  if (!tossResult) return false;
+
+  const storedPayment = getStoredPendingPayment();
+  if (!storedPayment) {
+    state.paymentResult = {
+      status: "fail",
+      type: "stay",
+      eyebrow: "결제 정보 확인 필요",
+      title: "결제 요청 정보를 찾지 못했습니다",
+      text: "결제창에서 돌아왔지만 브라우저에 저장된 주문 정보가 없습니다. 다시 결제를 시도해주세요.",
+      icon: "x",
+      className: "fail",
+      orderId: params.get("orderId") || "-",
+      itemName: "확인 필요",
+      amount: Number(params.get("amount") || 0),
+      backRoute: "stays",
+    };
+    navigate("paymentResult");
+    window.history.replaceState({}, "", getBaseUrl());
+    return true;
+  }
+
+  state.pendingPayment = storedPayment;
+  routeParents.paymentResult = storedPayment.type === "stay" ? "stays" : "market";
+
+  if (tossResult === "success") {
+    state.paymentResult = {
+      status: "authSuccess",
+      type: storedPayment.type,
+      eyebrow: "토스 결제창 인증 완료",
+      title: "서버 승인만 남았습니다",
+      text: "토스 결제창은 통과했습니다. 실제 서비스에서는 서버가 금액을 다시 확인하고 최종 결제 완료로 바꿉니다.",
+      icon: "shield-check",
+      className: "",
+      orderId: params.get("orderId") || storedPayment.orderId,
+      itemName: storedPayment.itemName,
+      amount: Number(params.get("amount") || storedPayment.amount),
+      paymentKey: params.get("paymentKey") || "토스에서 발급",
+      backRoute: paymentBackRoute(),
+    };
+  } else {
+    state.paymentResult = {
+      status: "fail",
+      type: storedPayment.type,
+      eyebrow: "토스 결제 실패",
+      title: "결제가 완료되지 않았습니다",
+      text: params.get("message") || "결제창에서 실패 또는 취소가 발생했습니다.",
+      icon: "x",
+      className: "fail",
+      orderId: params.get("orderId") || storedPayment.orderId,
+      itemName: storedPayment.itemName,
+      amount: storedPayment.amount,
+      errorCode: params.get("code") || "",
+      backRoute: paymentBackRoute(),
+    };
+  }
+
+  navigate("paymentResult");
+  window.history.replaceState({}, "", getBaseUrl());
+  return true;
+}
+
+function confirmPendingPayment() {
+  const payment = state.pendingPayment;
+  if (!payment) return null;
+
+  if (payment.type === "stay") {
+    const reservation = {
+      id: payment.orderId,
+      stayName: payment.stayName,
+      roomName: payment.roomName,
+      date: payment.date,
+      people: payment.people,
+      amount: payment.amount,
+      status: "결제 완료",
+    };
+    state.reservations.unshift(reservation);
+  } else {
+    state.orders.unshift({
+      id: payment.orderId,
+      storeName: payment.storeName,
+      items: payment.items,
+      amount: payment.amount,
+      pickupTime: payment.pickupTime,
+      status: "결제 완료",
+    });
+    state.cart = [];
+    updateCartBadge();
+  }
+
+  return payment;
+}
+
+function setPaymentResult(status) {
+  const payment = status === "success" ? confirmPendingPayment() : state.pendingPayment;
+  if (!payment) {
+    toast("결제할 내역이 없습니다.");
+    return;
+  }
+
+  const resultText = {
+    success: {
+      eyebrow: "토스페이먼츠 승인 완료",
+      title: payment.type === "stay" ? "숙소 예약 결제가 완료되었습니다" : "공판장 주문 결제가 완료되었습니다",
+      text: "실제 연동 때는 이 순간 서버가 토스에 결제 금액을 다시 확인하고, 맞으면 결제 완료로 저장합니다.",
+      icon: "check",
+      className: "",
+    },
+    fail: {
+      eyebrow: "결제 실패",
+      title: "결제가 완료되지 않았습니다",
+      text: "카드 한도, 인증 실패, 네트워크 문제처럼 결제가 실패한 상황을 보여주는 화면입니다.",
+      icon: "x",
+      className: "fail",
+    },
+    cancel: {
+      eyebrow: "결제 취소",
+      title: "결제를 취소했습니다",
+      text: "이용자가 토스 결제창을 닫거나 뒤로 가기를 눌렀을 때 보여주는 화면입니다.",
+      icon: "rotate-ccw",
+      className: "cancel",
+    },
+  }[status];
+
+  state.paymentResult = {
+    ...resultText,
+    status,
+    type: payment.type,
+    orderId: payment.orderId,
+    itemName: payment.itemName,
+    amount: payment.amount,
+    backRoute: paymentBackRoute(),
+  };
+  routeParents.paymentResult = payment.type === "stay" ? "stays" : "market";
+
+  if (status === "success") {
+    state.pendingPayment = null;
+    clearPendingPayment();
+  }
+
+  navigate("paymentResult");
+}
+
+function renderPaymentResult() {
+  const result = state.paymentResult;
+  if (!result) return;
+  routeParents.paymentResult = result.type === "stay" ? "stays" : "market";
+  const icon = qs("#paymentResultIcon");
+  icon.className = `complete-icon ${result.className}`;
+  icon.innerHTML = `<i data-lucide="${result.icon}"></i>`;
+  qs("#paymentResultEyebrow").textContent = result.eyebrow;
+  qs("#paymentResultTitle").textContent = result.title;
+  qs("#paymentResultText").textContent = result.text;
+  const extraRows = [
+    result.paymentKey ? `<div class="result-detail-row"><span>paymentKey</span><strong>${result.paymentKey}</strong></div>` : "",
+    result.errorCode ? `<div class="result-detail-row"><span>오류 코드</span><strong>${result.errorCode}</strong></div>` : "",
+  ].join("");
+  qs("#paymentResultDetails").innerHTML = `
+    <div class="result-detail-row"><span>주문번호</span><strong>${result.orderId}</strong></div>
+    <div class="result-detail-row"><span>상품명</span><strong>${result.itemName}</strong></div>
+    <div class="result-detail-row"><span>금액</span><strong>${money(result.amount)}</strong></div>
+    ${extraRows}
+  `;
+  let primaryAction = "";
+  if (result.status === "authSuccess") {
+    primaryAction = `<button class="primary-btn" data-payment-action="success"><i data-lucide="check-circle"></i>시연용 결제 완료 처리</button>`;
+  } else if (result.status !== "success") {
+    primaryAction = `<button class="primary-btn" data-route="${result.backRoute}"><i data-lucide="credit-card"></i>다시 결제하기</button>`;
+  }
+  qs("#paymentResultActions").innerHTML = `
+    ${primaryAction}
+    <button class="secondary-btn" data-route="mypage"><i data-lucide="user-round"></i>마이페이지 확인</button>
+    <button class="ghost-btn" data-route="${paymentHomeRoute()}"><i data-lucide="home"></i>목록으로</button>
+  `;
+  refreshIcons();
+}
+
 function renderCommunity() {
   const people = Number(qs("#recommendPeople").value || 32);
   const style = qs("#mealStyle").value;
@@ -1095,6 +1505,18 @@ document.addEventListener("click", (event) => {
     return;
   }
 
+  const tossPaymentButton = event.target.closest("[data-toss-payment]");
+  if (tossPaymentButton) {
+    requestTossPayment();
+    return;
+  }
+
+  const paymentActionButton = event.target.closest("[data-payment-action]");
+  if (paymentActionButton) {
+    setPaymentResult(paymentActionButton.dataset.paymentAction);
+    return;
+  }
+
   const payChip = event.target.closest(".pay-chip");
   if (payChip) {
     const group = payChip.closest(".payment-methods");
@@ -1130,18 +1552,9 @@ document.addEventListener("change", (event) => {
 
 qs("#bookingForm").addEventListener("submit", (event) => {
   event.preventDefault();
-  const amount = bookingAmount();
-  const reservation = {
-    id: `R-${Date.now()}`,
-    stayName: state.selectedStay.name,
-    roomName: state.selectedRoom.name,
-    date: qs("#stayDate").value,
-    people: Number(qs("#bookingPeople").value),
-    amount: amount.total,
-    status: "결제 완료",
-  };
-  state.reservations.unshift(reservation);
-  complete("숙소 예약 완료", `${reservation.stayName} 예약이 확정되었습니다`, `${reservation.people}명 · ${reservation.roomName} · ${money(reservation.amount)}`);
+  state.pendingPayment = createStayPendingPayment();
+  routeParents.payment = "stays";
+  navigate("payment");
 });
 
 qs("#orderForm").addEventListener("submit", (event) => {
@@ -1150,22 +1563,9 @@ qs("#orderForm").addEventListener("submit", (event) => {
     toast("장바구니가 비어 있습니다.");
     return;
   }
-  const itemSnapshots = state.cart.map((item) => {
-    const found = findProduct(item.productId);
-    return { name: found.product.name, qty: item.qty, storeName: found.store.name };
-  });
-  const amount = cartTotal() + 15000;
-  state.orders.unshift({
-    id: `O-${Date.now()}`,
-    storeName: itemSnapshots[0].storeName,
-    items: itemSnapshots,
-    amount,
-    pickupTime: qs("#pickupTime").value,
-    status: "결제 완료",
-  });
-  state.cart = [];
-  updateCartBadge();
-  complete("공판장 주문 완료", "주문과 결제가 완료되었습니다", `${itemSnapshots.length}개 품목 · ${money(amount)}`);
+  state.pendingPayment = createOrderPendingPayment();
+  routeParents.payment = "market";
+  navigate("payment");
 });
 
 qs("#chatForm").addEventListener("submit", (event) => {
@@ -1198,10 +1598,12 @@ qs("#reviewForm").addEventListener("submit", (event) => {
 
 qsa(".brand").forEach((brand) => {
   brand.addEventListener("keydown", (event) => {
-    if (event.key === "Enter" || event.key === " ") navigate("landing");
+    if (event.key === "Enter" || event.key === " ") navigate("stays");
   });
 });
 
-renderStays();
+if (!handleTossRedirect()) {
+  renderStays();
+}
 updateCartBadge();
 refreshIcons();

@@ -4,15 +4,13 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>moTF - 모두의 TF 이용자 프로토타입</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="styles.css?v=start-screen-olive-pastel-v1" />
+    <link rel="stylesheet" href="styles.css" />
     <script async src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" onload="window.__motfRefreshIcons && window.__motfRefreshIcons()"></script>
+    <script async src="https://js.tosspayments.com/v2/standard"></script>
   </head>
   <body>
     <header class="app-header">
-      <div class="brand" role="button" tabindex="0" data-route="landing">
+      <div class="brand" role="button" tabindex="0" data-route="stays">
         <div class="brand-mark">mT</div>
         <div>
           <strong>moTF</strong>
@@ -20,8 +18,7 @@
         </div>
       </div>
       <nav class="top-nav" aria-label="주요 메뉴">
-        <button class="nav-link active" data-route="landing"><i data-lucide="sparkles"></i><span>시작</span></button>
-        <button class="nav-link" data-route="stays"><i data-lucide="home"></i><span>숙소</span></button>
+        <button class="nav-link active" data-route="stays"><i data-lucide="home"></i><span>숙소</span></button>
         <button class="nav-link" data-route="market"><i data-lucide="shopping-basket"></i><span>공판장</span></button>
         <button class="nav-link" data-route="community"><i data-lucide="users-round"></i><span>커뮤니티</span></button>
         <button class="nav-link" data-route="chat"><i data-lucide="message-circle"></i><span>채팅</span></button>
@@ -30,68 +27,7 @@
     </header>
 
     <main>
-      <section id="landing" class="view active">
-        <div class="start-hero">
-          <div class="start-copy">
-            <p class="start-badge">MT · 워크숍 · 단체여행 준비 플랫폼</p>
-            <h1>어떤 준비부터<br />시작할까요?</h1>
-            <p>숙소 예약, 공판장 장보기, MT 후기와 추천 정보까지 한 곳에서 이어집니다. 오늘 필요한 화면을 먼저 골라보세요.</p>
-          </div>
-
-          <form class="start-search" data-route="stays">
-            <label>
-              지역
-              <select aria-label="지역 선택">
-                <option>가평</option>
-                <option>양평</option>
-                <option>강촌</option>
-                <option>대성리</option>
-              </select>
-            </label>
-            <label>
-              날짜
-              <input type="date" value="2026-06-12" />
-            </label>
-            <label>
-              인원
-              <input type="number" value="32" min="10" />
-            </label>
-            <button class="primary-btn" type="button" data-route="stays"><i data-lucide="search"></i>숙소부터 찾기</button>
-          </form>
-        </div>
-
-        <div class="start-grid" aria-label="시작 카테고리">
-          <button class="start-card primary-start" data-route="stays">
-            <span class="start-icon"><i data-lucide="home"></i></span>
-            <strong>숙소 예약</strong>
-            <span>지도와 조건 필터로 단체 숙소를 비교하고 바로 예약해요.</span>
-          </button>
-          <button class="start-card" data-route="market">
-            <span class="start-icon"><i data-lucide="shopping-basket"></i></span>
-            <strong>공판장 주문</strong>
-            <span>고기, 술, 음료, 일회용품을 숙소 근처에서 한 번에 준비해요.</span>
-          </button>
-          <button class="start-card" data-route="community">
-            <span class="start-icon"><i data-lucide="users-round"></i></span>
-            <strong>커뮤니티</strong>
-            <span>인원별 주문량, 레크레이션, MT 후기를 함께 확인해요.</span>
-          </button>
-          <button class="start-card" data-route="chat">
-            <span class="start-icon"><i data-lucide="messages-square"></i></span>
-            <strong>채팅 문의</strong>
-            <span>사장님과 운영팀 중개 채팅으로 조건을 정확히 맞춰요.</span>
-          </button>
-        </div>
-
-        <div class="start-strip">
-          <div><strong>1,200+</strong><span>등록 숙소</span></div>
-          <div><strong>340+</strong><span>지역 공판장</span></div>
-          <div><strong>4.9</strong><span>평균 만족도</span></div>
-          <button class="secondary-btn" data-route="mypage"><i data-lucide="user-round"></i>내 예약 보기</button>
-        </div>
-      </section>
-
-      <section id="stays" class="view">
+      <section id="stays" class="view active">
         <div class="view-title">
           <div>
             <p class="eyebrow">MT 숙소 실시간 예약</p>
@@ -179,16 +115,15 @@
             </div>
             <label>요청사항<textarea id="bookingMemo" rows="4" placeholder="예: 음향 장비, 숯 추가, 늦은 체크인 문의"></textarea></label>
             <label class="checkbox-row"><input required type="checkbox" id="bookingTerms" />환불·취소 정책과 시설 이용 규칙에 동의합니다.</label>
-            <button class="primary-btn" type="submit"><i data-lucide="credit-card"></i>결제하고 예약 확정</button>
+            <button class="primary-btn" type="submit"><i data-lucide="credit-card"></i>토스페이먼츠로 결제하기</button>
           </form>
 
           <aside class="summary-panel">
             <h2>최종 금액</h2>
             <div id="bookingSummary"></div>
-            <div class="payment-methods">
-              <button class="pay-chip active" type="button">토스페이먼츠</button>
-              <button class="pay-chip" type="button">카카오페이</button>
-              <button class="pay-chip" type="button">무통장입금</button>
+            <div class="toss-ready-card">
+              <strong>토스페이먼츠 결제 예정</strong>
+              <span>카드, 계좌이체, 간편결제는 토스 결제창 안에서 선택하게 됩니다.</span>
             </div>
           </aside>
         </div>
@@ -280,13 +215,71 @@
             <label>수령 시간<input required type="time" id="pickupTime" value="17:00" /></label>
             <label>요청사항<textarea id="pickupMemo" rows="3" placeholder="예: 아이스박스 포장, 술은 별도 박스"></textarea></label>
             <div id="cartSummary"></div>
-            <div class="payment-methods">
-              <button class="pay-chip active" type="button">토스페이먼츠</button>
-              <button class="pay-chip" type="button">카카오페이</button>
-              <button class="pay-chip" type="button">무통장입금</button>
+            <div class="toss-ready-card">
+              <strong>토스페이먼츠 결제 예정</strong>
+              <span>주문 금액을 확인한 뒤 토스 결제창으로 이동합니다.</span>
             </div>
-            <button class="primary-btn" type="submit"><i data-lucide="credit-card"></i>결제하고 주문 확정</button>
+            <button class="primary-btn" type="submit"><i data-lucide="credit-card"></i>토스페이먼츠로 결제하기</button>
           </form>
+        </div>
+      </section>
+
+      <section id="payment" class="view">
+        <button class="ghost-btn back-btn" id="paymentBackBtn"><i data-lucide="chevron-left"></i>결제 전 화면</button>
+        <div class="payment-layout">
+          <section class="payment-main">
+            <div class="view-title compact">
+              <div>
+                <p class="eyebrow">토스페이먼츠 테스트 결제</p>
+                <h1>결제창으로 넘어가기 전 마지막 확인</h1>
+              </div>
+            </div>
+            <div id="paymentSummary"></div>
+            <div class="toss-widget-box">
+              <div class="toss-widget-header">
+                <i data-lucide="credit-card"></i>
+                <strong>토스페이먼츠 테스트 결제위젯</strong>
+              </div>
+              <p>문서용 테스트 키로 토스 결제수단 선택창을 띄웁니다. 결제 후에는 서버 승인 전 단계로 돌아옵니다.</p>
+              <div id="tossPaymentMethods" class="toss-widget-area"></div>
+              <div id="tossAgreement" class="toss-widget-area"></div>
+              <p id="tossWidgetStatus" class="toss-widget-status">결제위젯을 준비하고 있습니다.</p>
+              <div class="key-row">
+                <span>clientKey</span>
+                <code>test_gck_docs_...7xlzm</code>
+              </div>
+              <div class="key-row">
+                <span>server 승인</span>
+                <code>다음 단계에서 연결</code>
+              </div>
+            </div>
+            <div class="button-row">
+              <button class="primary-btn" data-toss-payment><i data-lucide="external-link"></i>토스 테스트 결제하기</button>
+              <button class="secondary-btn" data-payment-action="success"><i data-lucide="check-circle"></i>시연용 결제 완료</button>
+              <button class="ghost-btn" data-payment-action="fail"><i data-lucide="x-circle"></i>결제 실패 보기</button>
+              <button class="ghost-btn" data-payment-action="cancel"><i data-lucide="rotate-ccw"></i>결제 취소 보기</button>
+            </div>
+          </section>
+          <aside class="summary-panel">
+            <h2>실제 연동 때 필요한 것</h2>
+            <ol class="plain-steps">
+              <li>토스 개발자센터에서 테스트 키 준비</li>
+              <li>결제 성공 후 서버에서 금액 확인</li>
+              <li>문제 없을 때 예약/주문을 결제 완료로 변경</li>
+              <li>실패나 취소는 다시 결제할 수 있게 안내</li>
+            </ol>
+          </aside>
+        </div>
+      </section>
+
+      <section id="paymentResult" class="view">
+        <div class="complete-panel payment-result-panel">
+          <div class="complete-icon" id="paymentResultIcon"><i data-lucide="check"></i></div>
+          <p class="eyebrow" id="paymentResultEyebrow">결제 결과</p>
+          <h1 id="paymentResultTitle">결제 결과 화면</h1>
+          <p id="paymentResultText"></p>
+          <div id="paymentResultDetails" class="result-details"></div>
+          <div class="complete-actions" id="paymentResultActions"></div>
         </div>
       </section>
 
