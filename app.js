@@ -1070,7 +1070,28 @@ async function requestTossPayment() {
   }
 }
 
-function handleTossRedirect() {
+async function confirmPaymentOnServer(payment, params) {
+  const payload = {
+    paymentKey: params.get("paymentKey"),
+    orderId: params.get("orderId") || payment.orderId,
+    amount: Number(params.get("amount") || payment.amount),
+    payment,
+  };
+  const response = await fetch("/api/confirm-payment", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+  const data = await response.json();
+  if (!response.ok || !data.ok) {
+    throw new Error(data.message || "서버 결제 승인에 실패했습니다.");
+  }
+  return data;
+}
+
+async function handleTossRedirect() {
   const params = new URLSearchParams(window.location.search);
   const tossResult = params.get("tossResult");
   if (!tossResult) return false;
@@ -1100,11 +1121,11 @@ function handleTossRedirect() {
 
   if (tossResult === "success") {
     state.paymentResult = {
-      status: "authSuccess",
+      status: "confirming",
       type: storedPayment.type,
       eyebrow: "토스 결제창 인증 완료",
-      title: "서버 승인만 남았습니다",
-      text: "토스 결제창은 통과했습니다. 실제 서비스에서는 서버가 금액을 다시 확인하고 최종 결제 완료로 바꿉니다.",
+      title: "서버에서 결제를 확인하는 중입니다",
+      text: "토스에 결제 금액과 주문번호가 맞는지 확인하고, 맞으면 Supabase 장부에 저장합니다.",
       icon: "shield-check",
       className: "",
       orderId: params.get("orderId") || storedPayment.orderId,
@@ -1113,6 +1134,29 @@ function handleTossRedirect() {
       paymentKey: params.get("paymentKey") || "토스에서 발급",
       backRoute: paymentBackRoute(),
     };
+    navigate("paymentResult");
+    window.history.replaceState({}, "", getBaseUrl());
+    try {
+      await confirmPaymentOnServer(storedPayment, params);
+      setPaymentResult("success");
+    } catch (error) {
+      state.paymentResult = {
+        status: "fail",
+        type: storedPayment.type,
+        eyebrow: "서버 승인 실패",
+        title: "결제 확인을 완료하지 못했습니다",
+        text: error.message || "Vercel 환경변수나 Supabase 설정을 확인해주세요.",
+        icon: "x",
+        className: "fail",
+        orderId: params.get("orderId") || storedPayment.orderId,
+        itemName: storedPayment.itemName,
+        amount: Number(params.get("amount") || storedPayment.amount),
+        paymentKey: params.get("paymentKey") || "토스에서 발급",
+        backRoute: paymentBackRoute(),
+      };
+      navigate("paymentResult");
+    }
+    return true;
   } else {
     state.paymentResult = {
       status: "fail",
@@ -1177,7 +1221,7 @@ function setPaymentResult(status) {
     success: {
       eyebrow: "토스페이먼츠 승인 완료",
       title: payment.type === "stay" ? "숙소 예약 결제가 완료되었습니다" : "공판장 주문 결제가 완료되었습니다",
-      text: "실제 연동 때는 이 순간 서버가 토스에 결제 금액을 다시 확인하고, 맞으면 결제 완료로 저장합니다.",
+      text: "Vercel 서버가 토스 결제를 확인했고 Supabase 장부에 저장했습니다.",
       icon: "check",
       className: "",
     },
@@ -1237,8 +1281,8 @@ function renderPaymentResult() {
     ${extraRows}
   `;
   let primaryAction = "";
-  if (result.status === "authSuccess") {
-    primaryAction = `<button class="primary-btn" data-payment-action="success"><i data-lucide="check-circle"></i>시연용 결제 완료 처리</button>`;
+  if (result.status === "confirming") {
+    primaryAction = `<button class="primary-btn" type="button" disabled><i data-lucide="loader-circle"></i>서버 확인 중</button>`;
   } else if (result.status !== "success") {
     primaryAction = `<button class="primary-btn" data-route="${result.backRoute}"><i data-lucide="credit-card"></i>다시 결제하기</button>`;
   }
@@ -1602,8 +1646,11 @@ qsa(".brand").forEach((brand) => {
   });
 });
 
-if (!handleTossRedirect()) {
-  renderStays();
-}
-updateCartBadge();
-refreshIcons();
+(async function boot() {
+  const handledRedirect = await handleTossRedirect();
+  if (!handledRedirect) {
+    renderStays();
+  }
+  updateCartBadge();
+  refreshIcons();
+})();
