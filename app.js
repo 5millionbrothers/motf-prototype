@@ -6,6 +6,15 @@ const TOSS_CUSTOMER_KEY = "motf-demo-customer_001";
 let tossWidgets = null;
 let tossWidgetOrderId = null;
 
+const NAVER_MAP_KEY_ID = window.MOTF_CONFIG?.NAVER_MAP_KEY_ID?.trim() || "";
+const NAVER_MAP_SCRIPT_ID = "motf-naver-map-sdk";
+let naverMapPromise = null;
+
+const mapState = {
+  stays: { map: null, markers: [], infoWindow: null, version: 0 },
+  market: { map: null, markers: [], infoWindow: null, version: 0 },
+};
+
 const photo = (id, params = "auto=format&fit=crop&w=1200&q=82") =>
   `https://images.unsplash.com/${id}?${params}`;
 
@@ -19,6 +28,10 @@ const stays = [
     rating: 4.8,
     reviews: 128,
     distance: "가평역 차량 12분",
+    location: { lat: 37.8314, lng: 127.5098 },
+    detailTags: ["waterside", "convenience", "barbecue", "screen", "karaoke", "mic", "outdoor"],
+    roomCount: 5,
+    bathCount: 4,
     image: photo("photo-1564013799919-ab600027ffc6"),
     images: [
       photo("photo-1564013799919-ab600027ffc6"),
@@ -62,6 +75,10 @@ const stays = [
     rating: 4.7,
     reviews: 94,
     distance: "양평역 차량 18분",
+    location: { lat: 37.4918, lng: 127.4877 },
+    detailTags: ["valley", "barbecue", "screen", "mic", "field", "outdoor", "convenience"],
+    roomCount: 6,
+    bathCount: 4,
     image: photo("photo-1449158743715-0a90ebb6d2d8"),
     images: [
       photo("photo-1449158743715-0a90ebb6d2d8"),
@@ -105,6 +122,10 @@ const stays = [
     rating: 4.6,
     reviews: 211,
     distance: "강촌역 도보 9분",
+    location: { lat: 37.8056, lng: 127.6341 },
+    detailTags: ["station", "convenience", "screen", "mic", "field"],
+    roomCount: 10,
+    bathCount: 8,
     image: photo("photo-1601918774946-25832a4be0d6"),
     images: [
       photo("photo-1601918774946-25832a4be0d6"),
@@ -148,6 +169,10 @@ const stays = [
     rating: 4.5,
     reviews: 57,
     distance: "대성리역 도보 6분",
+    location: { lat: 37.6842, lng: 127.3794 },
+    detailTags: ["station", "convenience", "barbecue", "screen", "outdoor"],
+    roomCount: 3,
+    bathCount: 2,
     image: photo("photo-1522708323590-d24dbb6b0267"),
     images: [
       photo("photo-1522708323590-d24dbb6b0267"),
@@ -191,6 +216,7 @@ const stores = [
     region: "가평",
     type: "숙소 배송 가능",
     rating: 4.9,
+    location: { lat: 37.8329, lng: 127.5107 },
     image: photo("photo-1542838132-92c53300491e"),
     intro: "MT용 바베큐 세트와 주류, 일회용품을 한 번에 준비하는 공판장입니다.",
     products: [
@@ -272,6 +298,7 @@ const stores = [
     region: "양평",
     type: "픽업 전용",
     rating: 4.7,
+    location: { lat: 37.4924, lng: 127.4916 },
     image: photo("photo-1516594798947-e65505dbb29d"),
     intro: "채소와 고기 품질이 좋은 지역 식자재 매장입니다.",
     products: [
@@ -323,6 +350,7 @@ const stores = [
     region: "강촌",
     type: "역 앞 픽업",
     rating: 4.6,
+    location: { lat: 37.8062, lng: 127.6334 },
     image: photo("photo-1606787366850-de6330128bfc"),
     intro: "강촌역 앞에서 빠르게 픽업할 수 있는 MT 전문 장보기 매장입니다.",
     products: [
@@ -443,7 +471,9 @@ const state = {
 };
 
 const routeParents = {
+  home: "home",
   stayDetail: "stays",
+  roomDetail: "stays",
   booking: "stays",
   storeDetail: "market",
   productDetail: "market",
@@ -454,6 +484,27 @@ const routeParents = {
   complete: "",
 };
 
+const appRoutes = new Set([
+  "home",
+  "stays",
+  "stayDetail",
+  "roomDetail",
+  "booking",
+  "market",
+  "storeDetail",
+  "productDetail",
+  "cart",
+  "payment",
+  "paymentResult",
+  "community",
+  "chat",
+  "mypage",
+  "review",
+  "complete",
+]);
+
+const routeHistory = [];
+let appHistoryDepth = 0;
 const qs = (selector) => document.querySelector(selector);
 const qsa = (selector) => [...document.querySelectorAll(selector)];
 
@@ -473,18 +524,63 @@ function toast(message) {
   toast.timer = window.setTimeout(() => el.classList.remove("show"), 2200);
 }
 
-function navigate(route) {
+function currentRoute() {
+  return qs(".view.active")?.id || "home";
+}
+
+function routeFromLocation() {
+  const hashRoute = window.location.hash.replace(/^#!/, "").replace("#", "");
+  return appRoutes.has(hashRoute) ? hashRoute : "home";
+}
+
+function routeUrl(route) {
+  const baseUrl = getBaseUrl();
+  return route === "home" ? baseUrl : `${baseUrl}#!${route}`;
+}
+
+function updateBrowserRoute(route, options = {}) {
+  if (options.updateHistory === false) return;
+  const method = options.replace ? "replaceState" : "pushState";
+  window.history[method]({ route }, "", routeUrl(route));
+  if (!options.replace) appHistoryDepth += 1;
+}
+
+function replaceBrowserRoute(route) {
+  window.history.replaceState({ route }, "", routeUrl(route));
+}
+
+function navigate(route, options = {}) {
+  if (!appRoutes.has(route)) route = "home";
+  const previousRoute = currentRoute();
+  if (options.record !== false && previousRoute && previousRoute !== route) {
+    routeHistory.push(previousRoute);
+    if (routeHistory.length > 30) routeHistory.shift();
+  }
   qsa(".view").forEach((view) => view.classList.toggle("active", view.id === route));
+  document.body.dataset.currentRoute = route;
   const activeNav = routeParents[route] ?? route;
   qsa(".nav-link").forEach((link) => link.classList.toggle("active", link.dataset.route === activeNav));
   renderRoute(route);
-  window.scrollTo({ top: 0, behavior: "smooth" });
+  updateBrowserRoute(route, options);
+  if (options.scroll !== false) {
+    window.scrollTo({ top: 0, behavior: "auto" });
+  }
   refreshIcons();
+}
+
+function goBack(fallbackRoute = "home") {
+  if (appHistoryDepth > 0) {
+    window.history.back();
+    return;
+  }
+  const previousRoute = routeHistory.pop() || fallbackRoute || "home";
+  navigate(previousRoute, { record: false, replace: true });
 }
 
 function renderRoute(route) {
   if (route === "stays") renderStays();
   if (route === "stayDetail") renderStayDetail();
+  if (route === "roomDetail") renderRoomDetail();
   if (route === "booking") renderBooking();
   if (route === "market") renderStores();
   if (route === "storeDetail") renderStoreDetail();
@@ -498,24 +594,253 @@ function renderRoute(route) {
   if (route === "review") renderReviews();
 }
 
+function hasNaverMapKey() {
+  return Boolean(NAVER_MAP_KEY_ID);
+}
+
+function loadNaverMaps() {
+  if (window.naver?.maps) return Promise.resolve(window.naver.maps);
+  if (!hasNaverMapKey()) {
+    return Promise.reject(new Error("네이버 지도 Client ID가 아직 비어 있습니다."));
+  }
+  if (naverMapPromise) return naverMapPromise;
+
+  naverMapPromise = new Promise((resolve, reject) => {
+    const existingScript = document.getElementById(NAVER_MAP_SCRIPT_ID);
+    if (existingScript) {
+      existingScript.addEventListener("load", () => resolve(window.naver.maps), { once: true });
+      existingScript.addEventListener("error", () => reject(new Error("네이버 지도 스크립트를 불러오지 못했습니다.")), { once: true });
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.id = NAVER_MAP_SCRIPT_ID;
+    script.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${encodeURIComponent(NAVER_MAP_KEY_ID)}`;
+    script.async = true;
+    script.onload = () => {
+      if (window.naver?.maps) {
+        resolve(window.naver.maps);
+      } else {
+        reject(new Error("네이버 지도 SDK가 준비되지 않았습니다."));
+      }
+    };
+    script.onerror = () => reject(new Error("네이버 지도 스크립트를 불러오지 못했습니다."));
+    document.head.appendChild(script);
+  });
+
+  return naverMapPromise;
+}
+
+function mapPanel(kind) {
+  return qs(`[data-map-kind="${kind}"]`);
+}
+
+function setMapStatus(kind, message) {
+  const status = mapPanel(kind)?.querySelector("[data-map-status]");
+  if (status) status.textContent = message;
+}
+
+function mapItems(kind, matches) {
+  return matches.map((item) => ({
+    id: item.id,
+    name: item.name,
+    region: item.region,
+    line: kind === "stays" ? `최대 ${item.maxPeople}명` : item.type,
+    amount: kind === "stays" ? money(item.price) : `상품 ${item.products.length}개`,
+    location: item.location,
+  }));
+}
+
+function fallbackMarker(item, kind, index) {
+  const markerClass = ["marker-a", "marker-b", "marker-c", "marker-d"][index % 4];
+  const dataAttr = kind === "stays" ? `data-stay-id="${item.id}"` : `data-store-id="${item.id}"`;
+  return `<button class="map-marker ${markerClass}" ${dataAttr}>${item.region}<br />${item.line.replace("최대 ", "")}</button>`;
+}
+
+function renderFallbackMap(kind, matches, statusMessage) {
+  const panel = mapPanel(kind);
+  if (!panel) return;
+  const fallback = panel.querySelector("[data-map-fallback]");
+  const items = mapItems(kind, matches);
+
+  panel.classList.remove("map-ready");
+  fallback.innerHTML = `
+    <div class="map-grid"></div>
+    ${
+      items.length
+        ? items.map((item, index) => fallbackMarker(item, kind, index)).join("")
+        : `<div class="map-empty">조건에 맞는 ${kind === "stays" ? "숙소" : "공판장"}이 없습니다.</div>`
+    }
+  `;
+  setMapStatus(kind, statusMessage);
+}
+
+function clearNaverMarkers(kind) {
+  mapState[kind].markers.forEach((marker) => marker.setMap(null));
+  mapState[kind].markers = [];
+  mapState[kind].infoWindow?.close();
+}
+
+function openListingFromMap(kind, itemId) {
+  if (kind === "stays") {
+    state.selectedStay = stays.find((stay) => stay.id === itemId) || stays[0];
+    state.selectedRoom = state.selectedStay.rooms[0];
+    navigate("stayDetail");
+    return;
+  }
+
+  state.selectedStore = stores.find((store) => store.id === itemId) || stores[0];
+  state.activeCategory = qs("#marketCategory")?.value || "전체";
+  navigate("storeDetail");
+}
+
+function markerContent(item, kind) {
+  return `
+    <div class="naver-map-marker ${kind === "market" ? "market" : ""}">
+      ${item.region}
+      <span>${item.line}</span>
+    </div>
+  `;
+}
+
+function infoContent(item, kind) {
+  const action = kind === "stays" ? "숙소 상세로 이동" : "공판장 상품 보기";
+  return `
+    <div class="naver-map-info">
+      <strong>${item.name}</strong>
+      <div>${item.line} · ${item.amount}</div>
+      <div>${action}</div>
+    </div>
+  `;
+}
+
+function drawNaverMap(kind, matches, maps) {
+  const panel = mapPanel(kind);
+  const canvas = panel?.querySelector(".naver-map-canvas");
+  if (!panel || !canvas) return;
+
+  const items = mapItems(kind, matches).filter((item) => item.location);
+  const fallbackCenter = kind === "stays" ? { lat: 37.7465, lng: 127.5065 } : { lat: 37.7108, lng: 127.5452 };
+  const firstLocation = items[0]?.location || fallbackCenter;
+  const center = new maps.LatLng(firstLocation.lat, firstLocation.lng);
+
+  if (!mapState[kind].map) {
+    mapState[kind].map = new maps.Map(canvas, {
+      center,
+      zoom: items.length <= 1 ? 11 : 10,
+      mapDataControl: false,
+      scaleControl: false,
+    });
+    mapState[kind].infoWindow = new maps.InfoWindow({ borderWidth: 0, disableAnchor: true });
+  }
+
+  const map = mapState[kind].map;
+  clearNaverMarkers(kind);
+  panel.classList.add("map-ready");
+  setMapStatus(kind, `네이버 지도 연동됨 · ${items.length}개 표시`);
+
+  if (!items.length) {
+    map.setCenter(center);
+    map.setZoom(10);
+    return;
+  }
+
+  const bounds = new maps.LatLngBounds();
+  items.forEach((item) => {
+    const position = new maps.LatLng(item.location.lat, item.location.lng);
+    bounds.extend(position);
+    const marker = new maps.Marker({
+      position,
+      map,
+      title: item.name,
+      icon: {
+        content: markerContent(item, kind),
+        size: new maps.Size(102, 58),
+        anchor: new maps.Point(51, 58),
+      },
+    });
+
+    maps.Event.addListener(marker, "click", () => {
+      mapState[kind].infoWindow.setContent(infoContent(item, kind));
+      mapState[kind].infoWindow.open(map, marker);
+      window.setTimeout(() => openListingFromMap(kind, item.id), 450);
+    });
+    mapState[kind].markers.push(marker);
+  });
+
+  if (items.length === 1) {
+    map.setCenter(center);
+    map.setZoom(12);
+  } else {
+    map.fitBounds(bounds);
+  }
+
+  window.setTimeout(() => {
+    map.refresh?.();
+  }, 0);
+}
+
+async function renderListingMap(kind, matches) {
+  mapState[kind].version += 1;
+  const version = mapState[kind].version;
+  const waitingMessage = hasNaverMapKey() ? "네이버 지도 불러오는 중" : "config.js에 지도 키 입력 필요";
+  renderFallbackMap(kind, matches, waitingMessage);
+
+  if (!hasNaverMapKey()) return;
+
+  try {
+    const maps = await loadNaverMaps();
+    if (mapState[kind].version !== version) return;
+    drawNaverMap(kind, matches, maps);
+  } catch (error) {
+    if (mapState[kind].version !== version) return;
+    renderFallbackMap(kind, matches, "네이버 지도 키 또는 도메인 확인 필요");
+  }
+}
+
+function getStayDetailFilters() {
+  return {
+    tags: qsa("[data-stay-filter]:checked").map((input) => input.value),
+    minRooms: Number(qs("#stayMinRooms")?.value || 0),
+    minBaths: Number(qs("#stayMinBaths")?.value || 0),
+  };
+}
+
+function stayMatchesDetailFilters(stay, filters) {
+  const tags = stay.detailTags || [];
+  const tagsOk = filters.tags.every((tag) => tags.includes(tag));
+  const roomsOk = Number(stay.roomCount || 0) >= filters.minRooms;
+  const bathsOk = Number(stay.bathCount || 0) >= filters.minBaths;
+  return tagsOk && roomsOk && bathsOk;
+}
+
 function getStayMatches() {
   const region = qs("#stayRegion").value;
   const people = Number(qs("#stayPeople").value || 0);
   const maxPrice = Number(qs("#stayPrice").value || 0);
+  const detailFilters = getStayDetailFilters();
   return stays.filter((stay) => {
     const regionOk = region === "전체" || stay.region === region;
-    return regionOk && stay.maxPeople >= people && stay.price <= maxPrice;
+    return regionOk && stay.maxPeople >= people && stay.price <= maxPrice && stayMatchesDetailFilters(stay, detailFilters);
   });
 }
 
 function renderStays() {
   const price = Number(qs("#stayPrice").value);
   qs("#stayPriceLabel").textContent = `${money(price)} 이하`;
+  const detailFilters = getStayDetailFilters();
+  const activeDetailFilterCount = detailFilters.tags.length + (detailFilters.minRooms > 0 ? 1 : 0) + (detailFilters.minBaths > 0 ? 1 : 0);
+  const detailFilterButton = qs("[data-toggle-stay-filters]");
+  if (detailFilterButton) {
+    detailFilterButton.classList.toggle("active", activeDetailFilterCount > 0);
+    detailFilterButton.innerHTML = `<i data-lucide="sliders-horizontal"></i>세부필터${activeDetailFilterCount ? ` ${activeDetailFilterCount}` : ""}`;
+  }
   const matches = getStayMatches();
   qs("#stayCount").textContent = `${matches.length}개 숙소`;
   qs("#stayList").innerHTML = matches.length
     ? matches.map(stayCard).join("")
     : `<div class="empty-state">조건에 맞는 숙소가 없습니다. 인원이나 예산을 넓혀보세요.</div>`;
+  renderListingMap("stays", matches);
   refreshIcons();
 }
 
@@ -544,70 +869,197 @@ function stayCard(stay) {
   `;
 }
 
+function uniqueImages(images) {
+  return [...new Set(images.filter(Boolean))];
+}
+
+function stayGalleryImages(stay) {
+  return uniqueImages([
+    stay.image,
+    ...stay.images,
+    ...stay.rooms.map((room) => room.image),
+    photo("photo-1600566753190-17f0baa2a6c3"),
+    photo("photo-1596394516093-501ba68a0ba6"),
+    photo("photo-1523217582562-09d0def993a6"),
+  ]).slice(0, 9);
+}
+
+function roomGalleryImages(stay, room) {
+  return uniqueImages([
+    room.image,
+    ...stay.images,
+    ...stay.rooms.map((item) => item.image),
+    photo("photo-1600607688969-a5bfcd646154"),
+    photo("photo-1493809842364-78817add7ffb"),
+  ]).slice(0, 8);
+}
+
+function dashList(items) {
+  return `<ul class="dash-list">${items.map((item) => `<li>${item}</li>`).join("")}</ul>`;
+}
+
+function roomCapacityMax(room) {
+  const match = room.capacity.match(/(\d+)\D*$/);
+  return match ? Number(match[1]) : 0;
+}
+
+function roomDetailFacts(stay, room) {
+  return [
+    ["정원", room.capacity],
+    ["객실 금액", money(room.price)],
+    ["숙소 위치", `${stay.region} · ${stay.distance}`],
+    ["공간 구성", room.features.join(" · ")],
+  ];
+}
+
+function renderStayGallery(images, alt) {
+  return `
+    <div class="stay-photo-layout">
+      <img class="stay-main-photo" src="${images[0]}" alt="${alt} 대표 사진" />
+      <div class="stay-side-photos">
+        ${images.slice(1, 5).map((src) => `<img src="${src}" alt="${alt} 추가 사진" />`).join("")}
+      </div>
+    </div>
+    <div class="photo-strip" aria-label="추가 사진">
+      ${images.slice(1).map((src, index) => `<img src="${src}" alt="${alt} 추가 사진 ${index + 1}" />`).join("")}
+    </div>
+  `;
+}
+
+function roomOptionCard(room, index, stay) {
+  return `
+    <article class="room-option-card">
+      <img src="${room.image}" alt="${room.name} 사진" />
+      <div class="room-option-body">
+        <div>
+          <p class="eyebrow">객실 유형 ${index + 1}</p>
+          <h3>${room.name}</h3>
+          <p class="muted">${room.capacity} · ${money(room.price)}</p>
+        </div>
+        <div class="mini-detail-grid">
+          ${roomDetailFacts(stay, room)
+            .map(
+              ([label, value]) => `
+                <div class="mini-detail-block">
+                  <strong>${label}</strong>
+                  <span>- ${value}</span>
+                </div>
+              `
+            )
+            .join("")}
+        </div>
+        <div class="detail-meta">${room.features.map((feature) => `<span class="pill">${feature}</span>`).join("")}</div>
+        <button class="primary-btn" data-room-index="${index}"><i data-lucide="door-open"></i>객실 자세히 보기</button>
+      </div>
+    </article>
+  `;
+}
+
 function renderStayDetail() {
   const stay = state.selectedStay;
+  const gallery = stayGalleryImages(stay);
   qs("#stayDetailContent").innerHTML = `
-    <div class="detail-hero">
-      <div class="photo-grid">
-        ${stay.images.map((src) => `<img src="${src}" alt="${stay.name} 내부 사진" />`).join("")}
+    <section class="stay-detail-top">
+      <div>
+        <p class="eyebrow">${stay.region} · ${stay.distance}</p>
+        <h1 class="stay-detail-title">${stay.name}</h1>
+        <p>${stay.intro}</p>
+        <div class="detail-meta">
+          <span class="pill success">최대 ${stay.maxPeople}명</span>
+          <span class="pill">방 ${stay.roomCount}개</span>
+          <span class="pill">화장실 ${stay.bathCount}개</span>
+          <span class="pill">★ ${stay.rating} (${stay.reviews})</span>
+        </div>
       </div>
-      <aside class="detail-intro">
-        <div>
-          <p class="eyebrow">${stay.region} · ${stay.distance}</p>
-          <h1>${stay.name}</h1>
-          <p>${stay.intro}</p>
-          <div class="detail-meta">
-            <span class="pill success">최대 ${stay.maxPeople}명</span>
-            <span class="pill">★ ${stay.rating}</span>
-            <span class="pill warning">${stay.reviews}개 리뷰</span>
-          </div>
-        </div>
-        <div class="button-row">
-          <button class="secondary-btn" data-open-chat="${stay.name}"><i data-lucide="messages-square"></i>사장님과 채팅</button>
-          <button class="ghost-btn" data-route="review"><i data-lucide="star"></i>리뷰 보기</button>
-        </div>
-      </aside>
-    </div>
+      <div class="button-row">
+        <button class="secondary-btn" data-open-chat="${stay.name}"><i data-lucide="messages-square"></i>사장님과 채팅</button>
+        <button class="ghost-btn" data-route="review"><i data-lucide="star"></i>리뷰 보기</button>
+      </div>
+    </section>
 
-    <div class="detail-sections">
-      <section class="info-panel">
-        <h2>편의시설</h2>
-        <ul>${stay.amenities.map((item) => `<li>${item}</li>`).join("")}</ul>
-      </section>
-      <section class="info-panel">
-        <h2>추가요금</h2>
-        <ul>${stay.fees.map((item) => `<li>${item}</li>`).join("")}</ul>
-      </section>
-      <section class="info-panel">
-        <h2>환불 및 규칙</h2>
-        <ul>${stay.policy.map((item) => `<li>${item}</li>`).join("")}</ul>
-      </section>
-    </div>
+    <section class="stay-gallery-section">
+      ${renderStayGallery(gallery, stay.name)}
+    </section>
 
     <section>
       <div class="section-toolbar">
-        <h2>객실 선택</h2>
-        <span>객실별 정원·금액</span>
+        <h2>객실 유형 및 타입</h2>
+        <span>객실을 누르면 상세 정보로 이동합니다</span>
       </div>
-      <div class="room-grid">
-        ${stay.rooms
-          .map(
-            (room, index) => `
-          <article class="room-card">
-            <img src="${room.image}" alt="${room.name} 사진" />
-            <div>
-              <h3>${room.name}</h3>
-              <p>${room.capacity}</p>
-              <div class="detail-meta">${room.features.map((feature) => `<span class="pill">${feature}</span>`).join("")}</div>
-              <p class="price">${money(room.price)}</p>
-              <button class="primary-btn" data-room-index="${index}"><i data-lucide="calendar-check"></i>이 방 예약</button>
-            </div>
-          </article>
-        `
-          )
-          .join("")}
+      <div class="room-list-vertical">
+        ${stay.rooms.map((room, index) => roomOptionCard(room, index, stay)).join("")}
       </div>
     </section>
+
+    <div class="detail-sections detail-sections-bottom">
+      <section class="info-panel">
+        <h2>편의시설</h2>
+        ${dashList(stay.amenities)}
+      </section>
+      <section class="info-panel">
+        <h2>추가요금</h2>
+        ${dashList(stay.fees)}
+      </section>
+      <section class="info-panel">
+        <h2>환불 및 규칙</h2>
+        ${dashList(stay.policy)}
+      </section>
+    </div>
+  `;
+  refreshIcons();
+}
+
+function renderRoomDetail() {
+  const stay = state.selectedStay;
+  const room = state.selectedRoom;
+  const gallery = roomGalleryImages(stay, room);
+  const maxPeople = roomCapacityMax(room);
+  qs("#roomDetailContent").innerHTML = `
+    <section class="room-detail-hero">
+      <div>
+        <p class="eyebrow">${stay.name}</p>
+        <h1 class="room-detail-title">${room.name}</h1>
+        <p>${room.capacity} 기준으로 운영되는 객실입니다. 예약 전에 사진, 인원 규정, 추가 요금, 시설 조건을 한 번 더 확인해주세요.</p>
+      </div>
+      <aside class="room-reserve-card">
+        <span>객실 금액</span>
+        <strong>${money(room.price)}</strong>
+        <p>최대 ${maxPeople || stay.maxPeople}명까지 선택 가능</p>
+        <button class="primary-btn" data-route="booking"><i data-lucide="calendar-check"></i>예약 정보 입력하기</button>
+      </aside>
+    </section>
+
+    <section class="stay-gallery-section">
+      ${renderStayGallery(gallery, room.name)}
+    </section>
+
+    <div class="room-detail-grid">
+      <section class="info-panel">
+        <h2>객실 세부사항</h2>
+        ${dashList([
+          `정원 ${room.capacity}`,
+          `객실 금액 ${money(room.price)}`,
+          `${room.features.join(" · ")}`,
+          "체크인 15:00 이후, 체크아웃 11:00 이전",
+        ])}
+      </section>
+      <section class="info-panel">
+        <h2>인원 규정</h2>
+        ${dashList([
+          `기본 정원은 ${room.capacity}입니다.`,
+          "초과 인원은 숙소 규정에 따라 1인당 추가 요금이 발생합니다.",
+          "미성년자 단체 이용은 대표자 확인이 필요합니다.",
+        ])}
+      </section>
+      <section class="info-panel">
+        <h2>포함 편의시설</h2>
+        ${dashList([...room.features, ...stay.amenities.slice(0, 4)])}
+      </section>
+      <section class="info-panel">
+        <h2>추가요금 및 환불</h2>
+        ${dashList([...stay.fees.slice(0, 3), ...stay.policy.slice(0, 3)])}
+      </section>
+    </div>
   `;
   refreshIcons();
 }
@@ -666,6 +1118,7 @@ function renderStores() {
   qs("#storeList").innerHTML = matches.length
     ? matches.map(storeCard).join("")
     : `<div class="empty-state">조건에 맞는 공판장이 없습니다.</div>`;
+  renderListingMap("market", matches);
   updateCartBadge();
   refreshIcons();
 }
@@ -894,7 +1347,7 @@ function setTossWidgetStatus(message, isError = false) {
   const status = qs("#tossWidgetStatus");
   if (!status) return;
   status.textContent = message;
-  status.style.color = isError ? "#b74332" : "#556575";
+  status.style.color = isError ? "#b74332" : "#6d7368";
 }
 
 function loadTossSdk() {
@@ -976,7 +1429,6 @@ function renderPayment() {
     return;
   }
   routeParents.payment = payment.type === "stay" ? "stays" : "market";
-  qs("#paymentBackBtn").dataset.route = paymentBackRoute();
   qs("#paymentSummary").innerHTML = `
     <div class="summary-line"><span>결제 대상</span><strong>${payment.title}</strong></div>
     <div class="summary-line"><span>상품명</span><strong>${payment.itemName}</strong></div>
@@ -1111,8 +1563,8 @@ async function handleTossRedirect() {
       amount: Number(params.get("amount") || 0),
       backRoute: "stays",
     };
-    navigate("paymentResult");
-    window.history.replaceState({}, "", getBaseUrl());
+    navigate("paymentResult", { replace: true });
+    replaceBrowserRoute("paymentResult");
     return true;
   }
 
@@ -1134,8 +1586,8 @@ async function handleTossRedirect() {
       paymentKey: params.get("paymentKey") || "토스에서 발급",
       backRoute: paymentBackRoute(),
     };
-    navigate("paymentResult");
-    window.history.replaceState({}, "", getBaseUrl());
+    navigate("paymentResult", { replace: true });
+    replaceBrowserRoute("paymentResult");
     try {
       await confirmPaymentOnServer(storedPayment, params);
       setPaymentResult("success");
@@ -1154,7 +1606,7 @@ async function handleTossRedirect() {
         paymentKey: params.get("paymentKey") || "토스에서 발급",
         backRoute: paymentBackRoute(),
       };
-      navigate("paymentResult");
+      navigate("paymentResult", { replace: true });
     }
     return true;
   } else {
@@ -1174,8 +1626,8 @@ async function handleTossRedirect() {
     };
   }
 
-  navigate("paymentResult");
-  window.history.replaceState({}, "", getBaseUrl());
+  navigate("paymentResult", { replace: true });
+  replaceBrowserRoute("paymentResult");
   return true;
 }
 
@@ -1439,6 +1891,12 @@ function ensureChat(title) {
 }
 
 document.addEventListener("click", (event) => {
+  const historyBackButton = event.target.closest("[data-history-back]");
+  if (historyBackButton) {
+    goBack(historyBackButton.dataset.fallbackRoute || "home");
+    return;
+  }
+
   const routeButton = event.target.closest("[data-route]");
   if (routeButton) {
     navigate(routeButton.dataset.route);
@@ -1456,7 +1914,30 @@ document.addEventListener("click", (event) => {
   const roomButton = event.target.closest("[data-room-index]");
   if (roomButton) {
     state.selectedRoom = state.selectedStay.rooms[Number(roomButton.dataset.roomIndex)];
-    navigate("booking");
+    navigate("roomDetail");
+    return;
+  }
+
+  const stayFilterToggle = event.target.closest("[data-toggle-stay-filters]");
+  if (stayFilterToggle) {
+    const panel = qs("#stayAdvancedFilters");
+    if (panel) panel.hidden = !panel.hidden;
+    return;
+  }
+
+  const stayFilterReset = event.target.closest("[data-reset-stay-filters]");
+  if (stayFilterReset) {
+    qsa("[data-stay-filter]").forEach((input) => {
+      input.checked = false;
+    });
+    qs("#stayMinRooms").value = 0;
+    qs("#stayMinBaths").value = 0;
+    renderStays();
+    return;
+  }
+
+  if (event.target.closest("[data-stay-filter], .check-card")) {
+    window.setTimeout(renderStays, 0);
     return;
   }
 
@@ -1576,7 +2057,7 @@ document.addEventListener("click", (event) => {
 });
 
 document.addEventListener("input", (event) => {
-  if (event.target.matches("#stayPrice, #stayRegion, #stayPeople, #stayDate")) renderStays();
+  if (event.target.matches("#stayPrice, #stayRegion, #stayPeople, #stayDate, #stayMinRooms, #stayMinBaths")) renderStays();
   if (event.target.matches("#marketRegion, #marketCategory, #marketPeople, #marketDate")) renderStores();
   if (event.target.matches("#recommendPeople, #mealStyle")) renderCommunity();
   if (event.target.matches("[data-cart-input]")) {
@@ -1589,7 +2070,7 @@ document.addEventListener("input", (event) => {
 });
 
 document.addEventListener("change", (event) => {
-  if (event.target.matches("#stayRegion, #stayDate")) renderStays();
+  if (event.target.matches("#stayRegion, #stayDate, [data-stay-filter], #stayMinRooms, #stayMinBaths")) renderStays();
   if (event.target.matches("#marketRegion, #marketCategory, #marketDate")) renderStores();
   if (event.target.matches("#mealStyle")) renderCommunity();
 });
@@ -1642,14 +2123,20 @@ qs("#reviewForm").addEventListener("submit", (event) => {
 
 qsa(".brand").forEach((brand) => {
   brand.addEventListener("keydown", (event) => {
-    if (event.key === "Enter" || event.key === " ") navigate("stays");
+    if (event.key === "Enter" || event.key === " ") navigate("home");
   });
+});
+
+window.addEventListener("popstate", () => {
+  if (appHistoryDepth > 0) appHistoryDepth -= 1;
+  routeHistory.pop();
+  navigate(routeFromLocation(), { record: false, updateHistory: false });
 });
 
 (async function boot() {
   const handledRedirect = await handleTossRedirect();
   if (!handledRedirect) {
-    renderStays();
+    navigate(routeFromLocation(), { record: false, replace: true });
   }
   updateCartBadge();
   refreshIcons();
