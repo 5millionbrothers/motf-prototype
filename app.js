@@ -1,6 +1,6 @@
 const money = (value) => `${Number(value).toLocaleString("ko-KR")}원`;
 
-const TOSS_CLIENT_KEY = "test_gck_docs_Ovk5rk1EwkEbP0W43n07xlzm";
+const TOSS_CLIENT_KEY = window.MOTF_CONFIG?.TOSS_CLIENT_KEY?.trim() || "test_gck_docs_Ovk5rk1EwkEbP0W43n07xlzm";
 const TOSS_PENDING_PAYMENT_KEY = "motf.pendingPayment";
 const TOSS_CUSTOMER_KEY = "motf-demo-customer_001";
 let tossWidgets = null;
@@ -1550,6 +1550,9 @@ async function renderTossWidgets(payment) {
   setTossWidgetStatus("토스 결제위젯을 불러오는 중입니다.");
 
   try {
+    if (!TOSS_CLIENT_KEY) {
+      throw new Error("토스페이먼츠 Client Key가 설정되지 않았습니다.");
+    }
     await loadTossSdk();
     const tossPayments = window.TossPayments(TOSS_CLIENT_KEY);
     tossWidgets = tossPayments.widgets({ customerKey: TOSS_CUSTOMER_KEY });
