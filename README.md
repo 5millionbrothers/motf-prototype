@@ -24,6 +24,7 @@
 - `config.js`
 - `index.html`
 - `netlify.toml`
+- `supabase/`
 - `styles.css`
 - `vercel.json`
 
@@ -51,6 +52,6 @@ Vercel 프로젝트 설정에서 아래 값을 추가해야 API가 정상 동작
 
 ## 현재 단계
 
-현재는 16단계 중 1단계인 코드 정리 단계입니다.
+현재는 16단계 중 2단계인 데이터베이스 설계 단계입니다.
 
-다음 단계는 Supabase 데이터베이스 설계입니다. 숙소, 공판장, 예약, 주문, 게시글, 댓글, 채팅, 결제 기록을 어떤 테이블에 저장할지 정리한 뒤 실제 SQL로 옮길 예정입니다.
+`docs/step-02-database-design.md`에는 비전공자용 설계 설명이 있고, `supabase/schema.sql`에는 Supabase SQL Editor에 넣을 수 있는 테이블 생성 초안이 있습니다.

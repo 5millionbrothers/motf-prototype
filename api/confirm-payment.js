@@ -27,22 +27,25 @@ async function saveBusinessRecord(payment, tossPayment) {
   if (payment.type === "stay") {
     return insertSupabaseRow("reservations", {
       order_id: payment.orderId,
-      stay_name: payment.stayName,
-      room_name: payment.roomName,
+      stay_name_snapshot: payment.stayName || null,
+      room_name_snapshot: payment.roomName || null,
       reserved_date: payment.date || null,
       people: payment.people,
+      representative_name: payment.customerName || null,
+      representative_phone: payment.customerPhone || null,
       amount: payment.amount,
+      status: "confirmed",
       payment_status: "paid",
     });
   }
 
   return insertSupabaseRow("orders", {
     order_id: payment.orderId,
-    store_name: payment.storeName,
+    market_name_snapshot: payment.storeName || null,
     pickup_place: payment.pickupPlace || null,
     pickup_time: payment.pickupTime || null,
-    items: payment.items || [],
     amount: payment.amount,
+    status: "paid",
     payment_status: "paid",
   });
 }
@@ -64,7 +67,7 @@ module.exports = async function handler(req, res) {
 
     const tossPayment = await confirmTossPayment({ paymentKey, orderId, amount });
     await insertSupabaseRow("payments", {
-      order_id: orderId,
+      order_code: orderId,
       payment_key: paymentKey,
       payment_type: payment.type,
       status: "paid",
