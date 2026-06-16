@@ -54,4 +54,6 @@ Vercel 프로젝트 설정에서 아래 값을 추가해야 API가 정상 동작
 
 현재는 16단계 중 2단계인 데이터베이스 설계 단계입니다.
 
-`docs/step-02-database-design.md`에는 비전공자용 설계 설명이 있고, `supabase/schema.sql`에는 Supabase SQL Editor에 넣을 수 있는 테이블 생성 초안이 있습니다.
+`docs/step-02-database-design.md`에는 비전공자용 DB 설계 설명이 있고, `supabase/schema.sql`에는 Supabase SQL Editor에 넣을 수 있는 테이블 생성 초안이 있습니다.
+
+`docs/step-03-auth-and-permissions.md`에는 회원/권한 설계 설명이 있고, `supabase/rls.sql`에는 Supabase RLS 권한 정책 초안이 있습니다. RLS 정책은 운영 포털 MVP와 로그인 연결을 확인한 뒤 실행하는 것을 권장합니다.
