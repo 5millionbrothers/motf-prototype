@@ -20,8 +20,8 @@
         <button class="nav-link" data-route="stays">숙소</button>
         <button class="nav-link" data-route="market">공판장</button>
         <button class="nav-link" data-route="community">커뮤니티</button>
-        <button class="nav-link" data-route="chat">채팅</button>
-        <button class="nav-link" data-route="mypage">마이</button>
+        <button class="nav-link icon-nav" data-route="chat" aria-label="채팅"><i data-lucide="message-circle"></i></button>
+        <button class="nav-link icon-nav" data-route="mypage" aria-label="마이페이지"><i data-lucide="user-round"></i></button>
       </nav>
     </header>
 
@@ -341,7 +341,7 @@
           <section class="tool-panel">
             <div class="section-toolbar">
               <h2>추천 레크레이션</h2>
-              <button class="ghost-btn" type="button" data-toggle-activities>더보기</button>
+              <button class="ghost-btn" type="button" data-route="recreation"><i data-lucide="list-plus"></i>더보기</button>
             </div>
             <div class="mini-card-list" id="activityList"></div>
           </section>
@@ -352,6 +352,120 @@
             </div>
             <div class="board-grid" id="communityBoards"></div>
           </section>
+        </div>
+      </section>
+
+      <section id="recreation" class="view">
+        <button class="ghost-btn back-btn" data-route="community"><i data-lucide="chevron-left"></i>커뮤니티</button>
+        <div class="view-title">
+          <div>
+            <p class="eyebrow">추천 레크레이션</p>
+            <h1>인원과 공간에 맞는 MT 게임을 고르기</h1>
+          </div>
+          <button class="secondary-btn" type="button" data-open-recreation-form><i data-lucide="plus"></i>레크레이션 추천</button>
+        </div>
+        <form class="filter-panel community-filter" id="recreationFilters">
+          <label>참여 인원
+            <select id="activityPeople">
+              <option value="전체">전체</option>
+              <option value="small">10~25명</option>
+              <option value="medium">26~50명</option>
+              <option value="large">51명 이상</option>
+            </select>
+          </label>
+          <label>공간
+            <select id="activitySpace">
+              <option value="전체">전체</option>
+              <option value="indoor">실내</option>
+              <option value="outdoor">야외</option>
+              <option value="any">공간 무관</option>
+            </select>
+          </label>
+          <label>분위기
+            <select id="activityMood">
+              <option value="전체">전체</option>
+              <option value="icebreak">아이스브레이킹</option>
+              <option value="team">팀 대항</option>
+              <option value="calm">잔잔한 진행</option>
+            </select>
+          </label>
+        </form>
+        <div class="recreation-layout">
+          <section class="activity-directory" id="activityDirectory"></section>
+          <form class="tool-panel submit-panel" id="activitySubmitForm">
+            <h2>새 레크레이션 추천</h2>
+            <label>제목<input id="activitySubmitTitle" placeholder="예: 과잠 색깔 스피드퀴즈" /></label>
+            <label>추천 인원<input id="activitySubmitPeople" placeholder="예: 20~60명" /></label>
+            <label>진행 공간
+              <select id="activitySubmitSpace">
+                <option>실내</option>
+                <option>야외</option>
+                <option>공간 무관</option>
+              </select>
+            </label>
+            <label>사진/영상 첨부<input type="file" multiple accept="image/*,video/*" /></label>
+            <label>진행 방법<textarea id="activitySubmitNote" rows="5" placeholder="준비물, 진행 방식, 주의사항을 적어주세요"></textarea></label>
+            <button class="primary-btn" type="submit"><i data-lucide="send"></i>익명 추천 등록</button>
+          </form>
+        </div>
+      </section>
+
+      <section id="activityDetail" class="view">
+        <button class="ghost-btn back-btn" data-route="recreation"><i data-lucide="chevron-left"></i>레크레이션 목록</button>
+        <div class="post-detail-layout">
+          <article class="post-detail-card" id="activityDetailContent"></article>
+          <aside class="comment-panel">
+            <h2>댓글</h2>
+            <div class="comment-list" id="activityCommentList"></div>
+            <form class="comment-form" id="activityCommentForm">
+              <input id="activityCommentInput" placeholder="익명 댓글을 입력하세요" />
+              <button class="primary-icon" type="submit" aria-label="댓글 등록"><i data-lucide="send"></i></button>
+            </form>
+          </aside>
+        </div>
+      </section>
+
+      <section id="boardDetail" class="view">
+        <button class="ghost-btn back-btn" data-route="community"><i data-lucide="chevron-left"></i>커뮤니티</button>
+        <div class="board-detail-layout">
+          <section>
+            <div class="view-title compact" id="boardDetailHeader"></div>
+            <div class="board-post-list" id="boardPostList"></div>
+          </section>
+          <form class="board-write-panel" id="boardWriteForm">
+            <div>
+              <p class="eyebrow">익명 글쓰기</p>
+              <h2>새 글 작성</h2>
+            </div>
+            <label>게시판
+              <select id="boardPostBoard">
+                <option value="market-share">나눔장터</option>
+                <option value="match">대결신청</option>
+                <option value="field-info">현장정보</option>
+                <option value="confession">익명고백</option>
+              </select>
+            </label>
+            <label>제목<input id="boardPostTitle" required placeholder="제목을 입력하세요" /></label>
+            <label>내용<textarea id="boardPostBody" required rows="7" placeholder="익명으로 공유할 내용을 적어주세요"></textarea></label>
+            <label>사진/영상 첨부<input type="file" multiple accept="image/*,video/*" /></label>
+            <div class="anonymous-note"><i data-lucide="shield-check"></i>모든 게시글은 익명으로만 등록됩니다.</div>
+            <button class="primary-btn" type="submit"><i data-lucide="pencil"></i>익명으로 올리기</button>
+          </form>
+        </div>
+      </section>
+
+      <section id="postDetail" class="view">
+        <button class="ghost-btn back-btn" data-route="boardDetail"><i data-lucide="chevron-left"></i>게시판 목록</button>
+        <div class="post-detail-layout">
+          <article class="post-detail-card" id="postDetailContent"></article>
+          <aside class="comment-panel">
+            <h2>댓글</h2>
+            <div class="comment-list" id="postCommentList"></div>
+            <form class="comment-form" id="postCommentForm">
+              <input id="postCommentInput" placeholder="익명 댓글을 입력하세요" />
+              <button class="primary-icon" type="submit" aria-label="댓글 등록"><i data-lucide="send"></i></button>
+            </form>
+          </aside>
         </div>
       </section>
 
@@ -368,6 +482,10 @@
             <div class="chat-room-header" id="chatRoomHeader"></div>
             <div class="chat-messages" id="chatMessages"></div>
             <form class="chat-input" id="chatForm">
+              <label class="attachment-btn" aria-label="사진 또는 영상 첨부">
+                <i data-lucide="paperclip"></i>
+                <input type="file" id="chatAttachment" multiple accept="image/*,video/*" />
+              </label>
               <input id="chatText" placeholder="메시지를 입력하세요" />
               <button class="primary-icon" type="submit" aria-label="메시지 보내기"><i data-lucide="send"></i></button>
             </form>
@@ -379,7 +497,34 @@
         <div class="view-title">
           <div>
             <p class="eyebrow">마이페이지</p>
-            <h1>예약, 주문, 결산 파일, 리뷰를 한 곳에서 관리하기</h1>
+            <h1>내 이용 내역과 계정 정보를 한 곳에서 관리하기</h1>
+          </div>
+        </div>
+        <div class="mypage-hub">
+          <button class="mypage-menu-card" data-route="myUsage">
+            <i data-lucide="receipt-text"></i>
+            <strong>이용 내역</strong>
+            <span>숙소 예약, 공판장 주문, 예결산 엑셀, 리뷰 관리</span>
+          </button>
+          <button class="mypage-menu-card" data-route="myAccount">
+            <i data-lucide="user-cog"></i>
+            <strong>계정</strong>
+            <span>아이디, 비밀번호, 학교 소속, 회원 탈퇴 설정</span>
+          </button>
+          <button class="mypage-menu-card" data-route="myGuide">
+            <i data-lucide="circle-help"></i>
+            <strong>이용안내</strong>
+            <span>문의하기, 고객센터, 이용약관, 개인정보 처리방침</span>
+          </button>
+        </div>
+      </section>
+
+      <section id="myUsage" class="view">
+        <button class="ghost-btn back-btn" data-route="mypage"><i data-lucide="chevron-left"></i>마이페이지</button>
+        <div class="view-title">
+          <div>
+            <p class="eyebrow">이용 내역</p>
+            <h1>숙소와 공판장 이용 내역 관리</h1>
           </div>
           <button class="secondary-btn" data-route="review"><i data-lucide="star"></i>리뷰 남기기</button>
         </div>
@@ -391,6 +536,58 @@
           <section>
             <h2>공판장 주문</h2>
             <div id="orderList" class="card-list compact-list"></div>
+          </section>
+        </div>
+      </section>
+
+      <section id="myAccount" class="view">
+        <button class="ghost-btn back-btn" data-route="mypage"><i data-lucide="chevron-left"></i>마이페이지</button>
+        <div class="account-layout">
+          <form class="tool-panel">
+            <p class="eyebrow">계정</p>
+            <h1>로그인 정보</h1>
+            <label>아이디<input value="motf_demo_user" /></label>
+            <label>비밀번호<input type="password" value="password" /></label>
+            <label>학교/소속<input value="한국대 경영학과 학생회" /></label>
+            <label>대표 연락처<input value="010-0000-0000" /></label>
+            <button class="primary-btn" type="button"><i data-lucide="save"></i>수정 내용 저장</button>
+          </form>
+          <section class="tool-panel danger-panel">
+            <p class="eyebrow">회원 관리</p>
+            <h2>탈퇴 및 데이터 요청</h2>
+            <p>예약, 주문, 정산 파일 보관 기간과 탈퇴 전 확인사항을 안내하는 영역입니다.</p>
+            <button class="ghost-btn" type="button"><i data-lucide="user-x"></i>회원 탈퇴 요청</button>
+          </section>
+        </div>
+      </section>
+
+      <section id="myGuide" class="view">
+        <button class="ghost-btn back-btn" data-route="mypage"><i data-lucide="chevron-left"></i>마이페이지</button>
+        <div class="view-title">
+          <div>
+            <p class="eyebrow">이용안내</p>
+            <h1>문의와 정책을 확인하는 고객센터</h1>
+          </div>
+        </div>
+        <div class="guide-grid">
+          <section class="tool-panel">
+            <h2>문의하기</h2>
+            <label>문의 유형
+              <select>
+                <option>예약/결제 문의</option>
+                <option>공판장 주문 문의</option>
+                <option>분쟁/환불 문의</option>
+                <option>계정 문의</option>
+              </select>
+            </label>
+            <label>문의 내용<textarea rows="5" placeholder="문의 내용을 남겨주세요"></textarea></label>
+            <button class="primary-btn" type="button"><i data-lucide="send"></i>문의 접수</button>
+          </section>
+          <section class="policy-list">
+            <button class="policy-link"><i data-lucide="file-text"></i><span>이용약관</span></button>
+            <button class="policy-link"><i data-lucide="lock-keyhole"></i><span>개인정보 처리방침</span></button>
+            <button class="policy-link"><i data-lucide="rotate-ccw"></i><span>환불 및 취소 규정</span></button>
+            <button class="policy-link"><i data-lucide="messages-square"></i><span>분쟁 중개 안내</span></button>
           </section>
         </div>
       </section>

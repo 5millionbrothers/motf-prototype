@@ -103,6 +103,7 @@ textarea:focus-visible,
 .nav-link {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   min-height: 34px;
   padding: 0 10px;
   color: var(--muted);
@@ -112,6 +113,11 @@ textarea:focus-visible,
   font-size: 14px;
   font-weight: 520;
   white-space: nowrap;
+}
+
+.nav-link.icon-nav {
+  width: 38px;
+  padding: 0;
 }
 
 .nav-link svg,
@@ -1516,15 +1522,49 @@ input[type="range"] {
   gap: 6px;
 }
 
+.interactive-card {
+  width: 100%;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.interactive-card:hover {
+  border-color: var(--olive-light);
+  box-shadow: var(--shadow);
+}
+
 .result-box {
   display: grid;
-  gap: 8px;
-  min-height: 120px;
-  padding: 14px;
+  gap: 12px;
+  min-height: 184px;
+  padding: 16px 16px 22px;
+  margin-bottom: 10px;
   color: var(--teal-dark);
   background: var(--warm);
   border: 1px solid var(--line);
   border-radius: 8px;
+}
+
+.recommend-total {
+  display: grid;
+  gap: 2px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.recommend-total span,
+.recommend-row span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.recommend-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 28px;
 }
 
 .board-grid {
@@ -1538,9 +1578,15 @@ input[type="range"] {
   gap: 12px;
   min-height: 220px;
   padding: 16px;
+  text-align: left;
   background: var(--paper);
   border: 1px solid var(--line);
   border-radius: 8px;
+}
+
+.board-card:hover {
+  border-color: var(--olive-light);
+  box-shadow: var(--shadow);
 }
 
 .board-card p {
@@ -1558,12 +1604,164 @@ input[type="range"] {
 }
 
 .board-card li {
+  display: grid;
+  gap: 2px;
   padding: 9px 10px;
   color: var(--ink);
   background: var(--warm);
   border: 1px solid var(--line);
   border-radius: 8px;
   font-size: 13px;
+}
+
+.board-card li span,
+.reaction-line,
+.card-reactions {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.reaction-line,
+.card-reactions,
+.comment-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.community-filter {
+  margin-bottom: 18px;
+}
+
+.recreation-layout,
+.board-detail-layout,
+.post-detail-layout,
+.account-layout,
+.guide-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.65fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.activity-directory,
+.board-post-list,
+.mypage-hub,
+.policy-list {
+  display: grid;
+  gap: 12px;
+}
+
+.activity-card,
+.anonymous-post,
+.post-detail-card,
+.mypage-menu-card,
+.policy-link,
+.board-write-panel {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  text-align: left;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.post-detail-card {
+  padding: 0;
+  overflow: hidden;
+}
+
+.post-detail-media {
+  width: 100%;
+  max-height: 360px;
+  object-fit: cover;
+}
+
+.post-detail-body {
+  display: grid;
+  gap: 14px;
+  padding: 22px;
+}
+
+.post-detail-body h1 {
+  margin: 0;
+}
+
+.post-media-placeholder {
+  display: grid;
+  place-items: center;
+  min-height: 220px;
+  gap: 8px;
+  color: var(--muted);
+  background: var(--warm);
+  border: 1px dashed var(--sage);
+  border-radius: 8px;
+}
+
+.post-media-placeholder svg {
+  width: 34px;
+  height: 34px;
+}
+
+.comment-panel {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.comment-list {
+  display: grid;
+  gap: 8px;
+}
+
+.comment-item {
+  display: grid;
+  gap: 3px;
+  padding: 10px;
+  background: var(--warm);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.comment-item strong {
+  font-size: 12px;
+}
+
+.comment-form {
+  display: grid;
+  grid-template-columns: 1fr 44px;
+}
+
+.activity-card-head,
+.post-topline {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.media-chip,
+.anonymous-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  padding: 7px 10px;
+  color: var(--teal-dark);
+  background: var(--olive-soft);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 13px;
+}
+
+.post-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .chat-shell {
@@ -1627,11 +1825,37 @@ input[type="range"] {
   background: var(--cream);
 }
 
+.message-row {
+  display: grid;
+  gap: 4px;
+  max-width: min(540px, 84%);
+}
+
+.message-row.user {
+  justify-self: end;
+  justify-items: end;
+}
+
+.message-row.owner {
+  justify-self: start;
+  justify-items: start;
+}
+
+.message-row.admin {
+  justify-self: center;
+  justify-items: center;
+  max-width: 90%;
+}
+
 .bubble {
   max-width: min(520px, 78%);
   padding: 10px 12px;
   border-radius: 8px;
   line-height: 1.5;
+}
+
+.message-row .bubble {
+  max-width: 100%;
 }
 
 .bubble.owner {
@@ -1655,16 +1879,89 @@ input[type="range"] {
   font-size: 13px;
 }
 
+.read-status {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.attachment-list {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.attachment-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  padding: 5px 8px;
+  color: var(--teal-dark);
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 12px;
+}
+
 .chat-input {
   display: grid;
-  grid-template-columns: 1fr 44px;
+  grid-template-columns: 42px 1fr 44px;
   gap: 8px;
   padding: 12px;
   border-top: 1px solid var(--line);
 }
 
+.attachment-btn {
+  display: grid;
+  place-items: center;
+  min-height: 42px;
+  color: var(--teal-dark);
+  background: var(--warm);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.attachment-btn input {
+  display: none;
+}
+
 .mypage-grid {
   grid-template-columns: 1fr 1fr;
+}
+
+.mypage-hub {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.mypage-menu-card {
+  min-height: 210px;
+  align-content: start;
+}
+
+.mypage-menu-card i {
+  width: 28px;
+  height: 28px;
+  color: var(--teal-dark);
+}
+
+.mypage-menu-card strong {
+  font-size: 20px;
+}
+
+.mypage-menu-card span,
+.policy-link span {
+  color: var(--muted);
+}
+
+.danger-panel {
+  border-color: #e7c8b8;
+}
+
+.policy-link {
+  grid-template-columns: 28px 1fr;
+  align-items: center;
+  min-height: 74px;
 }
 
 .compact-list .listing-card {
@@ -1857,6 +2154,12 @@ input[type="range"] {
   .community-grid,
   .mypage-grid,
   .review-layout,
+  .recreation-layout,
+  .board-detail-layout,
+  .post-detail-layout,
+  .account-layout,
+  .guide-grid,
+  .mypage-hub,
   .room-detail-grid {
     grid-template-columns: 1fr;
   }
