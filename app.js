@@ -399,10 +399,35 @@ const stores = [
 ];
 
 const activities = [
-  { title: "학과 빙고", people: "20~60명", time: "25분", note: "첫 만남 아이스브레이킹에 좋음" },
-  { title: "팀별 미션 경매", people: "30~80명", time: "45분", note: "예산 게임과 장기자랑을 섞기 좋음" },
-  { title: "MT 재판소", people: "15~40명", time: "30분", note: "웃긴 사연 제보를 받아 진행" },
-  { title: "랜덤 조 편성 퀴즈", people: "20~70명", time: "35분", note: "선후배 섞임을 자연스럽게 만듦" },
+  { title: "학과 빙고", people: "20~60명", time: "25분", note: "첫 만남 아이스브레이킹", media: "진행지 PDF · 예시 이미지" },
+  { title: "팀별 미션 경매", people: "30~80명", time: "45분", note: "예산 게임과 장기자랑 조합", media: "룰 설명 영상" },
+  { title: "MT 재판소", people: "15~40명", time: "30분", note: "익명 사연으로 진행", media: "대본 템플릿" },
+  { title: "랜덤 조 편성 퀴즈", people: "20~70명", time: "35분", note: "선후배 섞임 유도", media: "문제 예시" },
+  { title: "몸으로 말해요 릴레이", people: "20~50명", time: "20분", note: "장비 없이 빠르게 시작", media: "제시어 카드" },
+  { title: "술자리 금지어 게임", people: "10~40명", time: "30분", note: "소규모 뒤풀이용", media: "카드 이미지" },
+];
+
+const communityBoards = [
+  {
+    title: "나눔 장터",
+    description: "남는 고기, 술, 일회용품을 같은 지역 MT 팀에게 나눔하거나 양도해요.",
+    posts: ["대성리 소주 8병 남아요", "가평역 근처 종이컵 나눔", "숯 3kg 필요하신 팀?"],
+  },
+  {
+    title: "물품 공유",
+    description: "빔프로젝터, 마이크, 보드게임처럼 잠깐 필요한 물품을 빌리거나 찾아요.",
+    posts: ["강촌 오늘 밤 블루투스 마이크 구해요", "보드게임 4종 빌려드립니다", "멀티탭 여분 있으신 팀"],
+  },
+  {
+    title: "현장 정보",
+    description: "픽업, 택시, 편의점, 날씨, 소음 규칙처럼 현장에서 필요한 정보를 공유해요.",
+    posts: ["가평역 택시 줄 현재 20분", "근처 편의점 얼음 재고 있음", "대성리 비 와서 운동장 젖었어요"],
+  },
+  {
+    title: "그날의 쪽지",
+    description: "같은 날 같은 지역에서 마주친 다른 학교 MT 팀에게 익명으로 마음을 전해요.",
+    posts: ["6/12 강촌역 파란 과잠 분들", "가평 편의점에서 도와준 팀 고마워요", "양평 버스정류장 우산 빌려주신 분"],
+  },
 ];
 
 const state = {
@@ -466,6 +491,7 @@ const state = {
   ],
   activeChatId: "river-chat",
   rating: 5,
+  showAllActivities: false,
   pendingPayment: null,
   paymentResult: null,
 };
@@ -690,7 +716,7 @@ function openListingFromMap(kind, itemId) {
   }
 
   state.selectedStore = stores.find((store) => store.id === itemId) || stores[0];
-  state.activeCategory = qs("#marketCategory")?.value || "전체";
+  state.activeCategory = "전체";
   navigate("storeDetail");
 }
 
@@ -1102,23 +1128,54 @@ function renderBooking() {
   });
 }
 
-function getStoreMatches() {
-  const region = qs("#marketRegion").value;
-  const category = qs("#marketCategory").value;
-  return stores.filter((store) => {
-    const regionOk = region === "전체" || store.region === region;
-    const categoryOk = category === "전체" || store.products.some((product) => product.category === category);
-    return regionOk && categoryOk;
-  });
-}
-
 function renderStores() {
-  const matches = getStoreMatches();
-  qs("#storeCount").textContent = `${matches.length}개 공판장`;
-  qs("#storeList").innerHTML = matches.length
-    ? matches.map(storeCard).join("")
-    : `<div class="empty-state">조건에 맞는 공판장이 없습니다.</div>`;
-  renderListingMap("market", matches);
+  const store = stores[0];
+  state.selectedStore = store;
+  const categories = ["전체", "식재료", "주류/음료", "일회용품", "냉동식품", "기타"];
+  if (!categories.includes(state.activeCategory)) state.activeCategory = "전체";
+  const products = state.activeCategory === "전체"
+    ? store.products
+    : store.products.filter((product) => product.category === state.activeCategory);
+  const people = Number(qs("#marketPeople")?.value || 32);
+  const porkKg = Math.ceil(people * 0.35);
+  qs("#marketIntro").innerHTML = `
+    <section class="market-intro">
+      <img src="${store.image}" alt="${store.name} 매장 사진" />
+      <div class="market-intro-body">
+        <p class="eyebrow">${store.region} 계약 공판장</p>
+        <h2>${store.name}</h2>
+        <p>${store.intro} 숙소 일정에 맞춰 수령 또는 배송 요청을 남길 수 있습니다.</p>
+        <div class="detail-meta">
+          <span class="pill">★ ${store.rating}</span>
+          <span class="pill success">${store.type}</span>
+          <span class="pill warning">주류 성인 인증</span>
+        </div>
+        <div class="market-controls">
+          <label>참여 인원<input type="number" id="marketPeople" min="10" max="120" value="${people}" /></label>
+          <div class="market-reco">
+            <strong>${people}명 기준</strong>
+            <span>고기 약 ${porkKg}kg · 생수 2L 약 ${Math.ceil(people * 0.6)}병</span>
+          </div>
+        </div>
+        <div class="button-row">
+          <button class="secondary-btn" data-open-chat="${store.name}"><i data-lucide="messages-square"></i>공판장 문의</button>
+          <button class="ghost-btn" data-route="cart"><i data-lucide="shopping-cart"></i>장바구니 보기</button>
+        </div>
+      </div>
+    </section>
+  `;
+  qs("#marketProducts").innerHTML = `
+    <div class="section-toolbar">
+      <h2>상품 둘러보기</h2>
+      <span>${products.length}개 상품</span>
+    </div>
+    <div class="category-tabs">
+      ${categories.map((cat) => `<button class="category-tab ${cat === state.activeCategory ? "active" : ""}" data-category="${cat}">${cat}</button>`).join("")}
+    </div>
+    <div class="product-grid">
+      ${products.map(productCard).join("")}
+    </div>
+  `;
   updateCartBadge();
   refreshIcons();
 }
@@ -1751,26 +1808,46 @@ function renderCommunity() {
   const style = qs("#mealStyle").value;
   const factor = style === "heavy" ? 0.45 : style === "light" ? 0.28 : 0.35;
   const pork = Math.ceil(people * factor);
-  const drinks = Math.ceil(people * 1.7);
+  const alcohol = Math.ceil(people * (style === "light" ? 1.1 : style === "heavy" ? 2.1 : 1.6));
   const water = Math.ceil(people * 0.6);
+  const snacks = Math.ceil(people * (style === "heavy" ? 0.35 : 0.25));
   qs("#recommendResult").innerHTML = `
     <strong>${people}명 기준 추천</strong>
-    <span>고기: 약 ${pork}kg</span>
-    <span>음료/주류: 약 ${drinks}병 또는 캔</span>
-    <span>생수 2L: 약 ${water}병</span>
+    <span>고기 · 약 ${pork}kg</span>
+    <span>술 · 약 ${alcohol}병 또는 캔</span>
+    <span>생수 · 2L ${water}병</span>
+    <span>안주 · 약 ${snacks}kg 또는 ${Math.ceil(people / 6)}세트</span>
   `;
-  qs("#activityList").innerHTML = activities
+  const visibleActivities = state.showAllActivities ? activities : activities.slice(0, 3);
+  qs("#activityList").innerHTML = visibleActivities
     .map(
       (activity) => `
       <article class="mini-card">
         <h3>${activity.title}</h3>
         <p>${activity.people} · ${activity.time}</p>
         <span class="pill">${activity.note}</span>
+        <span class="muted">${activity.media}</span>
       </article>
     `
     )
     .join("");
-  qs("#communityReviews").innerHTML = state.reviews.map(reviewCard).join("");
+  const activityToggle = qs("[data-toggle-activities]");
+  if (activityToggle) activityToggle.textContent = state.showAllActivities ? "접기" : "더보기";
+  qs("#communityBoards").innerHTML = communityBoards
+    .map(
+      (board) => `
+      <article class="board-card">
+        <div>
+          <h3>${board.title}</h3>
+          <p>${board.description}</p>
+        </div>
+        <ul>
+          ${board.posts.map((post) => `<li>${post}</li>`).join("")}
+        </ul>
+      </article>
+    `
+    )
+    .join("");
   refreshIcons();
 }
 
@@ -1847,7 +1924,6 @@ function orderCard(item) {
 
 function renderReviews() {
   qs("#reviewList").innerHTML = state.reviews.map(reviewCard).join("");
-  qs("#communityReviews") && (qs("#communityReviews").innerHTML = state.reviews.map(reviewCard).join(""));
   qs("#ratingRow").innerHTML = [1, 2, 3, 4, 5]
     .map((score) => `<button type="button" class="star-btn ${score <= state.rating ? "active" : ""}" data-rating="${score}">★</button>`)
     .join("");
@@ -1950,7 +2026,7 @@ document.addEventListener("click", (event) => {
   const storeButton = event.target.closest("[data-store-id]");
   if (storeButton) {
     state.selectedStore = stores.find((store) => store.id === storeButton.dataset.storeId) || stores[0];
-    state.activeCategory = qs("#marketCategory")?.value || "전체";
+    state.activeCategory = "전체";
     navigate("storeDetail");
     return;
   }
@@ -1958,7 +2034,20 @@ document.addEventListener("click", (event) => {
   const categoryButton = event.target.closest("[data-category]");
   if (categoryButton) {
     state.activeCategory = categoryButton.dataset.category;
-    renderStoreDetail();
+    currentRoute() === "market" ? renderStores() : renderStoreDetail();
+    return;
+  }
+
+  const activityToggle = event.target.closest("[data-toggle-activities]");
+  if (activityToggle) {
+    state.showAllActivities = !state.showAllActivities;
+    renderCommunity();
+    return;
+  }
+
+  const communityWriteButton = event.target.closest("[data-community-write]");
+  if (communityWriteButton) {
+    toast("익명 게시글 작성 화면으로 연결됩니다.");
     return;
   }
 
@@ -2058,7 +2147,7 @@ document.addEventListener("click", (event) => {
 
 document.addEventListener("input", (event) => {
   if (event.target.matches("#stayPrice, #stayRegion, #stayPeople, #stayDate, #stayMinRooms, #stayMinBaths")) renderStays();
-  if (event.target.matches("#marketRegion, #marketCategory, #marketPeople, #marketDate")) renderStores();
+  if (event.target.matches("#marketPeople")) renderStores();
   if (event.target.matches("#recommendPeople, #mealStyle")) renderCommunity();
   if (event.target.matches("[data-cart-input]")) {
     const item = state.cart.find((row) => row.productId === event.target.dataset.cartInput);
@@ -2071,7 +2160,7 @@ document.addEventListener("input", (event) => {
 
 document.addEventListener("change", (event) => {
   if (event.target.matches("#stayRegion, #stayDate, [data-stay-filter], #stayMinRooms, #stayMinBaths")) renderStays();
-  if (event.target.matches("#marketRegion, #marketCategory, #marketDate")) renderStores();
+  if (event.target.matches("#marketPeople")) renderStores();
   if (event.target.matches("#mealStyle")) renderCommunity();
 });
 
