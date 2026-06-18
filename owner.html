@@ -1,0 +1,1224 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>moTF 운영 포털 MVP</title>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    :root {
+      --bg: #f7f5ef;
+      --surface: #fffdf8;
+      --surface-2: #f0ede4;
+      --ink: #20231f;
+      --muted: #77736a;
+      --line: #dfd9cc;
+      --brand: #536645;
+      --brand-strong: #39472f;
+      --brand-soft: #e6ecdd;
+      --warning: #a76318;
+      --danger: #a33932;
+      --blue: #3c5878;
+      --shadow: 0 16px 40px rgba(40, 35, 25, 0.08);
+      --radius: 8px;
+      font-family: Inter, Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--ink);
+      font-size: 14px;
+    }
+    button, input, select, textarea { font: inherit; }
+    button { cursor: pointer; }
+
+    .login {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: minmax(360px, 440px) 1fr;
+      background: var(--bg);
+    }
+    .login-panel {
+      background: var(--surface);
+      border-right: 1px solid var(--line);
+      padding: 36px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 24px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 800;
+      color: var(--brand-strong);
+      letter-spacing: 0;
+    }
+    .brand-mark {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      background: var(--brand);
+      color: #fffdf8;
+      display: grid;
+      place-items: center;
+      font-size: 13px;
+      font-weight: 800;
+    }
+    .login h1 {
+      margin: 0;
+      font-size: 30px;
+      line-height: 1.25;
+      letter-spacing: 0;
+    }
+    .muted { color: var(--muted); }
+    .role-grid { display: grid; gap: 10px; }
+    .role-card {
+      width: 100%;
+      border: 1px solid var(--line);
+      background: var(--surface);
+      border-radius: var(--radius);
+      padding: 14px;
+      text-align: left;
+      display: grid;
+      grid-template-columns: 32px 1fr;
+      gap: 12px;
+      align-items: start;
+    }
+    .role-card.active {
+      border-color: var(--brand);
+      background: var(--brand-soft);
+    }
+    .role-card i { color: var(--brand-strong); }
+    .role-card strong { display: block; margin-bottom: 4px; }
+    .role-card span { color: var(--muted); font-size: 13px; line-height: 1.45; }
+    .login-form { display: grid; gap: 12px; }
+    .field { display: grid; gap: 6px; }
+    .field label { font-size: 12px; font-weight: 700; color: var(--muted); }
+    .field input, .field select, .field textarea {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 11px 12px;
+      background: #fff;
+      color: var(--ink);
+    }
+    .primary, .secondary, .ghost, .danger {
+      border: 1px solid transparent;
+      border-radius: var(--radius);
+      min-height: 38px;
+      padding: 9px 12px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-weight: 700;
+    }
+    .primary { background: var(--brand); color: #fff; }
+    .secondary { background: var(--surface); color: var(--ink); border-color: var(--line); }
+    .ghost { background: transparent; color: var(--muted); }
+    .danger { background: #fff5f3; color: var(--danger); border-color: #e6c8c4; }
+    .login-visual {
+      padding: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .preview-shell {
+      width: min(880px, 100%);
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .preview-top {
+      height: 54px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 18px;
+      border-bottom: 1px solid var(--line);
+    }
+    .dot { width: 9px; height: 9px; border-radius: 50%; background: #d8d2c4; }
+    .preview-content { padding: 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    .preview-card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 16px;
+      background: #fff;
+      min-height: 140px;
+    }
+
+    .app { min-height: 100vh; display: none; grid-template-columns: 250px 1fr; }
+    .sidebar {
+      background: var(--surface);
+      border-right: 1px solid var(--line);
+      padding: 18px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+    }
+    .account-card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 12px;
+      background: var(--bg);
+    }
+    .account-card strong { display: block; margin-bottom: 4px; }
+    .nav { display: grid; gap: 4px; }
+    .nav button {
+      width: 100%;
+      border: 0;
+      background: transparent;
+      color: var(--muted);
+      min-height: 40px;
+      padding: 10px 12px;
+      border-radius: var(--radius);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      text-align: left;
+    }
+    .nav button.active, .nav button:hover { background: var(--brand-soft); color: var(--brand-strong); }
+    .main { min-width: 0; }
+    .topbar {
+      height: 64px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255, 253, 248, 0.9);
+      backdrop-filter: blur(10px);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 28px;
+      position: sticky;
+      top: 0;
+      z-index: 5;
+    }
+    .topbar h2 { margin: 0; font-size: 18px; letter-spacing: 0; }
+    .topbar-actions { display: flex; align-items: center; gap: 8px; }
+    .content { padding: 28px; max-width: 1440px; }
+    .panel { display: none; }
+    .panel.active { display: block; }
+    .section-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 18px;
+      margin-bottom: 18px;
+    }
+    .section-head h1 { margin: 0 0 6px; font-size: 24px; letter-spacing: 0; }
+    .section-head p { margin: 0; color: var(--muted); line-height: 1.5; }
+    .grid-4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 18px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+    .metric, .card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 16px;
+    }
+    .metric span { color: var(--muted); font-size: 12px; font-weight: 700; }
+    .metric strong { display: block; margin-top: 8px; font-size: 24px; letter-spacing: 0; }
+    .metric small { display: block; margin-top: 6px; color: var(--muted); }
+    .toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+    .toolbar input, .toolbar select {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      min-height: 38px;
+      padding: 8px 10px;
+      background: #fff;
+    }
+    table { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+    th, td { padding: 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle; }
+    th { color: var(--muted); font-size: 12px; background: var(--surface-2); }
+    tr:last-child td { border-bottom: 0; }
+    .table-wrap { overflow-x: auto; border-radius: var(--radius); }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+    .badge.green { background: var(--brand-soft); color: var(--brand-strong); }
+    .badge.orange { background: #f7ead7; color: var(--warning); }
+    .badge.red { background: #f9e6e2; color: var(--danger); }
+    .badge.blue { background: #e6edf5; color: var(--blue); }
+    .split { display: grid; grid-template-columns: 360px 1fr; gap: 14px; }
+    .list { display: grid; gap: 8px; }
+    .list-item {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+      padding: 12px;
+      text-align: left;
+      width: 100%;
+    }
+    .list-item.active { border-color: var(--brand); background: var(--brand-soft); }
+    .list-item strong { display: block; margin-bottom: 5px; }
+    .chat-box {
+      height: 520px;
+      display: grid;
+      grid-template-rows: 1fr auto;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      overflow: hidden;
+      background: var(--surface);
+    }
+    .messages { padding: 18px; overflow: auto; display: flex; flex-direction: column; gap: 10px; }
+    .bubble { max-width: 70%; border-radius: 14px; padding: 10px 12px; line-height: 1.45; }
+    .bubble.in { background: var(--surface-2); align-self: flex-start; }
+    .bubble.out { background: var(--brand); color: #fff; align-self: flex-end; }
+    .chat-input { border-top: 1px solid var(--line); padding: 12px; display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+    .chat-input input { border: 1px solid var(--line); border-radius: var(--radius); padding: 10px; }
+    .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .form-grid .full { grid-column: 1 / -1; }
+    .activity {
+      display: grid;
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .activity-row {
+      display: grid;
+      grid-template-columns: 110px 1fr auto;
+      gap: 12px;
+      align-items: center;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+    }
+    .empty { padding: 24px; text-align: center; color: var(--muted); border: 1px dashed var(--line); border-radius: var(--radius); background: var(--surface); }
+    .mobile-only { display: none; }
+    .tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; }
+    .tab {
+      border: 1px solid var(--line);
+      background: var(--surface);
+      color: var(--muted);
+      min-height: 36px;
+      border-radius: var(--radius);
+      padding: 8px 12px;
+      font-weight: 800;
+    }
+    .tab.active { border-color: var(--brand); background: var(--brand-soft); color: var(--brand-strong); }
+    .calendar-shell { display: grid; grid-template-columns: 1fr 320px; gap: 14px; }
+    .calendar {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(96px, 1fr));
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      overflow: auto;
+      background: var(--surface);
+    }
+    .calendar-head, .calendar-day {
+      min-height: 42px;
+      padding: 10px;
+      border-right: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+    }
+    .calendar-head { min-height: 36px; background: var(--surface-2); color: var(--muted); font-size: 12px; font-weight: 800; }
+    .calendar-day { min-height: 118px; background: #fff; }
+    .calendar-day:nth-child(7n), .calendar-head:nth-child(7n) { border-right: 0; }
+    .day-num { font-weight: 800; margin-bottom: 8px; }
+    .event-pill {
+      display: block;
+      width: 100%;
+      border: 0;
+      text-align: left;
+      border-radius: 6px;
+      padding: 6px;
+      margin-top: 5px;
+      font-size: 12px;
+      line-height: 1.35;
+      background: var(--brand-soft);
+      color: var(--brand-strong);
+    }
+    .event-pill.pending { background: #f7ead7; color: var(--warning); }
+    .event-pill.past { background: var(--surface-2); color: var(--muted); }
+    .chart-bars { display: grid; gap: 10px; margin-top: 12px; }
+    .bar-row { display: grid; grid-template-columns: 108px 1fr 96px; gap: 10px; align-items: center; }
+    .bar-track { height: 10px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+    .bar-fill { height: 100%; border-radius: 999px; background: var(--brand); }
+    .insight-grid { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 14px; margin-top: 14px; }
+    .edit-preview {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      align-items: start;
+    }
+    .photo-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+    .photo-slot {
+      aspect-ratio: 4 / 3;
+      border: 1px dashed var(--line);
+      border-radius: var(--radius);
+      background: linear-gradient(135deg, var(--surface-2), #fff);
+      display: grid;
+      place-items: center;
+      color: var(--muted);
+      font-size: 12px;
+      text-align: center;
+      padding: 8px;
+    }
+    .option-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    .option-row {
+      border: 1px solid var(--line);
+      background: var(--surface);
+      border-radius: var(--radius);
+      padding: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    @media (max-width: 1000px) {
+      .login { grid-template-columns: 1fr; }
+      .login-visual { display: none; }
+      .app { grid-template-columns: 1fr; }
+      .sidebar { position: static; height: auto; }
+      .nav { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .content { padding: 20px; }
+      .grid-4, .grid-3, .split, .form-grid, .preview-content, .calendar-shell, .insight-grid, .edit-preview, .photo-grid, .option-grid { grid-template-columns: 1fr; }
+      .topbar { padding: 0 18px; }
+      .activity-row { grid-template-columns: 1fr; }
+      .calendar { grid-template-columns: repeat(7, minmax(72px, 1fr)); }
+    }
+  </style>
+</head>
+<body>
+  <section class="login" id="loginView">
+    <div class="login-panel">
+      <div class="brand">
+        <div class="brand-mark">TF</div>
+        <span>moTF 운영 포털</span>
+      </div>
+      <div>
+        <h1>4단계 운영 포털 MVP</h1>
+        <p class="muted">사장님과 관리자가 같은 구조 안에서 필요한 데이터만 보도록 나눈 프로토타입입니다.</p>
+      </div>
+
+      <div class="role-grid" id="roleCards">
+        <button class="role-card active" data-role="admin">
+          <i data-lucide="shield-check"></i>
+          <span><strong>관리자</strong>전체 숙소, 공판장, 거래, 커뮤니티, 회원, 분쟁을 관리합니다.</span>
+        </button>
+        <button class="role-card" data-role="stay">
+          <i data-lucide="building-2"></i>
+          <span><strong>숙소 사장님</strong>내 숙소, 객실, 예약, 채팅, 리뷰만 확인합니다.</span>
+        </button>
+        <button class="role-card" data-role="market">
+          <i data-lucide="store"></i>
+          <span><strong>공판장 사장님</strong>내 상품, 주문, 채팅, 리뷰만 확인합니다.</span>
+        </button>
+      </div>
+
+      <form class="login-form" id="loginForm">
+        <div class="field">
+          <label for="demoAccount">데모 계정</label>
+          <input id="demoAccount" value="admin@motf.demo" autocomplete="off" />
+        </div>
+        <div class="field">
+          <label for="demoPassword">비밀번호</label>
+          <input id="demoPassword" type="password" value="123456" readonly />
+        </div>
+        <button class="primary" type="submit"><i data-lucide="log-in"></i>포털 입장</button>
+      </form>
+    </div>
+    <div class="login-visual">
+      <div class="preview-shell">
+        <div class="preview-top"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="muted">운영 현황 미리보기</span></div>
+        <div class="preview-content">
+          <div class="preview-card">
+            <strong>오늘 처리할 일</strong>
+            <p class="muted">예약 승인 2건, 주문 확인 1건, 분쟁 접수 1건</p>
+          </div>
+          <div class="preview-card">
+            <strong>파트너 공개 상태</strong>
+            <p class="muted">숙소 3곳 공개, 공판장 1곳 공개, 신규 심사 1건</p>
+          </div>
+          <div class="preview-card">
+            <strong>커뮤니티 관리</strong>
+            <p class="muted">신고 글 2건, 익명 게시판 운영 상태 정상</p>
+          </div>
+          <div class="preview-card">
+            <strong>실시간 채팅</strong>
+            <p class="muted">미응답 3건, 관리자 중개 필요 1건</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="app" id="appView">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">TF</div>
+        <span>moTF</span>
+      </div>
+      <div class="account-card">
+        <strong id="accountName">관리자</strong>
+        <span class="muted" id="accountDesc">전체 운영 권한</span>
+      </div>
+      <nav class="nav" id="nav"></nav>
+      <button class="ghost" id="logoutBtn"><i data-lucide="log-out"></i>로그아웃</button>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <h2 id="topTitle">대시보드</h2>
+        <div class="topbar-actions">
+          <button class="secondary" id="seedBtn"><i data-lucide="refresh-ccw"></i>데모 데이터 초기화</button>
+          <button class="primary" data-open-panel="chat"><i data-lucide="message-square"></i>채팅</button>
+        </div>
+      </header>
+      <div class="content" id="content"></div>
+    </main>
+  </section>
+
+  <script>
+    const fmt = new Intl.NumberFormat("ko-KR");
+    const money = value => fmt.format(value) + "원";
+    const statusClass = {
+      공개: "green", 비공개: "orange", 대기: "orange", 확정: "green", 완료: "green",
+      취소: "red", 접수: "orange", 검토: "blue", 해결: "green", 숨김: "red", 정상: "green",
+      "확정 대기": "orange", "지난 예약": "blue", "지난 주문": "blue", 거절: "red",
+      "정산 완료": "green", "정산 예정": "orange"
+    };
+
+    const seed = () => ({
+      role: "admin",
+      activePanel: "dashboard",
+      activeChat: "c1",
+      selectedRole: "admin",
+      transactionTab: "확정 대기",
+      revenueMode: "period",
+      selectedCalendarId: "r-1001",
+      stays: [
+        { id: "s1", name: "가평 리버사이드 펜션", owner: "박민수", status: "공개", rooms: 4, monthSales: 4320000, rating: 4.7, desc: "대학생 MT와 동아리 행사에 맞춘 넓은 독채형 펜션입니다.", photos: ["외관", "대강당", "바베큐장"], options: ["바베큐장", "노래방", "족구장", "수영장", "버스 주차"] },
+        { id: "s2", name: "청평 포레스트 하우스", owner: "김지현", status: "공개", rooms: 3, monthSales: 2860000, rating: 4.5, desc: "청평역에서 가까운 숲속 단체 숙소입니다.", photos: ["외관", "거실", "마당"], options: ["세미나실", "빔프로젝터", "주차"] },
+        { id: "s3", name: "대성리 스테이 24", owner: "이준호", status: "비공개", rooms: 2, monthSales: 0, rating: 0, desc: "오픈 준비 중인 대성리 단체 숙소입니다.", photos: ["외관"], options: ["바베큐장"] }
+      ],
+      markets: [
+        { id: "m1", name: "가평 청춘 공판장", owner: "최정우", status: "공개", products: 38, monthSales: 3000000, rating: 4.6, desc: "MT 장보기용 고기, 주류, 생수, 안주를 묶음으로 준비하는 계약 공판장입니다.", photos: ["매장", "정육 냉장고", "배송차량"], options: ["펜션 배송", "냉장 보관", "대량 견적", "수령 시간 지정"] }
+      ],
+      transactions: [
+        { id: "r-1001", type: "숙소 예약", partner: "가평 리버사이드 펜션", user: "고려대 경영 MT", date: "2026-06-20", amount: 720000, cost: 180000, status: "확정 대기", item: "단체동 A", settled: false },
+        { id: "r-1002", type: "숙소 예약", partner: "가평 리버사이드 펜션", user: "연세대 밴드 동아리", date: "2026-06-25", amount: 680000, cost: 160000, status: "확정", item: "복층동 B", settled: false },
+        { id: "r-1003", type: "숙소 예약", partner: "가평 리버사이드 펜션", user: "서강대 학생회", date: "2026-06-12", amount: 720000, cost: 170000, status: "지난 예약", item: "단체동 A", settled: true },
+        { id: "r-1004", type: "숙소 예약", partner: "가평 리버사이드 펜션", user: "한양대 동문회", date: "2026-06-05", amount: 680000, cost: 150000, status: "거절", item: "복층동 B", rejectReason: "시설 보수 일정 중복", settled: false },
+        { id: "r-1005", type: "숙소 예약", partner: "청평 포레스트 하우스", user: "중앙대 사진동아리", date: "2026-06-28", amount: 860000, cost: 210000, status: "확정", item: "전관 대여", settled: false },
+        { id: "o-2001", type: "공판장 주문", partner: "가평 청춘 공판장", user: "중앙대 연합 MT", date: "2026-06-22", amount: 1320000, cost: 980000, status: "확정 대기", item: "고기/술 패키지", settled: false },
+        { id: "o-2002", type: "공판장 주문", partner: "가평 청춘 공판장", user: "서강대 학생회", date: "2026-06-12", amount: 418000, cost: 285000, status: "지난 주문", item: "주류/생수", settled: true },
+        { id: "o-2003", type: "공판장 주문", partner: "가평 청춘 공판장", user: "외대 방송부", date: "2026-06-29", amount: 760000, cost: 520000, status: "확정", item: "바베큐 세트", settled: false },
+        { id: "o-2004", type: "공판장 주문", partner: "가평 청춘 공판장", user: "건국대 밴드부", date: "2026-06-09", amount: 300000, cost: 220000, status: "거절", item: "주류 추가 주문", rejectReason: "수령 시간 재고 부족", settled: false }
+      ],
+      rooms: [
+        { id: "room-1", stayId: "s1", name: "단체동 A", capacity: "25명", price: 720000, status: "공개" },
+        { id: "room-2", stayId: "s1", name: "복층동 B", capacity: "18명", price: 680000, status: "공개" }
+      ],
+      products: [
+        { id: "p1", marketId: "m1", name: "국내산 삼겹살 1kg", category: "고기", price: 23900, stock: 80, status: "공개" },
+        { id: "p2", marketId: "m1", name: "소주 20병 박스", category: "술", price: 34800, stock: 45, status: "공개" },
+        { id: "p3", marketId: "m1", name: "생수 2L 12병", category: "생수", price: 9800, stock: 100, status: "공개" }
+      ],
+      monthlyRevenue: [
+        { month: "2026-03", stay: 1280000, market: 520000, cost: 720000 },
+        { month: "2026-04", stay: 2460000, market: 940000, cost: 1320000 },
+        { month: "2026-05", stay: 3600000, market: 1820000, cost: 2180000 },
+        { month: "2026-06", stay: 3660000, market: 2798000, cost: 2875000 }
+      ],
+      posts: [
+        { id: "post-1", board: "나눔장터", title: "대성리 근처 남는 숯 나눔합니다", author: "익명", reports: 0, status: "정상" },
+        { id: "post-2", board: "현장정보", title: "청평역 택시 줄 현재 20분 정도", author: "익명", reports: 0, status: "정상" },
+        { id: "post-3", board: "익명고백", title: "어제 파란 과잠 분 찾습니다", author: "익명", reports: 2, status: "검토" }
+      ],
+      members: [
+        { id: "u1", name: "김고려", role: "user", org: "고려대 경영학과", status: "정상" },
+        { id: "u2", name: "박민수", role: "partner", org: "가평 리버사이드 펜션", status: "정상" },
+        { id: "u3", name: "최정우", role: "partner", org: "가평 청춘 공판장", status: "정상" }
+      ],
+      reviews: [
+        { id: "rv1", target: "가평 리버사이드 펜션", user: "고려대 경영 MT", rating: 5, body: "응답이 빠르고 단체 이용 동선이 좋았어요.", status: "정상" },
+        { id: "rv2", target: "가평 청춘 공판장", user: "중앙대 연합 MT", rating: 4, body: "고기 상태가 좋았고 배송 시간이 정확했습니다.", status: "정상" }
+      ],
+      disputes: [
+        { id: "d1", target: "가평 리버사이드 펜션", user: "한양대 동문회", reason: "환불 규정 문의", status: "접수", memo: "정책 안내 필요" },
+        { id: "d2", target: "가평 청춘 공판장", user: "중앙대 연합 MT", reason: "주류 수량 확인", status: "검토", memo: "사장님 답변 대기" }
+      ],
+      chats: [
+        { id: "c1", partner: "가평 리버사이드 펜션", user: "고려대 경영 MT", unread: 2, needAdmin: false, messages: [
+          { from: "user", text: "바베큐장 이용 시간이 몇 시까지인가요?" },
+          { from: "partner", text: "기본은 22시까지이고 조용히 이용하면 23시까지 가능합니다." }
+        ] },
+        { id: "c2", partner: "가평 청춘 공판장", user: "중앙대 연합 MT", unread: 1, needAdmin: true, messages: [
+          { from: "user", text: "주문 수량 변경하고 싶은데 결제 후에도 가능한가요?" },
+          { from: "admin", text: "수령 전날 오전까지는 변경 가능하도록 중개하겠습니다." }
+        ] }
+      ]
+    });
+
+    let state = seed();
+
+    const menus = {
+      admin: [
+        ["dashboard", "layout-dashboard", "대시보드"],
+        ["revenue", "chart-no-axes-combined", "매출/정산"],
+        ["stays", "building-2", "숙소 관리"],
+        ["markets", "store", "공판장 관리"],
+        ["transactions", "receipt-text", "예약/주문"],
+        ["chat", "message-square", "채팅 관리"],
+        ["community", "messages-square", "커뮤니티"],
+        ["reviews", "star", "리뷰 관리"],
+        ["disputes", "circle-alert", "문의/분쟁"],
+        ["members", "users", "회원 관리"]
+      ],
+      stay: [
+        ["dashboard", "layout-dashboard", "대시보드"],
+        ["calendar", "calendar-days", "캘린더"],
+        ["myStay", "building-2", "내 숙소"],
+        ["transactions", "receipt-text", "내 예약"],
+        ["revenue", "chart-no-axes-combined", "매출 관리"],
+        ["mypage", "settings", "마이페이지"],
+        ["chat", "message-square", "내 채팅"],
+        ["reviews", "star", "내 리뷰"]
+      ],
+      market: [
+        ["dashboard", "layout-dashboard", "대시보드"],
+        ["calendar", "calendar-days", "캘린더"],
+        ["myMarket", "store", "내 공판장"],
+        ["transactions", "receipt-text", "내 주문"],
+        ["revenue", "chart-no-axes-combined", "매출 관리"],
+        ["mypage", "settings", "마이페이지"],
+        ["chat", "message-square", "내 채팅"],
+        ["reviews", "star", "내 리뷰"]
+      ]
+    };
+
+    const byRole = {
+      admin: { name: "moTF 관리자", desc: "전체 운영 권한", account: "admin@motf.demo" },
+      stay: { name: "가평 리버사이드 펜션", desc: "숙소 파트너", account: "stay@motf.demo" },
+      market: { name: "가평 청춘 공판장", desc: "공판장 파트너", account: "market@motf.demo" }
+    };
+
+    function visibleTransactions() {
+      if (state.role === "admin") return state.transactions;
+      const partner = state.role === "stay" ? "가평 리버사이드 펜션" : "가평 청춘 공판장";
+      return state.transactions.filter(item => item.partner === partner);
+    }
+
+    function visibleReviews() {
+      if (state.role === "admin") return state.reviews;
+      const target = state.role === "stay" ? "가평 리버사이드 펜션" : "가평 청춘 공판장";
+      return state.reviews.filter(item => item.target === target);
+    }
+
+    function visibleChats() {
+      if (state.role === "admin") return state.chats;
+      const partner = state.role === "stay" ? "가평 리버사이드 펜션" : "가평 청춘 공판장";
+      return state.chats.filter(item => item.partner === partner);
+    }
+
+    function setRole(role) {
+      state.selectedRole = role;
+      document.querySelectorAll(".role-card").forEach(card => card.classList.toggle("active", card.dataset.role === role));
+      document.getElementById("demoAccount").value = byRole[role].account;
+    }
+
+    function login(role) {
+      state.role = role;
+      state.activePanel = "dashboard";
+      state.activeChat = visibleChats()[0]?.id || "";
+      document.getElementById("loginView").style.display = "none";
+      document.getElementById("appView").style.display = "grid";
+      document.getElementById("accountName").textContent = byRole[role].name;
+      document.getElementById("accountDesc").textContent = byRole[role].desc;
+      renderNav();
+      render();
+    }
+
+    function renderNav() {
+      const nav = document.getElementById("nav");
+      nav.innerHTML = menus[state.role].map(([id, icon, label]) => `
+        <button data-panel="${id}" class="${state.activePanel === id ? "active" : ""}">
+          <i data-lucide="${icon}"></i><span>${label}</span>
+        </button>
+      `).join("");
+      lucide.createIcons();
+    }
+
+    function setPanel(panel) {
+      state.activePanel = panel;
+      renderNav();
+      render();
+    }
+
+    function panelTitle(panel) {
+      const item = menus[state.role].find(menu => menu[0] === panel);
+      return item ? item[2] : "대시보드";
+    }
+
+    function render() {
+      document.getElementById("topTitle").textContent = panelTitle(state.activePanel);
+      const content = document.getElementById("content");
+      const map = {
+        dashboard: renderDashboard,
+        calendar: renderCalendar,
+        revenue: renderRevenue,
+        mypage: renderMyPage,
+        stays: renderStays,
+        markets: renderMarkets,
+        transactions: renderTransactions,
+        chat: renderChat,
+        community: renderCommunity,
+        reviews: renderReviews,
+        disputes: renderDisputes,
+        members: renderMembers,
+        myStay: renderMyStay,
+        myMarket: renderMyMarket
+      };
+      content.innerHTML = (map[state.activePanel] || renderDashboard)();
+      lucide.createIcons();
+    }
+
+    function renderDashboard() {
+      const tx = visibleTransactions();
+      const revenue = tx.reduce((sum, item) => sum + item.amount, 0);
+      const pending = tx.filter(item => item.status === "확정 대기").length;
+      const chatCount = visibleChats().filter(item => item.unread > 0).length;
+      const disputeCount = state.role === "admin" ? state.disputes.filter(item => item.status !== "해결").length : 0;
+      return `
+        <div class="section-head">
+          <div>
+            <h1>${byRole[state.role].name} 운영 현황</h1>
+            <p>오늘 바로 확인해야 하는 거래, 채팅, 리뷰, 분쟁을 한 화면에서 봅니다.</p>
+          </div>
+          <button class="secondary" data-action="export"><i data-lucide="download"></i>운영 리포트</button>
+        </div>
+        <div class="grid-4">
+          <div class="metric"><span>이번 달 거래액</span><strong>${money(revenue)}</strong><small>확정 전 거래 포함</small></div>
+          <div class="metric"><span>승인 대기</span><strong>${pending}건</strong><small>예약/주문 확인 필요</small></div>
+          <div class="metric"><span>미응답 채팅</span><strong>${chatCount}건</strong><small>사장님 또는 관리자 답변 필요</small></div>
+          <div class="metric"><span>${state.role === "admin" ? "미해결 분쟁" : "내 리뷰"}</span><strong>${state.role === "admin" ? disputeCount : visibleReviews().length}건</strong><small>운영 품질 관리 항목</small></div>
+        </div>
+        <div class="grid-3">
+          <div class="card"><h3>처리 우선순위</h3>${renderMiniTasks()}</div>
+          <div class="card"><h3>최근 거래</h3>${renderMiniTransactions(tx.slice(0, 4))}</div>
+          <div class="card"><h3>DB 연결 준비 상태</h3>
+            <p class="muted">profiles, partner_profiles, stays, rooms, markets, products, reservations, orders, posts, reviews, disputes 테이블로 이동하기 쉽게 화면 단위를 나눴습니다.</p>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderMiniTasks() {
+      const tasks = state.role === "admin"
+        ? ["신규 파트너 심사 1건", "신고 게시글 검토 2건", "분쟁 상태 업데이트 2건"]
+        : ["승인 대기 거래 확인", "미응답 채팅 답변", "공개 상태와 가격 확인"];
+      return `<div class="list">${tasks.map(task => `<div class="list-item"><strong>${task}</strong><span class="muted">오늘 처리 권장</span></div>`).join("")}</div>`;
+    }
+
+    function renderMiniTransactions(items) {
+      return `<div class="list">${items.map(item => `
+        <div class="list-item">
+          <strong>${item.user}</strong>
+          <span class="muted">${item.type} · ${money(item.amount)}</span>
+        </div>
+      `).join("")}</div>`;
+    }
+
+    function renderStays() {
+      return renderEntityTable("전체 숙소 관리", "숙소 공개 상태, 객실 수, 월 거래액을 관리합니다.", state.stays, ["숙소명", "사장님", "객실", "월 거래액", "평점", "상태"], item => [
+        item.name, item.owner, item.rooms + "개", money(item.monthSales), item.rating || "-", badge(item.status)
+      ]);
+    }
+
+    function renderMarkets() {
+      return renderEntityTable("공판장 관리", "계약 공판장과 상품 운영 상태를 관리합니다.", state.markets, ["공판장명", "사장님", "상품", "월 거래액", "평점", "상태"], item => [
+        item.name, item.owner, item.products + "개", money(item.monthSales), item.rating, badge(item.status)
+      ]);
+    }
+
+    function renderMyStay() {
+      const stay = state.stays[0];
+      return `
+        <div class="section-head"><div><h1>내 숙소</h1><p>사장님이 직접 확인하는 숙소 정보와 객실 공개 상태입니다.</p></div><button class="primary"><i data-lucide="save"></i>변경 저장</button></div>
+        <div class="grid-3">
+          <div class="metric"><span>숙소 상태</span><strong>${stay.status}</strong><small>${stay.name}</small></div>
+          <div class="metric"><span>이번 달 예약액</span><strong>${money(stay.monthSales)}</strong><small>수수료 정산 전</small></div>
+          <div class="metric"><span>평점</span><strong>${stay.rating}</strong><small>최근 리뷰 기준</small></div>
+        </div>
+        <div class="card">
+          <h3>객실 현황</h3>
+          ${simpleTable(["객실명", "수용 인원", "기본가", "공개 상태"], state.rooms.map(room => [room.name, room.capacity, money(room.price), badge(room.status)]))}
+        </div>
+      `;
+    }
+
+    function renderMyMarket() {
+      const market = state.markets[0];
+      return `
+        <div class="section-head"><div><h1>내 공판장</h1><p>계약 공판장의 상품, 재고, 주문 대기 상태를 확인합니다.</p></div><button class="primary"><i data-lucide="save"></i>변경 저장</button></div>
+        <div class="grid-3">
+          <div class="metric"><span>공판장 상태</span><strong>${market.status}</strong><small>${market.name}</small></div>
+          <div class="metric"><span>이번 달 주문액</span><strong>${money(market.monthSales)}</strong><small>수수료 정산 전</small></div>
+          <div class="metric"><span>등록 상품</span><strong>${market.products}개</strong><small>품절 상품 포함</small></div>
+        </div>
+        <div class="card">
+          <h3>대표 상품</h3>
+          ${simpleTable(["상품명", "카테고리", "가격", "재고", "상태"], state.products.map(product => [product.name, product.category, money(product.price), product.stock, badge(product.status)]))}
+        </div>
+      `;
+    }
+
+    function renderCalendar() {
+      const rows = visibleTransactions().filter(item => item.status !== "거절");
+      const selected = rows.find(item => item.id === state.selectedCalendarId) || rows[0];
+      if (selected) state.selectedCalendarId = selected.id;
+      const days = Array.from({ length: 30 }, (_, idx) => idx + 1);
+      const heads = ["일", "월", "화", "수", "목", "금", "토"];
+      return `
+        <div class="section-head">
+          <div><h1>월간 스케줄 현황</h1><p>확정 대기와 확정된 예약/주문을 날짜별로 확인합니다. 거절 건은 캘린더에서 제외하고 예약/주문 관리에 기록합니다.</p></div>
+          <div class="toolbar"><button class="secondary"><i data-lucide="chevron-left"></i>이전 달</button><button class="secondary">2026년 6월</button><button class="secondary">다음 달<i data-lucide="chevron-right"></i></button></div>
+        </div>
+        <div class="calendar-shell">
+          <div class="calendar">
+            ${heads.map(head => `<div class="calendar-head">${head}</div>`).join("")}
+            <div class="calendar-day"></div>
+            ${days.map(day => {
+              const dayText = `2026-06-${String(day).padStart(2, "0")}`;
+              const events = rows.filter(item => item.date === dayText);
+              return `<div class="calendar-day"><div class="day-num">${day}</div>${events.map(item => `
+                <button class="event-pill ${item.status === "확정 대기" ? "pending" : item.status.includes("지난") ? "past" : ""}" data-calendar-id="${item.id}">
+                  ${item.user}<br>${item.item} · ${item.status}
+                </button>
+              `).join("")}</div>`;
+            }).join("")}
+          </div>
+          <aside class="card">
+            <h3>선택 일정</h3>
+            ${selected ? `
+              <p><strong>${selected.user}</strong></p>
+              <p class="muted">${selected.partner}</p>
+              <p>${selected.date} · ${selected.item}</p>
+              <p>${money(selected.amount)} · ${badge(selected.status)}</p>
+              <button class="primary" data-open-panel="chat"><i data-lucide="message-square"></i>채팅으로 이동</button>
+            ` : `<p class="muted">선택된 일정이 없습니다.</p>`}
+          </aside>
+        </div>
+      `;
+    }
+
+    function renderTransactions() {
+      const rows = visibleTransactions();
+      const tabs = state.role === "admin"
+        ? ["확정 대기", "확정", "지난 예약", "지난 주문", "거절"]
+        : state.role === "market"
+        ? ["확정 대기", "확정", "지난 주문", "거절"]
+        : ["확정 대기", "확정", "지난 예약", "거절"];
+      if (!tabs.includes(state.transactionTab)) state.transactionTab = "확정 대기";
+      const filtered = rows.filter(item => item.status === state.transactionTab);
+      return `
+        <div class="section-head"><div><h1>${state.role === "market" ? "내 주문" : state.role === "stay" ? "내 예약" : "전체 예약/주문"}</h1><p>결제 이후 운영 포털에서 확인하고 상태를 바꾸는 업무 화면입니다.</p></div></div>
+        <div class="tabs">${tabs.map(tab => `<button class="tab ${state.transactionTab === tab ? "active" : ""}" data-transaction-tab="${tab}">${tab} <span class="muted">${rows.filter(item => item.status === tab).length}</span></button>`).join("")}</div>
+        <div class="toolbar">
+          <input data-search="transactions" placeholder="단체명, 업체명 검색" />
+          <select data-filter="transactions"><option value="">전체 상태</option>${tabs.map(tab => `<option>${tab}</option>`).join("")}</select>
+        </div>
+        ${transactionTable(filtered)}
+      `;
+    }
+
+    function transactionTable(rows) {
+      return `<div class="table-wrap"><table>
+        <thead><tr><th>코드</th><th>유형</th><th>업체</th><th>이용자</th><th>일자</th><th>항목</th><th>금액</th><th>상태</th><th>처리</th></tr></thead>
+        <tbody>${rows.map(item => `
+          <tr data-row="transactions" data-text="${item.user} ${item.partner}" data-status="${item.status}">
+            <td><code>${item.id}</code></td><td>${item.type}</td><td>${item.partner}</td><td>${item.user}</td><td>${item.date}</td><td>${item.item}</td><td>${money(item.amount)}</td><td>${badge(item.status)}</td>
+            <td>
+              <button class="secondary" data-status-id="${item.id}" data-status-next="확정">확정</button>
+              <button class="danger" data-status-id="${item.id}" data-status-next="거절">거절</button>
+            </td>
+          </tr>
+        `).join("") || `<tr><td colspan="9" class="muted">해당 상태의 내역이 없습니다.</td></tr>`}</tbody>
+      </table></div>`;
+    }
+
+    function renderRevenue() {
+      const tx = visibleTransactions().filter(item => item.status !== "거절");
+      const gross = tx.reduce((sum, item) => sum + item.amount, 0);
+      const cost = tx.reduce((sum, item) => sum + item.cost, 0);
+      const feeRate = state.role === "market" ? 0.05 : 0.07;
+      const platformFee = state.role === "admin" ? tx.reduce((sum, item) => sum + item.amount * (item.type.includes("공판장") ? 0.05 : 0.07), 0) : gross * feeRate;
+      const settlement = state.role === "admin" ? gross - platformFee : gross - platformFee;
+      const settled = tx.filter(item => item.settled).reduce((sum, item) => sum + item.amount - item.amount * (item.type.includes("공판장") ? 0.05 : 0.07), 0);
+      const expected = settlement - settled;
+      const netProfit = state.role === "admin" ? platformFee : gross - platformFee - cost;
+      return `
+        <div class="section-head">
+          <div><h1>${state.role === "admin" ? "전체 매출/정산 관리" : "매출 관리"}</h1><p>이번 달 매출, 정산 금액, 완료/예정 금액, 순수익과 추이를 한 번에 봅니다.</p></div>
+          <button class="secondary"><i data-lucide="download"></i>정산 리포트 다운로드</button>
+        </div>
+        <div class="grid-4">
+          <div class="metric"><span>이번 달 매출</span><strong>${money(gross)}</strong><small>취소/거절 제외</small></div>
+          <div class="metric"><span>정산 금액</span><strong>${money(Math.floor(settlement))}</strong><small>플랫폼 수수료 공제 후</small></div>
+          <div class="metric"><span>정산 완료</span><strong>${money(Math.floor(settled))}</strong><small>지급 완료 거래 기준</small></div>
+          <div class="metric"><span>정산 예정</span><strong>${money(Math.floor(expected))}</strong><small>확정/대기 거래 기준</small></div>
+        </div>
+        <div class="tabs">
+          ${["period", "partner", "item", "profit", "settlement", "trend"].map(mode => `<button class="tab ${state.revenueMode === mode ? "active" : ""}" data-revenue-mode="${mode}">${revenueLabel(mode)}</button>`).join("")}
+        </div>
+        ${renderRevenueMode(tx, { gross, cost, platformFee, settlement, settled, expected, netProfit })}
+      `;
+    }
+
+    function revenueLabel(mode) {
+      return ({ period: "기간별 매출", partner: "업장별 매출", item: "항목/객실별 매출", profit: "순수익 계산기", settlement: "정산 현황", trend: "매출 변동 추이" })[mode];
+    }
+
+    function renderRevenueMode(tx, summary) {
+      if (state.revenueMode === "profit") {
+        const fixed = state.role === "admin" ? 1200000 : 450000;
+        const profit = state.role === "admin" ? summary.platformFee - fixed : summary.gross - summary.platformFee - summary.cost - fixed;
+        const margin = summary.gross ? (profit / summary.gross) * 100 : 0;
+        return `<div class="insight-grid">
+          <div class="card"><h3>순수익 계산기</h3>
+            <div class="form-grid">
+              <div class="field"><label>총 매출</label><input value="${money(summary.gross)}" readonly></div>
+              <div class="field"><label>원가/운영비</label><input value="${money(summary.cost + fixed)}" readonly></div>
+              <div class="field"><label>플랫폼 수수료</label><input value="${money(Math.floor(summary.platformFee))}" readonly></div>
+              <div class="field"><label>예상 순수익</label><input value="${money(Math.floor(profit))}" readonly></div>
+            </div>
+          </div>
+          <div class="metric"><span>순이익률</span><strong>${margin.toFixed(1)}%</strong><small>현재 데모 데이터 기준</small></div>
+        </div>`;
+      }
+      if (state.revenueMode === "settlement") {
+        return simpleTable(["거래", "업체", "금액", "정산 상태", "예정 지급액"], tx.map(item => {
+          const rate = item.type.includes("공판장") ? 0.05 : 0.07;
+          return [item.id, item.partner, money(item.amount), badge(item.settled ? "정산 완료" : "정산 예정"), money(Math.floor(item.amount * (1 - rate)))];
+        }));
+      }
+      if (state.revenueMode === "partner") {
+        const grouped = groupBy(tx, "partner");
+        return barList(Object.entries(grouped).map(([name, items]) => ({ name, value: items.reduce((sum, item) => sum + item.amount, 0) })));
+      }
+      if (state.revenueMode === "item") {
+        return barList(tx.map(item => ({ name: item.item, value: item.amount })));
+      }
+      const monthly = state.monthlyRevenue.map(row => ({ name: row.month, value: state.role === "admin" ? row.stay + row.market : state.role === "stay" ? row.stay : row.market }));
+      return state.revenueMode === "trend"
+        ? `<div class="card"><h3>최근 4개월 매출 추이</h3>${barList(monthly)}</div>`
+        : `<div class="card"><h3>기간별 매출 조회</h3>${barList(monthly)}</div>`;
+    }
+
+    function groupBy(items, key) {
+      return items.reduce((acc, item) => {
+        acc[item[key]] = acc[item[key]] || [];
+        acc[item[key]].push(item);
+        return acc;
+      }, {});
+    }
+
+    function barList(items) {
+      const max = Math.max(...items.map(item => item.value), 1);
+      return `<div class="chart-bars">${items.map(item => `
+        <div class="bar-row"><strong>${item.name}</strong><div class="bar-track"><div class="bar-fill" style="width:${Math.max(6, item.value / max * 100)}%"></div></div><span>${money(item.value)}</span></div>
+      `).join("")}</div>`;
+    }
+
+    function renderMyPage() {
+      const entity = state.role === "stay" ? state.stays[0] : state.markets[0];
+      const rows = state.role === "stay" ? state.rooms : state.products;
+      return `
+        <div class="section-head">
+          <div><h1>마이페이지 데이터 편집</h1><p>업장 소개글, 사진, 객실/상품 정보, 편의시설과 옵션을 수정합니다. 지금은 데모 상태지만 Supabase 저장 구조에 맞춰 분리했습니다.</p></div>
+          <button class="primary" data-save-profile><i data-lucide="database"></i>실시간 DB 반영</button>
+        </div>
+        <div class="edit-preview">
+          <div class="card">
+            <h3>업장 기본 정보</h3>
+            <div class="form-grid">
+              <div class="field full"><label>업장명</label><input data-profile-field="name" value="${entity.name}"></div>
+              <div class="field full"><label>소개글</label><textarea data-profile-field="desc" rows="5">${entity.desc}</textarea></div>
+              <div class="field"><label>공개 상태</label><select data-profile-field="status"><option ${entity.status === "공개" ? "selected" : ""}>공개</option><option ${entity.status === "비공개" ? "selected" : ""}>비공개</option></select></div>
+              <div class="field"><label>대표 연락 가능 시간</label><input value="09:00 - 22:00"></div>
+            </div>
+          </div>
+          <div class="card">
+            <h3>이용자 화면 미리보기</h3>
+            <div class="preview-card" style="min-height:0">
+              <strong id="profilePreviewName">${entity.name}</strong>
+              <p class="muted" id="profilePreviewDesc">${entity.desc}</p>
+              <p>${badge(entity.status)} · 평점 ${entity.rating}</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid-3" style="margin-top:14px">
+          <div class="card">
+            <h3>${state.role === "stay" ? "업장/객실 사진" : "공판장/상품 사진"}</h3>
+            <div class="photo-grid">${entity.photos.map(photo => `<div class="photo-slot"><i data-lucide="image"></i>${photo}<br>사진 교체</div>`).join("")}</div>
+          </div>
+          <div class="card">
+            <h3>편의시설 및 옵션</h3>
+            <div class="option-grid">${entity.options.map(option => `<label class="option-row"><input type="checkbox" checked> ${option}</label>`).join("")}</div>
+          </div>
+          <div class="card">
+            <h3>DB 반영 예정 테이블</h3>
+            <p class="muted">${state.role === "stay" ? "stays, rooms, attachments" : "markets, products, attachments"} 테이블 업데이트로 연결하면 됩니다.</p>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:14px">
+          <h3>${state.role === "stay" ? "객실 정보 수정" : "상품 정보 수정"}</h3>
+          ${state.role === "stay"
+            ? simpleTable(["이름", "수용 인원", "가격", "상태"], rows.map(row => [
+              `<input data-edit-row="${row.id}" data-edit-key="name" value="${row.name}">`,
+              `<input data-edit-row="${row.id}" data-edit-key="capacity" value="${row.capacity}">`,
+              `<input data-edit-row="${row.id}" data-edit-key="price" type="number" value="${row.price}">`,
+              badge(row.status)
+            ]))
+            : simpleTable(["상품명", "카테고리", "가격", "재고", "상태"], rows.map(row => [
+              `<input data-edit-row="${row.id}" data-edit-key="name" value="${row.name}">`,
+              `<input data-edit-row="${row.id}" data-edit-key="category" value="${row.category}">`,
+              `<input data-edit-row="${row.id}" data-edit-key="price" type="number" value="${row.price}">`,
+              `<input data-edit-row="${row.id}" data-edit-key="stock" type="number" value="${row.stock}">`,
+              badge(row.status)
+            ]))}
+        </div>
+      `;
+    }
+
+    function renderChat() {
+      const chats = visibleChats();
+      const current = chats.find(item => item.id === state.activeChat) || chats[0];
+      if (!current) return `<div class="empty">표시할 채팅이 없습니다.</div>`;
+      state.activeChat = current.id;
+      return `
+        <div class="section-head"><div><h1>채팅 관리</h1><p>사장님과 이용자 사이의 문의를 확인하고, 관리자는 중개 메시지를 남길 수 있습니다.</p></div></div>
+        <div class="split">
+          <div class="list">
+            ${chats.map(chat => `
+              <button class="list-item ${chat.id === current.id ? "active" : ""}" data-chat="${chat.id}">
+                <strong>${chat.user}</strong>
+                <span class="muted">${chat.partner} · 안 읽음 ${chat.unread}건 ${chat.needAdmin ? "· 관리자 확인" : ""}</span>
+              </button>
+            `).join("")}
+          </div>
+          <div class="chat-box">
+            <div class="messages" id="messages">
+              ${current.messages.map(msg => `<div class="bubble ${msg.from === "user" ? "in" : "out"}">${msg.text}</div>`).join("")}
+            </div>
+            <form class="chat-input" id="chatForm">
+              <input id="chatInput" placeholder="${state.role === "admin" ? "관리자 중개 메시지 입력" : "이용자에게 보낼 답변 입력"}" />
+              <button class="primary"><i data-lucide="send"></i>전송</button>
+            </form>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderCommunity() {
+      return `
+        <div class="section-head"><div><h1>커뮤니티 관리</h1><p>익명 MT 게시판의 게시글, 신고, 숨김 상태를 관리합니다.</p></div><button class="secondary"><i data-lucide="settings"></i>게시판 설정</button></div>
+        ${simpleTable(["게시판", "제목", "작성자", "신고", "상태", "처리"], state.posts.map(post => [
+          post.board, post.title, post.author, post.reports + "건", badge(post.status), `<button class="secondary" data-hide-post="${post.id}">숨김 처리</button>`
+        ]))}
+      `;
+    }
+
+    function renderReviews() {
+      return `
+        <div class="section-head"><div><h1>리뷰 관리</h1><p>숙소와 공판장 상세 페이지에 노출되는 리뷰를 확인합니다.</p></div></div>
+        ${simpleTable(["대상", "작성자", "평점", "내용", "상태"], visibleReviews().map(review => [
+          review.target, review.user, review.rating, review.body, badge(review.status)
+        ]))}
+      `;
+    }
+
+    function renderDisputes() {
+      return `
+        <div class="section-head"><div><h1>문의/분쟁 관리</h1><p>접수, 검토, 해결 상태를 남겨 중개 플랫폼의 운영 기록을 만듭니다.</p></div></div>
+        ${simpleTable(["코드", "대상", "이용자", "사유", "상태", "메모", "처리"], state.disputes.map(dispute => [
+          dispute.id, dispute.target, dispute.user, dispute.reason, badge(dispute.status), dispute.memo,
+          `<button class="secondary" data-dispute-id="${dispute.id}" data-dispute-next="검토">검토</button> <button class="primary" data-dispute-id="${dispute.id}" data-dispute-next="해결">해결</button>`
+        ]))}
+      `;
+    }
+
+    function renderMembers() {
+      return `
+        <div class="section-head"><div><h1>회원 관리</h1><p>이용자, 사장님, 관리자 계정의 기본 상태를 봅니다.</p></div><button class="secondary"><i data-lucide="user-plus"></i>초대 링크</button></div>
+        ${simpleTable(["이름", "역할", "소속", "상태"], state.members.map(member => [
+          member.name, member.role, member.org, badge(member.status)
+        ]))}
+      `;
+    }
+
+    function renderEntityTable(title, desc, rows, heads, mapper) {
+      return `
+        <div class="section-head"><div><h1>${title}</h1><p>${desc}</p></div><button class="secondary"><i data-lucide="plus"></i>등록은 5단계에서 연결</button></div>
+        ${simpleTable([...heads, "처리"], rows.map(item => [...mapper(item), `<button class="secondary" data-toggle="${item.id}">공개 전환</button>`]))}
+      `;
+    }
+
+    function simpleTable(heads, rows) {
+      return `<div class="table-wrap"><table><thead><tr>${heads.map(head => `<th>${head}</th>`).join("")}</tr></thead><tbody>${rows.map(row => `<tr>${row.map(cell => `<td>${cell}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+    }
+
+    function badge(text) {
+      return `<span class="badge ${statusClass[text] || "blue"}">${text}</span>`;
+    }
+
+    document.getElementById("roleCards").addEventListener("click", event => {
+      const card = event.target.closest("[data-role]");
+      if (card) setRole(card.dataset.role);
+    });
+
+    document.getElementById("loginForm").addEventListener("submit", event => {
+      event.preventDefault();
+      login(state.selectedRole);
+    });
+
+    document.getElementById("logoutBtn").addEventListener("click", () => {
+      document.getElementById("appView").style.display = "none";
+      document.getElementById("loginView").style.display = "grid";
+    });
+
+    document.getElementById("seedBtn").addEventListener("click", () => {
+      const role = state.role;
+      state = seed();
+      state.role = role;
+      state.selectedRole = role;
+      state.activePanel = "dashboard";
+      renderNav();
+      render();
+    });
+
+    document.body.addEventListener("click", event => {
+      const panelButton = event.target.closest("[data-panel], [data-open-panel]");
+      if (panelButton) setPanel(panelButton.dataset.panel || panelButton.dataset.openPanel);
+
+      const chatButton = event.target.closest("[data-chat]");
+      if (chatButton) {
+        state.activeChat = chatButton.dataset.chat;
+        render();
+      }
+
+      const calendarButton = event.target.closest("[data-calendar-id]");
+      if (calendarButton) {
+        state.selectedCalendarId = calendarButton.dataset.calendarId;
+        render();
+      }
+
+      const transactionTab = event.target.closest("[data-transaction-tab]");
+      if (transactionTab) {
+        state.transactionTab = transactionTab.dataset.transactionTab;
+        render();
+      }
+
+      const revenueButton = event.target.closest("[data-revenue-mode]");
+      if (revenueButton) {
+        state.revenueMode = revenueButton.dataset.revenueMode;
+        render();
+      }
+
+      const statusButton = event.target.closest("[data-status-id]");
+      if (statusButton) {
+        const item = state.transactions.find(tx => tx.id === statusButton.dataset.statusId);
+        if (item) item.status = statusButton.dataset.statusNext;
+        render();
+      }
+
+      const disputeButton = event.target.closest("[data-dispute-id]");
+      if (disputeButton) {
+        const item = state.disputes.find(dispute => dispute.id === disputeButton.dataset.disputeId);
+        if (item) item.status = disputeButton.dataset.disputeNext;
+        render();
+      }
+
+      const hideButton = event.target.closest("[data-hide-post]");
+      if (hideButton) {
+        const post = state.posts.find(item => item.id === hideButton.dataset.hidePost);
+        if (post) post.status = "숨김";
+        render();
+      }
+
+      const toggleButton = event.target.closest("[data-toggle]");
+      if (toggleButton) {
+        const item = [...state.stays, ...state.markets].find(entity => entity.id === toggleButton.dataset.toggle);
+        if (item) item.status = item.status === "공개" ? "비공개" : "공개";
+        render();
+      }
+
+      const saveProfile = event.target.closest("[data-save-profile]");
+      if (saveProfile) {
+        const entity = state.role === "stay" ? state.stays[0] : state.markets[0];
+        document.querySelectorAll("[data-profile-field]").forEach(input => {
+          entity[input.dataset.profileField] = input.value;
+        });
+        render();
+      }
+    });
+
+    document.body.addEventListener("submit", event => {
+      if (event.target.id === "chatForm") {
+        event.preventDefault();
+        const input = document.getElementById("chatInput");
+        const text = input.value.trim();
+        const chat = state.chats.find(item => item.id === state.activeChat);
+        if (text && chat) {
+          chat.messages.push({ from: state.role === "admin" ? "admin" : "partner", text });
+          chat.unread = 0;
+          input.value = "";
+          render();
+        }
+      }
+    });
+
+    document.body.addEventListener("input", event => {
+      if (event.target.matches("[data-search='transactions'], [data-filter='transactions']")) {
+        const search = document.querySelector("[data-search='transactions']")?.value.toLowerCase() || "";
+        const filter = document.querySelector("[data-filter='transactions']")?.value || "";
+        document.querySelectorAll("[data-row='transactions']").forEach(row => {
+          const textMatch = row.dataset.text.toLowerCase().includes(search);
+          const statusMatch = !filter || row.dataset.status === filter;
+          row.style.display = textMatch && statusMatch ? "" : "none";
+        });
+      }
+
+      if (event.target.matches("[data-profile-field]")) {
+        const entity = state.role === "stay" ? state.stays[0] : state.markets[0];
+        entity[event.target.dataset.profileField] = event.target.value;
+        const name = document.getElementById("profilePreviewName");
+        const desc = document.getElementById("profilePreviewDesc");
+        if (name) name.textContent = entity.name;
+        if (desc) desc.textContent = entity.desc;
+      }
+
+      if (event.target.matches("[data-edit-row]")) {
+        const collection = state.role === "stay" ? state.rooms : state.products;
+        const row = collection.find(item => item.id === event.target.dataset.editRow);
+        if (row) {
+          const key = event.target.dataset.editKey;
+          row[key] = event.target.type === "number" ? Number(event.target.value) || 0 : event.target.value;
+        }
+      }
+    });
+
+    setRole("admin");
+    lucide.createIcons();
+  </script>
+</body>
+</html>
