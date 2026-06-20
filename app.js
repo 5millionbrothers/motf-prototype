@@ -537,6 +537,49 @@ window.motfApplyCatalog = function applyCatalog(nextStays, nextStores) {
   if (route === "storeDetail") renderStoreDetail();
 };
 
+window.motfGetReservationDraft = function getReservationDraft() {
+  const payment = createStayPendingPayment();
+  return {
+    business_id: state.selectedStay.id,
+    offering_id: state.selectedRoom.id || null,
+    customer_name: qs("#bookingName").value.trim(),
+    group_name: qs("#bookingOrg").value.trim() || null,
+    contact_phone: qs("#bookingPhone").value.trim() || null,
+    event_date: qs("#stayDate").value,
+    guest_count: Number(qs("#bookingPeople").value),
+    offering_name: state.selectedRoom.name,
+    total_amount: payment.amount,
+    request_memo: qs("#bookingMemo").value.trim() || null,
+  };
+};
+
+window.motfGetMarketOrderDraft = function getMarketOrderDraft() {
+  const items = state.cart.map((cartItem) => {
+    const found = findProduct(cartItem.productId);
+    return {
+      offering_id: found.product.id,
+      item_name: found.product.name,
+      quantity: cartItem.qty,
+      unit_price: found.product.price,
+    };
+  });
+  return {
+    business_id: state.selectedStore.id,
+    customer_name: window.motfCurrentUserProfile?.full_name || "이용자",
+    contact_phone: window.motfCurrentUserProfile?.phone || null,
+    pickup_place: qs("#pickupPlace").value.trim(),
+    pickup_time: qs("#pickupTime").value,
+    request_memo: qs("#pickupMemo").value.trim() || null,
+    items,
+  };
+};
+
+window.motfApplyMyTransactions = function applyMyTransactions(reservations, orders) {
+  state.reservations = reservations;
+  state.orders = orders;
+  renderMypage();
+};
+
 const routeParents = {
   home: "home",
   stayDetail: "stays",

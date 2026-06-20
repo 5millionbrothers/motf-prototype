@@ -206,6 +206,7 @@
       .eq("id", session.user.id)
       .maybeSingle();
     if (!error) profile = data;
+    window.motfCurrentUserProfile = profile;
   }
 
   function updateHeader() {
@@ -489,6 +490,7 @@
   client.auth.onAuthStateChange((event, nextSession) => {
     session = nextSession;
     if (event === "SIGNED_OUT") profile = null;
+    if (event === "SIGNED_OUT") window.motfCurrentUserProfile = null;
     if (event === "PASSWORD_RECOVERY") {
       window.setTimeout(openPasswordChange, 0);
     }
