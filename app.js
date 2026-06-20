@@ -2102,6 +2102,13 @@ function renderPostDetail() {
 }
 
 function renderChat() {
+  if (!state.chats.length) {
+    qs("#chatList").innerHTML = `<div class="empty-state">아직 시작한 대화가 없습니다.</div>`;
+    qs("#chatRoomHeader").innerHTML = `<h2>채팅</h2><p class="muted">숙소 또는 공판장에서 문의를 시작해보세요.</p>`;
+    qs("#chatMessages").innerHTML = `<div class="empty-state">대화를 선택하면 메시지가 표시됩니다.</div>`;
+    refreshIcons();
+    return;
+  }
   qs("#chatList").innerHTML = state.chats
     .map(
       (thread) => `
@@ -2132,6 +2139,17 @@ function renderChat() {
     .join("");
   refreshIcons();
 }
+
+window.motfApplyChats = function applyChats(chats, activeChatId) {
+  state.chats = Array.isArray(chats) ? chats : [];
+  state.activeChatId = activeChatId || state.activeChatId || state.chats[0]?.id || "";
+  if (!state.chats.some((item) => item.id === state.activeChatId)) state.activeChatId = state.chats[0]?.id || "";
+  if (currentRoute() === "chat") renderChat();
+};
+
+window.motfGetActiveChatId = () => state.activeChatId;
+window.motfFindBusinessByName = (name) => [...stays, ...stores].find((item) => item.name === name) || null;
+window.motfNavigate = navigate;
 
 function renderMypage() {
   const reservationList = qs("#reservationList");
@@ -2218,6 +2236,7 @@ function complete(type, title, text) {
 }
 
 function ensureChat(title) {
+  if (window.motfOpenDatabaseChat?.(title)) return;
   let thread = state.chats.find((item) => item.title === title);
   if (!thread) {
     thread = {
