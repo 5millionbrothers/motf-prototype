@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>moTF - 모두의 TF 이용자 프로토타입</title>
     <link rel="icon" href="assets/motf-logo-cream.png" />
-    <link rel="stylesheet" href="styles.css?v=20260617-step1" />
+    <link rel="stylesheet" href="styles.css?v=20260621-layout4" />
     <link rel="stylesheet" href="auth.css?v=20260620-auth3" />
     <script async src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" onload="window.__motfRefreshIcons && window.__motfRefreshIcons()"></script>
     <script async src="https://js.tosspayments.com/v2/standard"></script>
@@ -320,14 +320,13 @@
       </section>
 
       <section id="community" class="view">
-        <div class="view-title">
+        <div class="view-title community-view-title">
           <div>
-            <p class="eyebrow">MT 준비 커뮤니티</p>
-            <h1>준비 팁과 익명 게시판을 함께 보기</h1>
+            <h1>MT 준비 커뮤니티</h1>
           </div>
         </div>
         <div class="community-grid">
-          <section class="tool-panel">
+          <section class="tool-panel recommend-tool-panel">
             <h2>인원별 추천 주문량</h2>
             <label>참여 인원<input type="number" id="recommendPeople" min="10" max="120" value="32" /></label>
             <label>식사 스타일
@@ -473,8 +472,7 @@
       <section id="chat" class="view">
         <div class="view-title compact">
           <div>
-            <p class="eyebrow">중개형 채팅</p>
-            <h1>사장님과 이용자, 우리까지 함께 보는 소통 창구</h1>
+            <h1>사장님과 채팅</h1>
           </div>
         </div>
         <div class="chat-shell">
@@ -522,9 +520,8 @@
 
       <section id="myUsage" class="view">
         <button class="ghost-btn back-btn" data-route="mypage"><i data-lucide="chevron-left"></i>마이페이지</button>
-        <div class="view-title">
+        <div class="view-title mypage-subpage-title">
           <div>
-            <p class="eyebrow">이용 내역</p>
             <h1>숙소와 공판장 이용 내역 관리</h1>
           </div>
           <button class="secondary-btn" data-route="review"><i data-lucide="star"></i>리뷰 남기기</button>
@@ -564,10 +561,9 @@
 
       <section id="myGuide" class="view">
         <button class="ghost-btn back-btn" data-route="mypage"><i data-lucide="chevron-left"></i>마이페이지</button>
-        <div class="view-title">
+        <div class="view-title mypage-subpage-title">
           <div>
-            <p class="eyebrow">이용안내</p>
-            <h1>문의와 정책을 확인하는 고객센터</h1>
+            <h1>고객센터</h1>
           </div>
         </div>
         <div class="guide-grid">
@@ -643,7 +639,7 @@
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="config.js?v=20260620-auth1"></script>
-    <script src="app.js?v=20260621-transactions5"></script>
+    <script src="app.js?v=20260621-layout2"></script>
     <script src="auth.js?v=20260620-auth4"></script>
     <script src="catalog.js?v=20260620-catalog1"></script>
     <script src="transactions.js?v=20260621-transactions4"></script>

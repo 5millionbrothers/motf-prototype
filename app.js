@@ -978,7 +978,7 @@ function renderStays() {
 
 function stayCard(stay) {
   return `
-    <article class="listing-card">
+    <article class="listing-card stay-listing-card">
       <img src="${stay.image}" alt="${stay.name} 사진" />
       <div class="listing-body">
         <div>
@@ -1939,8 +1939,10 @@ function renderCommunity() {
       <button class="mini-card interactive-card" type="button" data-activity-id="${activity.id}">
         <h3>${activity.title}</h3>
         <p>${activity.people} · ${activity.time}</p>
-        <span class="pill">${activity.note}</span>
-        <span class="muted">${activity.media}</span>
+        <div class="activity-preview-details">
+          <span class="activity-preview-line"><i data-lucide="sparkles"></i>${activity.note}</span>
+          <span class="activity-preview-line"><i data-lucide="paperclip"></i>${activity.media}</span>
+        </div>
         <span class="reaction-line"><i data-lucide="heart"></i>${activity.likes} <i data-lucide="message-circle"></i>${activity.comments.length}</span>
       </button>
     `
@@ -1988,7 +1990,7 @@ function renderRecreation() {
           <div class="activity-card-head">
             <div>
               <h3>${activity.title}</h3>
-              <p>${activity.note}</p>
+              <p class="activity-note">${activity.note}</p>
             </div>
             <span class="pill">${activity.time}</span>
           </div>
@@ -2063,13 +2065,13 @@ function renderActivityDetail() {
     <div class="post-detail-body">
       <p class="eyebrow">추천 레크레이션</p>
       <h1>${activity.title}</h1>
-      <p>${activity.detail}</p>
-      <div class="detail-meta">
+      <p class="activity-detail-description">${activity.detail}</p>
+      <div class="detail-meta activity-detail-meta">
         <span class="pill">${activity.people}</span>
         <span class="pill">${activity.time}</span>
         <span class="pill">${activity.space === "indoor" ? "실내" : activity.space === "outdoor" ? "야외" : "공간 무관"}</span>
       </div>
-      <div class="media-chip"><i data-lucide="image-plus"></i>${activity.media}</div>
+      <div class="media-chip activity-media-chip"><i data-lucide="image-plus"></i>${activity.media}</div>
       <div class="post-actions">
         <button class="secondary-btn" type="button" data-like-activity><i data-lucide="heart"></i>공감 ${activity.likes}</button>
         <button class="ghost-btn" type="button" data-focus-activity-comment><i data-lucide="message-square"></i>댓글 ${activity.comments.length}</button>

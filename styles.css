@@ -1507,6 +1507,30 @@ input[type="range"] {
   grid-template-columns: 0.9fr 1.1fr;
 }
 
+.community-view-title {
+  margin-bottom: 20px;
+}
+
+.recommend-tool-panel {
+  display: block;
+}
+
+.recommend-tool-panel h2 {
+  margin: 0 0 12px;
+}
+
+.recommend-tool-panel label {
+  margin: 0;
+}
+
+.recommend-tool-panel label + label {
+  margin-top: 12px;
+}
+
+.recommend-tool-panel .result-box {
+  margin: 16px 0 0;
+}
+
 .tool-panel.wide {
   grid-column: 1 / -1;
 }
@@ -1520,6 +1544,36 @@ input[type="range"] {
 .mini-card {
   display: grid;
   gap: 6px;
+}
+
+.activity-preview-details {
+  display: grid;
+  gap: 7px;
+  margin-top: 4px;
+  padding: 11px 12px;
+  color: var(--teal-dark);
+  background: var(--warm);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.activity-preview-line {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  align-items: start;
+  gap: 7px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.activity-preview-line svg {
+  width: 15px;
+  height: 15px;
+  margin-top: 2px;
+}
+
+.mini-card .reaction-line {
+  margin-top: 4px;
 }
 
 .interactive-card {
@@ -1742,6 +1796,62 @@ input[type="range"] {
   align-items: start;
   justify-content: space-between;
   gap: 12px;
+}
+
+.activity-card-head > div,
+.activity-card .card-reactions {
+  padding-left: 9px;
+}
+
+.activity-note {
+  margin-bottom: 0;
+}
+
+.activity-detail-description {
+  padding-left: 0;
+  margin-bottom: 2px;
+}
+
+.activity-detail-meta {
+  margin-top: 2px;
+}
+
+.activity-media-chip {
+  margin-top: 8px;
+}
+
+.stay-listing-card .listing-meta {
+  margin-bottom: 14px;
+}
+
+.stay-listing-card .listing-body h3,
+.stay-listing-card .listing-body p {
+  margin-left: 9px;
+}
+
+.stay-listing-card .price {
+  margin-left: 9px;
+}
+
+#myUsage > .back-btn,
+#myGuide > .back-btn {
+  margin-bottom: 20px;
+}
+
+.mypage-subpage-title {
+  margin-bottom: 24px;
+}
+
+#recreation > .back-btn {
+  margin-bottom: 18px;
+}
+
+#activityDetail > .back-btn {
+  margin-bottom: 18px;
+}
+
+#activitySubmitForm .primary-btn {
+  margin-top: 8px;
 }
 
 .media-chip,
