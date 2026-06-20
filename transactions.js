@@ -50,15 +50,22 @@
       if (!draft || !isUuid(draft.business_id)) return;
       event.preventDefault();
       event.stopImmediatePropagation();
-      const { data: authData } = await client.auth.getSession();
-      if (!authData.session?.user) return;
-      const { error } = await client.from("reservations").insert({
-        ...draft,
-        customer_id: authData.session.user.id,
-      });
-      if (error) return window.toast?.("예약 요청을 저장하지 못했습니다.");
-      await loadMyTransactions();
-      window.complete?.("예약 요청", "예약 요청이 접수되었습니다", "사장님이 확인한 뒤 확정 또는 거절 상태가 마이페이지에 표시됩니다.");
+      const submitButton = event.target.querySelector('[type="submit"]');
+      const originalHtml = submitButton?.innerHTML;
+      if (submitButton) { submitButton.disabled = true; submitButton.textContent = "예약 요청 저장 중..."; }
+      try {
+        const { data: authData } = await client.auth.getSession();
+        if (!authData.session?.user) throw new Error("로그인 정보를 확인하지 못했습니다. 다시 로그인해주세요.");
+        const { error } = await client.from("reservations").insert({ ...draft, customer_id: authData.session.user.id });
+        if (error) throw error;
+        await loadMyTransactions();
+        window.complete?.("예약 요청", "예약 요청이 접수되었습니다", "사장님이 확인한 뒤 확정 또는 거절 상태가 마이페이지에 표시됩니다.");
+      } catch (error) {
+        console.error(error);
+        alert(`예약 요청을 저장하지 못했습니다.\n${error.message || "잠시 후 다시 시도해주세요."}`);
+      } finally {
+        if (submitButton) { submitButton.disabled = false; submitButton.innerHTML = originalHtml; window.refreshIcons?.(); }
+      }
       return;
     }
 
@@ -67,18 +74,28 @@
       if (!draft || !isUuid(draft.business_id)) return;
       event.preventDefault();
       event.stopImmediatePropagation();
-      const { error } = await client.rpc("create_market_order", {
-        target_business_id: draft.business_id,
-        customer_name: draft.customer_name,
-        contact_phone: draft.contact_phone,
-        pickup_place: draft.pickup_place,
-        pickup_time: draft.pickup_time,
-        request_memo: draft.request_memo,
-        items: draft.items,
-      });
-      if (error) return window.toast?.("주문 요청을 저장하지 못했습니다.");
-      await loadMyTransactions();
-      window.complete?.("주문 요청", "공판장 주문이 접수되었습니다", "공판장이 확인한 뒤 처리 상태가 마이페이지에 표시됩니다.");
+      const submitButton = event.target.querySelector('[type="submit"]');
+      const originalHtml = submitButton?.innerHTML;
+      if (submitButton) { submitButton.disabled = true; submitButton.textContent = "주문 요청 저장 중..."; }
+      try {
+        const { error } = await client.rpc("create_market_order", {
+          target_business_id: draft.business_id,
+          customer_name: draft.customer_name,
+          contact_phone: draft.contact_phone,
+          pickup_place: draft.pickup_place,
+          pickup_time: draft.pickup_time,
+          request_memo: draft.request_memo,
+          items: draft.items,
+        });
+        if (error) throw error;
+        await loadMyTransactions();
+        window.complete?.("주문 요청", "공판장 주문이 접수되었습니다", "공판장이 확인한 뒤 처리 상태가 마이페이지에 표시됩니다.");
+      } catch (error) {
+        console.error(error);
+        alert(`주문 요청을 저장하지 못했습니다.\n${error.message || "잠시 후 다시 시도해주세요."}`);
+      } finally {
+        if (submitButton) { submitButton.disabled = false; submitButton.innerHTML = originalHtml; window.refreshIcons?.(); }
+      }
     }
   }, true);
 
