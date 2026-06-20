@@ -40,6 +40,7 @@
     "activityCommentForm",
     "postCommentForm",
     "reviewForm",
+    "supportCaseForm",
   ]);
 
   let session = null;

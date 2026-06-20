@@ -30,7 +30,7 @@
         title: conversation.businesses?.business_name || "업장 채팅",
         subtitle: messages.at(-1)?.body || "대화를 시작해보세요.",
         messages: messages.map((message) => ({
-          from: message.sender_role === "user" ? "user" : "admin",
+          from: message.sender_role === "user" ? "user" : message.sender_role === "partner" ? "owner" : "admin",
           text: message.body,
           read: Boolean(message.read_at) || message.sender_role !== "user",
         })),
@@ -38,6 +38,12 @@
     });
     activeConversationId = chats.some((item) => item.id === preferredId) ? preferredId : chats[0]?.id || "";
     window.motfApplyChats?.(chats, activeConversationId);
+    if (activeConversationId) {
+      const { error: readError } = await client.rpc("mark_conversation_read", {
+        target_conversation_id: activeConversationId,
+      });
+      if (readError) console.error(readError);
+    }
   }
 
   window.motfOpenDatabaseChat = function openDatabaseChat(businessName) {

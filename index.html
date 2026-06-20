@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>moTF - 모두의 TF 이용자 프로토타입</title>
     <link rel="icon" href="assets/motf-logo-cream.png" />
-    <link rel="stylesheet" href="styles.css?v=20260621-layout4" />
+    <link rel="stylesheet" href="styles.css?v=20260621-support1" />
     <link rel="stylesheet" href="auth.css?v=20260620-auth3" />
     <script async src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" onload="window.__motfRefreshIcons && window.__motfRefreshIcons()"></script>
     <script async src="https://js.tosspayments.com/v2/standard"></script>
@@ -33,13 +33,13 @@
           <h1>우리 MT,<br /><span>한 번에 다 준비해요</span></h1>
           <p>숙소를 찾고, 공판장 장보기를 연결하고, 사장님과의 소통까지 moTF에서 차분하게 정리합니다.</p>
           <div class="home-hero-actions">
-            <button class="primary-btn" data-route="stays"><i data-lucide="search"></i>숙소 찾기</button>
+            <button class="secondary-btn" data-route="stays"><i data-lucide="search"></i>숙소 찾기</button>
             <button class="secondary-btn" data-route="market"><i data-lucide="shopping-basket"></i>공판장 주문하기</button>
           </div>
         </div>
 
         <section class="home-service-grid" aria-label="서비스 선택">
-          <button class="service-card primary-service" data-route="stays">
+          <button class="service-card" data-route="stays">
             <span class="service-icon"><i data-lucide="home"></i></span>
             <strong>숙소 예약</strong>
             <span>날짜, 지역, 인원, 예산에 맞는 단체 숙소를 찾고 바로 예약해요.</span>
@@ -567,19 +567,20 @@
           </div>
         </div>
         <div class="guide-grid">
-          <section class="tool-panel">
+          <form class="tool-panel" id="supportCaseForm">
             <h2>문의하기</h2>
             <label>문의 유형
-              <select>
+              <select id="supportCaseType">
                 <option>예약/결제 문의</option>
                 <option>공판장 주문 문의</option>
                 <option>분쟁/환불 문의</option>
                 <option>계정 문의</option>
               </select>
             </label>
-            <label>문의 내용<textarea rows="5" placeholder="문의 내용을 남겨주세요"></textarea></label>
-            <button class="primary-btn" type="button"><i data-lucide="send"></i>문의 접수</button>
-          </section>
+            <label>문의 내용<textarea id="supportCaseBody" rows="5" placeholder="문의 내용을 남겨주세요" required></textarea></label>
+            <button class="primary-btn" type="submit"><i data-lucide="send"></i>문의 접수</button>
+            <div id="supportCaseHistory" class="support-case-history"></div>
+          </form>
           <section class="policy-list">
             <button class="policy-link"><i data-lucide="file-text"></i><span>이용약관</span></button>
             <button class="policy-link"><i data-lucide="lock-keyhole"></i><span>개인정보 처리방침</span></button>
@@ -640,9 +641,10 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="config.js?v=20260620-auth1"></script>
     <script src="app.js?v=20260621-chat1"></script>
-    <script src="auth.js?v=20260620-auth4"></script>
+    <script src="auth.js?v=20260621-support1"></script>
     <script src="catalog.js?v=20260620-catalog1"></script>
     <script src="transactions.js?v=20260621-transactions4"></script>
-    <script src="chat-data.js?v=20260621-chat1"></script>
+    <script src="chat-data.js?v=20260621-chat2"></script>
+    <script src="support-data.js?v=20260621-support1"></script>
   </body>
 </html>

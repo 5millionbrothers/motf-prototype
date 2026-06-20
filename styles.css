@@ -1706,6 +1706,34 @@ input[type="range"] {
   gap: 12px;
 }
 
+.support-case-history {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.support-case-item {
+  display: grid;
+  gap: 4px;
+  padding: 11px 12px;
+  background: var(--warm);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.support-case-item div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.support-case-item p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
 .activity-card,
 .anonymous-post,
 .post-detail-card,
