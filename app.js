@@ -18,7 +18,7 @@ const mapState = {
 const photo = (id, params = "auto=format&fit=crop&w=1200&q=82") =>
   `https://images.unsplash.com/${id}?${params}`;
 
-const stays = [
+let stays = [
   {
     id: "river",
     name: "가평 리버사이드 펜션",
@@ -209,7 +209,7 @@ const stays = [
   },
 ];
 
-const stores = [
+let stores = [
   {
     id: "gapyeong",
     name: "가평 청춘 공판장",
@@ -516,6 +516,25 @@ const state = {
   activePostId: "share-soju",
   pendingPayment: null,
   paymentResult: null,
+};
+
+window.motfApplyCatalog = function applyCatalog(nextStays, nextStores) {
+  if (Array.isArray(nextStays) && nextStays.length) {
+    stays = nextStays;
+    state.selectedStay = stays[0];
+    state.selectedRoom = stays[0].rooms[0];
+  }
+  if (Array.isArray(nextStores) && nextStores.length) {
+    stores = nextStores;
+    state.selectedStore = stores[0];
+    state.selectedProduct = stores[0].products[0];
+    state.cart = [];
+  }
+  const route = currentRoute();
+  if (route === "stays") renderStays();
+  if (route === "stayDetail") renderStayDetail();
+  if (route === "market") renderStores();
+  if (route === "storeDetail") renderStoreDetail();
 };
 
 const routeParents = {
