@@ -1,6 +1,9 @@
 (function connectUserTransactions() {
   const client = window.motfSupabase;
-  if (!client) return;
+  if (!client) {
+    console.error("예약 연결에 필요한 로그인 설정을 불러오지 못했습니다.");
+    return;
+  }
   const isUuid = (value) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value || "");
   const statusText = {
     pending: "요청 대기",
@@ -47,7 +50,12 @@
   document.addEventListener("submit", async (event) => {
     if (event.target.id === "bookingForm") {
       const draft = window.motfGetReservationDraft?.();
-      if (!draft || !isUuid(draft.business_id)) return;
+      if (!draft || !isUuid(draft.business_id)) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        alert("이 숙소는 아직 데모 정보라 실제 예약을 접수할 수 없습니다.\n사장님이 등록한 실제 숙소를 선택해주세요.");
+        return;
+      }
       event.preventDefault();
       event.stopImmediatePropagation();
       const submitButton = event.target.querySelector('[type="submit"]');
@@ -71,7 +79,12 @@
 
     if (event.target.id === "orderForm") {
       const draft = window.motfGetMarketOrderDraft?.();
-      if (!draft || !isUuid(draft.business_id)) return;
+      if (!draft || !isUuid(draft.business_id)) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        alert("이 공판장은 아직 데모 정보라 실제 주문을 접수할 수 없습니다.\n사장님이 등록한 실제 공판장을 선택해주세요.");
+        return;
+      }
       event.preventDefault();
       event.stopImmediatePropagation();
       const submitButton = event.target.querySelector('[type="submit"]');
@@ -96,6 +109,17 @@
       } finally {
         if (submitButton) { submitButton.disabled = false; submitButton.innerHTML = originalHtml; window.refreshIcons?.(); }
       }
+    }
+  }, true);
+
+  // 필수 입력값이 빠져 submit 이벤트 자체가 발생하지 않는 경우에도
+  // 사용자가 버튼이 고장 났다고 느끼지 않도록 명확한 안내를 보여준다.
+  document.addEventListener("click", (event) => {
+    const submitButton = event.target.closest('#bookingForm [type="submit"], #orderForm [type="submit"]');
+    if (!submitButton) return;
+    const form = submitButton.closest("form");
+    if (form && !form.checkValidity()) {
+      window.setTimeout(() => alert("필수 입력 항목과 동의 체크를 모두 확인해주세요."), 0);
     }
   }, true);
 

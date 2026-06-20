@@ -541,7 +541,9 @@ window.motfGetReservationDraft = function getReservationDraft() {
   const payment = createStayPendingPayment();
   return {
     business_id: state.selectedStay.id,
-    offering_id: state.selectedRoom.id || null,
+    // 상품을 다시 저장하면 기존 상품 번호가 바뀔 수 있으므로 예약에는
+    // 상품명/가격 스냅샷을 저장하고, 선택 상품 FK는 비워 둔다.
+    offering_id: null,
     customer_name: qs("#bookingName").value.trim(),
     group_name: qs("#bookingOrg").value.trim() || null,
     contact_phone: qs("#bookingPhone").value.trim() || null,
@@ -557,7 +559,8 @@ window.motfGetMarketOrderDraft = function getMarketOrderDraft() {
   const items = state.cart.map((cartItem) => {
     const found = findProduct(cartItem.productId);
     return {
-      offering_id: found.product.id,
+      // 공판장 상품 재저장 뒤에도 주문이 막히지 않도록 스냅샷 기준으로 저장한다.
+      offering_id: null,
       item_name: found.product.name,
       quantity: cartItem.qty,
       unit_price: found.product.price,
