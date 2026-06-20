@@ -202,7 +202,7 @@
     if (!session?.user) return;
     const { data, error } = await client
       .from("profiles")
-      .select("email, full_name, phone, role, status")
+      .select("email, full_name, phone, organization, role, status")
       .eq("id", session.user.id)
       .maybeSingle();
     if (!error) profile = data;
@@ -228,7 +228,7 @@
       inputs[1].readOnly = true;
     }
     if (inputs[2]) {
-      inputs[2].value = "";
+      inputs[2].value = profile?.organization || "";
       inputs[2].placeholder = "학교 또는 소속을 입력해주세요";
     }
     if (inputs[3]) inputs[3].value = profile?.phone || "";
@@ -401,6 +401,46 @@
       await refreshAuthUi();
       if (typeof window.navigate === "function") window.navigate("home");
       showToast("로그아웃되었습니다.");
+      return;
+    }
+
+    const accountSaveButton = event.target.closest("[data-account-save]");
+    if (accountSaveButton) {
+      if (!requireLogin()) return;
+      const accountForm = document.querySelector("#accountForm");
+      const inputs = [...accountForm.querySelectorAll("input")];
+      const organization = inputs[2]?.value.trim() || "";
+      const phone = inputs[3]?.value.trim() || "";
+      if (phone && phone.replace(/\D/g, "").length < 9) {
+        showToast("연락처를 다시 확인해주세요.");
+        inputs[3]?.focus();
+        return;
+      }
+
+      const originalHtml = accountSaveButton.innerHTML;
+      accountSaveButton.disabled = true;
+      accountSaveButton.textContent = "저장 중...";
+      const { data, error } = await client
+        .from("profiles")
+        .update({
+          organization: organization || null,
+          phone: phone || null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", session.user.id)
+        .select("email, full_name, phone, organization, role, status")
+        .single();
+      accountSaveButton.disabled = false;
+      accountSaveButton.innerHTML = originalHtml;
+      if (typeof window.refreshIcons === "function") window.refreshIcons();
+
+      if (error) {
+        showToast("회원정보를 저장하지 못했습니다. 잠시 후 다시 시도해주세요.");
+        return;
+      }
+      profile = data;
+      updateAccountView();
+      showToast("회원정보가 저장되었습니다.");
     }
   });
 
