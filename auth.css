@@ -214,6 +214,23 @@ body.auth-modal-open {
   overflow: hidden;
 }
 
+/* 마이페이지 계정·이용안내 내부 간격만 보정 */
+#myAccount form.tool-panel,
+#myAccount .danger-panel,
+#myGuide .guide-grid > .tool-panel {
+  display: grid;
+  gap: 14px;
+}
+
+#myAccount form.tool-panel > .primary-btn,
+#myGuide .guide-grid > .tool-panel > .primary-btn {
+  margin-top: 4px;
+}
+
+#myGuide .guide-grid > .tool-panel > label + label {
+  margin-top: 4px;
+}
+
 @media (max-width: 520px) {
   .auth-dialog {
     padding: 22px 18px;
