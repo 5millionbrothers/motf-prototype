@@ -1200,7 +1200,9 @@ function bookingAmount() {
   const room = state.selectedRoom;
   const facility = qs("#bookingFacility")?.value || "바베큐장";
   const people = Number(qs("#bookingPeople")?.value || 0);
-  const extraPeople = Math.max(0, people - Number(room.capacity.split("~")[1].replace(/\D/g, "")));
+  const capacityNumbers = String(room.capacity || "").match(/\d+/g) || [];
+  const includedPeople = Number(capacityNumbers.at(-1)) || Number(state.selectedStay?.maxPeople) || people;
+  const extraPeople = Math.max(0, people - includedPeople);
   const facilityFee = facility === "바베큐장" ? 120000 : facility === "강당" ? 150000 : facility === "운동장" ? 70000 : 0;
   const extraFee = extraPeople * 18000;
   return {
