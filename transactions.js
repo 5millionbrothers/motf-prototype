@@ -62,9 +62,16 @@
       const originalHtml = submitButton?.innerHTML;
       if (submitButton) { submitButton.disabled = true; submitButton.textContent = "예약 요청 저장 중..."; }
       try {
-        const { data: authData } = await client.auth.getSession();
-        if (!authData.session?.user) throw new Error("로그인 정보를 확인하지 못했습니다. 다시 로그인해주세요.");
-        const { error } = await client.from("reservations").insert({ ...draft, customer_id: authData.session.user.id });
+        const { error } = await client.rpc("create_reservation", {
+          target_business_id: draft.business_id,
+          target_offering_id: draft.offering_id,
+          customer_name: draft.customer_name,
+          group_name: draft.group_name,
+          contact_phone: draft.contact_phone,
+          event_date: draft.event_date,
+          guest_count: draft.guest_count,
+          request_memo: draft.request_memo,
+        });
         if (error) throw error;
         await loadMyTransactions();
         window.complete?.("예약 요청", "예약 요청이 접수되었습니다", "사장님이 확인한 뒤 확정 또는 거절 상태가 마이페이지에 표시됩니다.");

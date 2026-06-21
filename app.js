@@ -1,4 +1,12 @@
 const money = (value) => `${Number(value).toLocaleString("ko-KR")}원`;
+const escapeHtml = (value) => String(value ?? "").replace(/[&<>'"]/g, (character) => ({
+  "&": "&amp;",
+  "<": "&lt;",
+  ">": "&gt;",
+  "'": "&#39;",
+  '"': "&quot;",
+}[character]));
+window.motfEscapeHtml = escapeHtml;
 
 const TOSS_CLIENT_KEY = window.MOTF_CONFIG?.TOSS_CLIENT_KEY?.trim() || "test_gck_docs_Ovk5rk1EwkEbP0W43n07xlzm";
 const TOSS_PENDING_PAYMENT_KEY = "motf.pendingPayment";
@@ -538,19 +546,14 @@ window.motfApplyCatalog = function applyCatalog(nextStays, nextStores) {
 };
 
 window.motfGetReservationDraft = function getReservationDraft() {
-  const payment = createStayPendingPayment();
   return {
     business_id: state.selectedStay.id,
-    // 상품을 다시 저장하면 기존 상품 번호가 바뀔 수 있으므로 예약에는
-    // 상품명/가격 스냅샷을 저장하고, 선택 상품 FK는 비워 둔다.
-    offering_id: null,
+    offering_id: state.selectedRoom.id,
     customer_name: qs("#bookingName").value.trim(),
     group_name: qs("#bookingOrg").value.trim() || null,
     contact_phone: qs("#bookingPhone").value.trim() || null,
     event_date: qs("#stayDate").value,
     guest_count: Number(qs("#bookingPeople").value),
-    offering_name: state.selectedRoom.name,
-    total_amount: payment.amount,
     request_memo: qs("#bookingMemo").value.trim() || null,
   };
 };
@@ -559,11 +562,8 @@ window.motfGetMarketOrderDraft = function getMarketOrderDraft() {
   const items = state.cart.map((cartItem) => {
     const found = findProduct(cartItem.productId);
     return {
-      // 공판장 상품 재저장 뒤에도 주문이 막히지 않도록 스냅샷 기준으로 저장한다.
-      offering_id: null,
-      item_name: found.product.name,
+      offering_id: found.product.id,
       quantity: cartItem.qty,
-      unit_price: found.product.price,
     };
   });
   return {
@@ -1937,10 +1937,10 @@ function renderCommunity() {
     .map(
       (activity) => `
       <button class="mini-card interactive-card" type="button" data-activity-id="${activity.id}">
-        <h3>${activity.title}</h3>
+        <h3>${escapeHtml(activity.title)}</h3>
         <p>${activity.people} · ${activity.time}</p>
         <div class="activity-preview-details">
-          <span class="activity-preview-line"><i data-lucide="sparkles"></i>${activity.note}</span>
+          <span class="activity-preview-line"><i data-lucide="sparkles"></i>${escapeHtml(activity.note)}</span>
           <span class="activity-preview-line"><i data-lucide="paperclip"></i>${activity.media}</span>
         </div>
         <span class="reaction-line"><i data-lucide="heart"></i>${activity.likes} <i data-lucide="message-circle"></i>${activity.comments.length}</span>
@@ -1959,7 +1959,7 @@ function renderCommunity() {
         <ul>
           ${board.posts
             .slice(0, 3)
-            .map((post) => `<li>${post.title}<span>공감 ${post.likes} · 댓글 ${post.comments.length}</span></li>`)
+            .map((post) => `<li>${escapeHtml(post.title)}<span>공감 ${post.likes} · 댓글 ${post.comments.length}</span></li>`)
             .join("")}
         </ul>
       </button>
@@ -1989,8 +1989,8 @@ function renderRecreation() {
         <article class="activity-card">
           <div class="activity-card-head">
             <div>
-              <h3>${activity.title}</h3>
-              <p class="activity-note">${activity.note}</p>
+              <h3>${escapeHtml(activity.title)}</h3>
+              <p class="activity-note">${escapeHtml(activity.note)}</p>
             </div>
             <span class="pill">${activity.time}</span>
           </div>
@@ -2042,8 +2042,8 @@ function renderBoardDetail() {
           <strong>익명</strong>
           <span>방금 전</span>
         </div>
-        <h3>${post.title}</h3>
-        <p>${post.body}</p>
+        <h3>${escapeHtml(post.title)}</h3>
+        <p>${escapeHtml(post.body)}</p>
         <div class="post-actions">
           ${post.media ? `<span class="pill"><i data-lucide="image"></i>${post.media}</span>` : ""}
           <span class="reaction-line"><i data-lucide="heart"></i>${post.likes} <i data-lucide="message-square"></i>${post.comments.length}</span>
@@ -2061,11 +2061,11 @@ function renderBoardDetail() {
 function renderActivityDetail() {
   const activity = activeActivity();
   qs("#activityDetailContent").innerHTML = `
-    <img class="post-detail-media" src="${activity.image}" alt="${activity.title}" />
+    <img class="post-detail-media" src="${activity.image}" alt="${escapeHtml(activity.title)}" />
     <div class="post-detail-body">
       <p class="eyebrow">추천 레크레이션</p>
-      <h1>${activity.title}</h1>
-      <p class="activity-detail-description">${activity.detail}</p>
+      <h1>${escapeHtml(activity.title)}</h1>
+      <p class="activity-detail-description">${escapeHtml(activity.detail)}</p>
       <div class="detail-meta activity-detail-meta">
         <span class="pill">${activity.people}</span>
         <span class="pill">${activity.time}</span>
@@ -2078,7 +2078,7 @@ function renderActivityDetail() {
       </div>
     </div>
   `;
-  qs("#activityCommentList").innerHTML = activity.comments.map((comment) => `<div class="comment-item"><strong>익명</strong><span>${comment}</span></div>`).join("");
+  qs("#activityCommentList").innerHTML = activity.comments.map((comment) => `<div class="comment-item"><strong>익명</strong><span>${escapeHtml(comment)}</span></div>`).join("");
   refreshIcons();
 }
 
@@ -2088,8 +2088,8 @@ function renderPostDetail() {
   qs("#postDetailContent").innerHTML = `
     <div class="post-detail-body">
       <p class="eyebrow">${board.title}</p>
-      <h1>${post.title}</h1>
-      <p>${post.body}</p>
+      <h1>${escapeHtml(post.title)}</h1>
+      <p>${escapeHtml(post.body)}</p>
       ${post.media ? `<div class="post-media-placeholder"><i data-lucide="image"></i>${post.media} 첨부 영역</div>` : ""}
       <div class="post-actions">
         <button class="secondary-btn" type="button" data-like-post><i data-lucide="heart"></i>공감 ${post.likes}</button>
@@ -2097,7 +2097,7 @@ function renderPostDetail() {
       </div>
     </div>
   `;
-  qs("#postCommentList").innerHTML = post.comments.map((comment) => `<div class="comment-item"><strong>익명</strong><span>${comment}</span></div>`).join("");
+  qs("#postCommentList").innerHTML = post.comments.map((comment) => `<div class="comment-item"><strong>익명</strong><span>${escapeHtml(comment)}</span></div>`).join("");
   refreshIcons();
 }
 
@@ -2113,24 +2113,24 @@ function renderChat() {
     .map(
       (thread) => `
       <button class="chat-thread ${thread.id === state.activeChatId ? "active" : ""}" data-chat-id="${thread.id}">
-        <strong>${thread.title}</strong>
-        <span>${thread.subtitle}</span>
+        <strong>${escapeHtml(thread.title)}</strong>
+        <span>${escapeHtml(thread.subtitle)}</span>
       </button>
     `
     )
     .join("");
   const thread = state.chats.find((item) => item.id === state.activeChatId) || state.chats[0];
   qs("#chatRoomHeader").innerHTML = `
-    <h2>${thread.title}</h2>
-    <p class="muted">${thread.subtitle}</p>
+    <h2>${escapeHtml(thread.title)}</h2>
+    <p class="muted">${escapeHtml(thread.subtitle)}</p>
   `;
   qs("#chatMessages").innerHTML = thread.messages
     .map(
       (message) => `
       <div class="message-row ${message.from}">
         <div class="bubble ${message.from}">
-          ${message.text ? `<span>${message.text}</span>` : ""}
-          ${message.attachments?.length ? `<div class="attachment-list">${message.attachments.map((name) => `<span class="attachment-chip"><i data-lucide="paperclip"></i>${name}</span>`).join("")}</div>` : ""}
+          ${message.text ? `<span>${escapeHtml(message.text)}</span>` : ""}
+          ${message.attachments?.length ? `<div class="attachment-list">${message.attachments.map((name) => `<span class="attachment-chip"><i data-lucide="paperclip"></i>${escapeHtml(name)}</span>`).join("")}</div>` : ""}
         </div>
         <span class="read-status">${message.read ? "읽음" : "안읽음"}</span>
       </div>
@@ -2148,7 +2148,7 @@ window.motfApplyChats = function applyChats(chats, activeChatId) {
 };
 
 window.motfGetActiveChatId = () => state.activeChatId;
-window.motfFindBusinessByName = (name) => [...stays, ...stores].find((item) => item.name === name) || null;
+window.motfFindBusinessByName = (name) => [...stays, ...stores].find((item) => item.name === escapeHtml(name)) || null;
 window.motfNavigate = navigate;
 
 function renderMypage() {
@@ -2218,12 +2218,12 @@ function reviewCard(review) {
   return `
     <article class="review-card">
       <div class="listing-meta">
-        <span class="pill">${review.target}</span>
+        <span class="pill">${escapeHtml(review.target)}</span>
         <span class="review-score">${"★".repeat(review.score)}${"☆".repeat(5 - review.score)}</span>
       </div>
-      <p>${review.text}</p>
-      <div class="detail-meta">${review.tags.map((tag) => `<span class="pill">${tag}</span>`).join("")}</div>
-      <strong>${review.author}</strong>
+      <p>${escapeHtml(review.text)}</p>
+      <div class="detail-meta">${review.tags.map((tag) => `<span class="pill">${escapeHtml(tag)}</span>`).join("")}</div>
+      <strong>${escapeHtml(review.author)}</strong>
     </article>
   `;
 }
