@@ -144,6 +144,21 @@
     message.className = `auth-message ${type}`.trim();
   }
 
+  function loginErrorMessage(error) {
+    const code = error?.code || "";
+    const detail = String(error?.message || "").toLowerCase();
+    if (code === "email_not_confirmed" || detail.includes("email not confirmed")) {
+      return "이메일 인증이 완료되지 않았습니다. 가입한 메일함의 인증 링크를 먼저 눌러주세요. 스팸 메일함도 확인해주세요.";
+    }
+    if (code === "invalid_credentials" || detail.includes("invalid login credentials")) {
+      return "이메일 또는 비밀번호가 일치하지 않습니다.";
+    }
+    if (code === "over_request_rate_limit" || detail.includes("rate limit")) {
+      return "로그인 요청이 너무 많습니다. 잠시 후 다시 시도해주세요.";
+    }
+    return error?.message ? `로그인에 실패했습니다: ${error.message}` : "로그인에 실패했습니다. 잠시 후 다시 시도해주세요.";
+  }
+
   function switchTab(tab) {
     const isLogin = tab === "login";
     loginForm.hidden = !isLogin;
@@ -290,7 +305,7 @@
     submitButton.disabled = false;
     submitButton.textContent = "이메일로 로그인";
     if (error) {
-      setMessage("이메일 또는 비밀번호를 확인해주세요.", "error");
+      setMessage(loginErrorMessage(error), "error");
       return;
     }
     session = data.session;
@@ -333,13 +348,16 @@
       return;
     }
 
-    signupForm.reset();
     if (data.session) {
+      signupForm.reset();
       session = data.session;
       await finishLogin();
       return;
     }
-    setMessage(`${email}로 인증메일을 보냈어요. 메일의 인증 링크를 누른 뒤 로그인해주세요.`, "success");
+    signupForm.reset();
+    switchTab("login");
+    document.querySelector("#customerLoginEmail").value = email;
+    setMessage(`회원가입 신청이 완료되었습니다. ${email}로 보낸 인증 링크를 눌러야 최종 가입되며, 인증 전에는 로그인할 수 없습니다. 스팸 메일함도 확인해주세요.`, "success");
   });
 
   passwordForm.addEventListener("submit", async (event) => {
