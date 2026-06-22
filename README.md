@@ -20,6 +20,7 @@
 - 예약·주문 이용내역
 - 실시간 채팅과 읽음 표시
 - 문의·분쟁 접수
+- 네이버 Dynamic Map 기반 숙소·공판장 지도와 마커
 
 커뮤니티, 후기, 지도 좌표와 첨부파일 업로드는 아직 완성 전입니다. 토스 결제는
 `motf-database`의 21번 SQL과 Vercel 환경변수를 적용한 뒤 테스트 결제로 검증합니다.
@@ -38,6 +39,7 @@ Vercel 프로젝트의 Development, Preview, Production 환경에 아래 값을 
 ```text
 TOSS_CLIENT_KEY=토스 테스트 클라이언트 키
 TOSS_SECRET_KEY=토스 테스트 시크릿 키
+NAVER_MAP_KEY_ID=네이버 지도 API Key ID
 SUPABASE_URL=https://프로젝트.supabase.co
 SUPABASE_PUBLISHABLE_KEY=Supabase Publishable Key
 SUPABASE_SERVICE_ROLE_KEY=Supabase service_role Key

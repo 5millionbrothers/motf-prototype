@@ -8,5 +8,6 @@ module.exports = async function handler(req, res) {
   return json(res, 200, {
     ok: true,
     clientKey: process.env.TOSS_CLIENT_KEY || "",
+    naverMapKeyId: process.env.NAVER_MAP_KEY_ID || "",
   });
 };

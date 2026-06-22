@@ -13,7 +13,7 @@ const TOSS_PENDING_PAYMENT_KEY = "motf.pendingPayment";
 let tossWidgets = null;
 let tossWidgetOrderId = null;
 
-const NAVER_MAP_KEY_ID = window.MOTF_CONFIG?.NAVER_MAP_KEY_ID?.trim() || "";
+let NAVER_MAP_KEY_ID = window.MOTF_CONFIG?.NAVER_MAP_KEY_ID?.trim() || "";
 const NAVER_MAP_SCRIPT_ID = "motf-naver-map-sdk";
 let naverMapPromise = null;
 
@@ -1550,6 +1550,7 @@ async function loadPaymentConfig() {
     const response = await fetch("/api/payment-config", { cache: "no-store" });
     const data = await response.json();
     if (response.ok && data.clientKey) TOSS_CLIENT_KEY = data.clientKey;
+    if (response.ok && data.naverMapKeyId) NAVER_MAP_KEY_ID = data.naverMapKeyId;
   } catch (error) {
     console.warn("토스 결제 공개 설정을 불러오지 못했습니다.", error);
   }
