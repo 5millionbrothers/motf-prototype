@@ -46,6 +46,7 @@
     }));
     window.motfApplyMyTransactions?.(reservations, orders);
   }
+  window.motfReloadTransactions = loadMyTransactions;
 
   document.addEventListener("submit", async (event) => {
     if (event.target.id === "bookingForm") {
@@ -60,9 +61,9 @@
       event.stopImmediatePropagation();
       const submitButton = event.target.querySelector('[type="submit"]');
       const originalHtml = submitButton?.innerHTML;
-      if (submitButton) { submitButton.disabled = true; submitButton.textContent = "예약 요청 저장 중..."; }
+      if (submitButton) { submitButton.disabled = true; submitButton.textContent = "결제 금액 확인 중..."; }
       try {
-        const { error } = await client.rpc("create_reservation", {
+        const { data, error } = await client.rpc("prepare_stay_payment", {
           target_business_id: draft.business_id,
           target_offering_id: draft.offering_id,
           customer_name: draft.customer_name,
@@ -73,11 +74,12 @@
           request_memo: draft.request_memo,
         });
         if (error) throw error;
-        await loadMyTransactions();
-        window.complete?.("예약 요청", "예약 요청이 접수되었습니다", "사장님이 확인한 뒤 확정 또는 거절 상태가 마이페이지에 표시됩니다.");
+        const intent = Array.isArray(data) ? data[0] : data;
+        if (!intent) throw new Error("결제 대기 정보를 만들지 못했습니다.");
+        window.motfStartPreparedPayment?.(intent, draft);
       } catch (error) {
         console.error(error);
-        alert(`예약 요청을 저장하지 못했습니다.\n${error.message || "잠시 후 다시 시도해주세요."}`);
+        alert(`결제를 준비하지 못했습니다.\n${error.message || "잠시 후 다시 시도해주세요."}`);
       } finally {
         if (submitButton) { submitButton.disabled = false; submitButton.innerHTML = originalHtml; window.refreshIcons?.(); }
       }
@@ -96,9 +98,9 @@
       event.stopImmediatePropagation();
       const submitButton = event.target.querySelector('[type="submit"]');
       const originalHtml = submitButton?.innerHTML;
-      if (submitButton) { submitButton.disabled = true; submitButton.textContent = "주문 요청 저장 중..."; }
+      if (submitButton) { submitButton.disabled = true; submitButton.textContent = "결제 금액 확인 중..."; }
       try {
-        const { error } = await client.rpc("create_market_order", {
+        const { data, error } = await client.rpc("prepare_market_payment", {
           target_business_id: draft.business_id,
           customer_name: draft.customer_name,
           contact_phone: draft.contact_phone,
@@ -108,11 +110,12 @@
           items: draft.items,
         });
         if (error) throw error;
-        await loadMyTransactions();
-        window.complete?.("주문 요청", "공판장 주문이 접수되었습니다", "공판장이 확인한 뒤 처리 상태가 마이페이지에 표시됩니다.");
+        const intent = Array.isArray(data) ? data[0] : data;
+        if (!intent) throw new Error("결제 대기 정보를 만들지 못했습니다.");
+        window.motfStartPreparedPayment?.(intent, draft);
       } catch (error) {
         console.error(error);
-        alert(`주문 요청을 저장하지 못했습니다.\n${error.message || "잠시 후 다시 시도해주세요."}`);
+        alert(`결제를 준비하지 못했습니다.\n${error.message || "잠시 후 다시 시도해주세요."}`);
       } finally {
         if (submitButton) { submitButton.disabled = false; submitButton.innerHTML = originalHtml; window.refreshIcons?.(); }
       }

@@ -16,13 +16,13 @@
 
 - 이용자 회원가입, 로그인, 계정 정보
 - 승인된 숙소·공판장과 상품 조회
-- 서버 검증을 거친 예약 요청과 공판장 주문
+- DB 가격 검증과 토스 승인 후 생성되는 예약·공판장 주문
 - 예약·주문 이용내역
 - 실시간 채팅과 읽음 표시
 - 문의·분쟁 접수
 
-커뮤니티, 후기, 지도 좌표, 첨부파일 업로드와 실결제는 아직 완성 전입니다.
-`/api/confirm-payment`는 잘못된 거래 생성을 막기 위해 의도적으로 501을 반환합니다.
+커뮤니티, 후기, 지도 좌표와 첨부파일 업로드는 아직 완성 전입니다. 토스 결제는
+`motf-database`의 21번 SQL과 Vercel 환경변수를 적용한 뒤 테스트 결제로 검증합니다.
 
 ## 설정과 배포
 
@@ -30,6 +30,21 @@
 2. `motf-database`의 적용 예정 SQL을 Supabase SQL Editor에서 번호 순서대로 실행합니다.
 3. 변경사항을 별도 브랜치에 올리고 Pull Request 검사를 통과시킵니다.
 4. 승인 후 `main`에 합치면 Vercel이 배포합니다.
+
+## 토스 결제 환경변수
+
+Vercel 프로젝트의 Development, Preview, Production 환경에 아래 값을 설정합니다.
+
+```text
+TOSS_CLIENT_KEY=토스 테스트 클라이언트 키
+TOSS_SECRET_KEY=토스 테스트 시크릿 키
+SUPABASE_URL=https://프로젝트.supabase.co
+SUPABASE_PUBLISHABLE_KEY=Supabase Publishable Key
+SUPABASE_SERVICE_ROLE_KEY=Supabase service_role Key
+```
+
+`TOSS_SECRET_KEY`와 `SUPABASE_SERVICE_ROLE_KEY`는 GitHub, `config.js`, 브라우저 코드에
+절대 입력하지 않습니다. Vercel 서버 환경변수에만 저장합니다.
 
 비밀 키와 `service_role` 키는 브라우저 코드나 GitHub에 넣지 않습니다.
 

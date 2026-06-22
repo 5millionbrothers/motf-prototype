@@ -8,9 +8,8 @@ const escapeHtml = (value) => String(value ?? "").replace(/[&<>'"]/g, (character
 }[character]));
 window.motfEscapeHtml = escapeHtml;
 
-const TOSS_CLIENT_KEY = window.MOTF_CONFIG?.TOSS_CLIENT_KEY?.trim() || "test_gck_docs_Ovk5rk1EwkEbP0W43n07xlzm";
+let TOSS_CLIENT_KEY = window.MOTF_CONFIG?.TOSS_CLIENT_KEY?.trim() || "";
 const TOSS_PENDING_PAYMENT_KEY = "motf.pendingPayment";
-const TOSS_CUSTOMER_KEY = "motf-demo-customer_001";
 let tossWidgets = null;
 let tossWidgetOrderId = null;
 
@@ -546,6 +545,12 @@ window.motfApplyCatalog = function applyCatalog(nextStays, nextStores) {
 };
 
 window.motfGetReservationDraft = function getReservationDraft() {
+  const requestDetails = [
+    `체크인 ${qs("#bookingCheckIn").value}`,
+    `체크아웃 ${qs("#bookingCheckOut").value}`,
+    `시설 이용 ${qs("#bookingFacility").value}`,
+    qs("#bookingMemo").value.trim(),
+  ].filter(Boolean).join(" / ");
   return {
     business_id: state.selectedStay.id,
     offering_id: state.selectedRoom.id,
@@ -554,7 +559,7 @@ window.motfGetReservationDraft = function getReservationDraft() {
     contact_phone: qs("#bookingPhone").value.trim() || null,
     event_date: qs("#stayDate").value,
     guest_count: Number(qs("#bookingPeople").value),
-    request_memo: qs("#bookingMemo").value.trim() || null,
+    request_memo: requestDetails || null,
   };
 };
 
@@ -575,6 +580,31 @@ window.motfGetMarketOrderDraft = function getMarketOrderDraft() {
     request_memo: qs("#pickupMemo").value.trim() || null,
     items,
   };
+};
+
+window.motfStartPreparedPayment = function startPreparedPayment(intent, draft) {
+  const type = intent.kind;
+  const isStay = type === "stay";
+  const amount = Number(intent.amount);
+  state.pendingPayment = {
+    type,
+    title: isStay ? "숙소 예약" : "공판장 주문",
+    itemName: intent.order_name,
+    amount,
+    orderId: intent.order_id,
+    customerName: draft.customer_name || window.motfCurrentUserProfile?.full_name || "이용자",
+    customerPhone: draft.contact_phone || window.motfCurrentUserProfile?.phone || "",
+    stayName: isStay ? state.selectedStay.name : undefined,
+    roomName: isStay ? state.selectedRoom.name : undefined,
+    storeName: isStay ? undefined : state.selectedStore.name,
+    date: isStay ? draft.event_date : undefined,
+    people: isStay ? draft.guest_count : undefined,
+    pickupTime: isStay ? undefined : draft.pickup_time,
+    lines: [[isStay ? "객실 결제 금액" : "상품 결제 금액", amount]],
+  };
+  savePendingPayment(state.pendingPayment);
+  routeParents.payment = isStay ? "stays" : "market";
+  navigate("payment");
 };
 
 window.motfApplyMyTransactions = function applyMyTransactions(reservations, orders) {
@@ -1198,19 +1228,9 @@ function renderRoomDetail() {
 
 function bookingAmount() {
   const room = state.selectedRoom;
-  const facility = qs("#bookingFacility")?.value || "바베큐장";
-  const people = Number(qs("#bookingPeople")?.value || 0);
-  const capacityNumbers = String(room.capacity || "").match(/\d+/g) || [];
-  const includedPeople = Number(capacityNumbers.at(-1)) || Number(state.selectedStay?.maxPeople) || people;
-  const extraPeople = Math.max(0, people - includedPeople);
-  const facilityFee = facility === "바베큐장" ? 120000 : facility === "강당" ? 150000 : facility === "운동장" ? 70000 : 0;
-  const extraFee = extraPeople * 18000;
   return {
     roomFee: room.price,
-    facilityFee,
-    extraFee,
-    serviceFee: 30000,
-    total: room.price + facilityFee + extraFee + 30000,
+    total: room.price,
   };
 }
 
@@ -1222,10 +1242,8 @@ function renderBooking() {
     const amount = bookingAmount();
     qs("#bookingSummary").innerHTML = `
       <div class="summary-line"><span>${stay.name}</span><strong>${room.name}</strong></div>
-      <div class="summary-line"><span>객실 금액</span><strong>${money(amount.roomFee)}</strong></div>
-      <div class="summary-line"><span>시설 이용료</span><strong>${money(amount.facilityFee)}</strong></div>
-      <div class="summary-line"><span>추가 인원</span><strong>${money(amount.extraFee)}</strong></div>
-      <div class="summary-line"><span>moTF 중개 수수료</span><strong>${money(amount.serviceFee)}</strong></div>
+      <div class="summary-line"><span>사장님 등록 객실 금액</span><strong>${money(amount.roomFee)}</strong></div>
+      <div class="summary-line"><span>시설 이용 요청</span><strong>결제 후 사장님 확인</strong></div>
       <div class="summary-line total"><span>총 결제 금액</span><strong>${money(amount.total)}</strong></div>
     `;
   };
@@ -1459,12 +1477,10 @@ function renderCart() {
         })
         .join("")
     : `<div class="empty-state">장바구니가 비어 있습니다. 공판장에서 상품을 담아보세요.</div>`;
-  const deliveryFee = state.cart.length ? 15000 : 0;
   const total = cartTotal();
   qs("#cartSummary").innerHTML = `
     <div class="summary-line"><span>상품 금액</span><strong>${money(total)}</strong></div>
-    <div class="summary-line"><span>수령/배송 준비비</span><strong>${money(deliveryFee)}</strong></div>
-    <div class="summary-line total"><span>총 결제 금액</span><strong>${money(total + deliveryFee)}</strong></div>
+    <div class="summary-line total"><span>총 결제 금액</span><strong>${money(total)}</strong></div>
   `;
   refreshIcons();
 }
@@ -1477,10 +1493,6 @@ function paymentBackRoute() {
 function paymentHomeRoute() {
   if (!state.paymentResult) return "stays";
   return state.paymentResult.type === "stay" ? "stays" : "market";
-}
-
-function makePaymentId(prefix) {
-  return `${prefix}-${Date.now()}`;
 }
 
 function getBaseUrl() {
@@ -1533,58 +1545,14 @@ function loadTossSdk() {
   });
 }
 
-function createStayPendingPayment() {
-  const amount = bookingAmount();
-  const people = Number(qs("#bookingPeople").value);
-  return {
-    type: "stay",
-    title: `${state.selectedStay.name} 예약`,
-    itemName: state.selectedRoom.name,
-    amount: amount.total,
-    orderId: makePaymentId("stay"),
-    customerName: qs("#bookingName").value || "대표자",
-    customerPhone: qs("#bookingPhone").value || "010-0000-0000",
-    stayName: state.selectedStay.name,
-    roomName: state.selectedRoom.name,
-    date: qs("#stayDate").value,
-    people,
-    lines: [
-      ["객실 금액", amount.roomFee],
-      ["시설 이용료", amount.facilityFee],
-      ["추가 인원", amount.extraFee],
-      ["moTF 중개 수수료", amount.serviceFee],
-    ],
-  };
-}
-
-function createOrderPendingPayment() {
-  const itemSnapshots = state.cart.map((item) => {
-    const found = findProduct(item.productId);
-    return {
-      name: found.product.name,
-      qty: item.qty,
-      price: found.product.price,
-      storeName: found.store.name,
-    };
-  });
-  const productTotal = cartTotal();
-  return {
-    type: "market",
-    title: "공판장 주문",
-    itemName: itemSnapshots.length === 1 ? itemSnapshots[0].name : `${itemSnapshots[0].name} 외 ${itemSnapshots.length - 1}개`,
-    amount: productTotal + 15000,
-    orderId: makePaymentId("market"),
-    customerName: "MT 대표자",
-    customerPhone: "010-0000-0000",
-    storeName: itemSnapshots[0].storeName,
-    pickupTime: qs("#pickupTime").value,
-    pickupPlace: qs("#pickupPlace").value,
-    items: itemSnapshots,
-    lines: [
-      ["상품 금액", productTotal],
-      ["수령/배송 준비비", 15000],
-    ],
-  };
+async function loadPaymentConfig() {
+  try {
+    const response = await fetch("/api/payment-config", { cache: "no-store" });
+    const data = await response.json();
+    if (response.ok && data.clientKey) TOSS_CLIENT_KEY = data.clientKey;
+  } catch (error) {
+    console.warn("토스 결제 공개 설정을 불러오지 못했습니다.", error);
+  }
 }
 
 function renderPayment() {
@@ -1621,8 +1589,11 @@ async function renderTossWidgets(payment) {
       throw new Error("토스페이먼츠 Client Key가 설정되지 않았습니다.");
     }
     await loadTossSdk();
+    const { data: sessionData } = await window.motfSupabase.auth.getSession();
+    const userId = sessionData.session?.user?.id;
+    if (!userId) throw new Error("로그인 후 결제할 수 있습니다.");
     const tossPayments = window.TossPayments(TOSS_CLIENT_KEY);
-    tossWidgets = tossPayments.widgets({ customerKey: TOSS_CUSTOMER_KEY });
+    tossWidgets = tossPayments.widgets({ customerKey: `motf_${userId.replaceAll("-", "")}` });
     tossWidgetOrderId = payment.orderId;
     await tossWidgets.setAmount({
       currency: "KRW",
@@ -1664,13 +1635,14 @@ async function requestTossPayment() {
       throw new Error("토스 결제위젯이 아직 준비되지 않았습니다.");
     }
     const baseUrl = getBaseUrl();
+    const mobilePhone = normalizePhone(payment.customerPhone);
     await tossWidgets.requestPayment({
       orderId: payment.orderId,
       orderName: payment.itemName,
       successUrl: `${baseUrl}?tossResult=success`,
       failUrl: `${baseUrl}?tossResult=fail`,
       customerName: payment.customerName,
-      customerMobilePhone: normalizePhone(payment.customerPhone),
+      ...(mobilePhone ? { customerMobilePhone: mobilePhone } : {}),
     });
   } catch (error) {
     state.paymentResult = {
@@ -1691,16 +1663,23 @@ async function requestTossPayment() {
 }
 
 async function confirmPaymentOnServer(payment, params) {
+  for (let i = 0; i < 20 && !window.motfSupabase; i += 1) {
+    await new Promise((resolve) => window.setTimeout(resolve, 100));
+  }
+  if (!window.motfSupabase) throw new Error("로그인 설정을 불러오지 못했습니다.");
+  const { data: sessionData } = await window.motfSupabase.auth.getSession();
+  const accessToken = sessionData.session?.access_token;
+  if (!accessToken) throw new Error("로그인이 만료되었습니다. 다시 로그인해주세요.");
   const payload = {
     paymentKey: params.get("paymentKey"),
     orderId: params.get("orderId") || payment.orderId,
     amount: Number(params.get("amount") || payment.amount),
-    payment,
   };
   const response = await fetch("/api/confirm-payment", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
     },
     body: JSON.stringify(payload),
   });
@@ -1758,6 +1737,7 @@ async function handleTossRedirect() {
     replaceBrowserRoute("paymentResult");
     try {
       await confirmPaymentOnServer(storedPayment, params);
+      await window.motfReloadTransactions?.();
       setPaymentResult("success");
     } catch (error) {
       state.paymentResult = {
@@ -1799,39 +1779,8 @@ async function handleTossRedirect() {
   return true;
 }
 
-function confirmPendingPayment() {
-  const payment = state.pendingPayment;
-  if (!payment) return null;
-
-  if (payment.type === "stay") {
-    const reservation = {
-      id: payment.orderId,
-      stayName: payment.stayName,
-      roomName: payment.roomName,
-      date: payment.date,
-      people: payment.people,
-      amount: payment.amount,
-      status: "결제 완료",
-    };
-    state.reservations.unshift(reservation);
-  } else {
-    state.orders.unshift({
-      id: payment.orderId,
-      storeName: payment.storeName,
-      items: payment.items,
-      amount: payment.amount,
-      pickupTime: payment.pickupTime,
-      status: "결제 완료",
-    });
-    state.cart = [];
-    updateCartBadge();
-  }
-
-  return payment;
-}
-
 function setPaymentResult(status) {
-  const payment = status === "success" ? confirmPendingPayment() : state.pendingPayment;
+  const payment = state.pendingPayment;
   if (!payment) {
     toast("결제할 내역이 없습니다.");
     return;
@@ -2454,12 +2403,6 @@ document.addEventListener("click", (event) => {
     return;
   }
 
-  const paymentActionButton = event.target.closest("[data-payment-action]");
-  if (paymentActionButton) {
-    setPaymentResult(paymentActionButton.dataset.paymentAction);
-    return;
-  }
-
   const payChip = event.target.closest(".pay-chip");
   if (payChip) {
     const group = payChip.closest(".payment-methods");
@@ -2497,9 +2440,7 @@ document.addEventListener("change", (event) => {
 
 qs("#bookingForm").addEventListener("submit", (event) => {
   event.preventDefault();
-  state.pendingPayment = createStayPendingPayment();
-  routeParents.payment = "stays";
-  navigate("payment");
+  toast("결제 준비 모듈을 불러오지 못했습니다. 페이지를 새로고침해주세요.");
 });
 
 qs("#orderForm").addEventListener("submit", (event) => {
@@ -2508,9 +2449,7 @@ qs("#orderForm").addEventListener("submit", (event) => {
     toast("장바구니가 비어 있습니다.");
     return;
   }
-  state.pendingPayment = createOrderPendingPayment();
-  routeParents.payment = "market";
-  navigate("payment");
+  toast("결제 준비 모듈을 불러오지 못했습니다. 페이지를 새로고침해주세요.");
 });
 
 qs("#chatForm").addEventListener("submit", (event) => {
@@ -2627,6 +2566,7 @@ window.addEventListener("popstate", () => {
 });
 
 (async function boot() {
+  await loadPaymentConfig();
   const handledRedirect = await handleTossRedirect();
   if (!handledRedirect) {
     navigate(routeFromLocation(), { record: false, replace: true });

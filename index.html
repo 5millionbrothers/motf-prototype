@@ -200,14 +200,14 @@
             </div>
             <label>요청사항<textarea id="bookingMemo" rows="4" placeholder="예: 음향 장비, 숯 추가, 늦은 체크인 문의"></textarea></label>
             <label class="checkbox-row"><input required type="checkbox" id="bookingTerms" />환불·취소 정책과 시설 이용 규칙에 동의합니다.</label>
-            <button class="primary-btn" type="submit"><i data-lucide="calendar-check"></i>예약 요청하기</button>
+            <button class="primary-btn" type="submit"><i data-lucide="credit-card"></i>예약 결제 준비하기</button>
           </form>
 
           <aside class="summary-panel">
             <h2>최종 금액</h2>
             <div id="bookingSummary"></div>
             <div class="toss-ready-card">
-              <strong>토스페이먼츠 결제 예정</strong>
+              <strong>토스페이먼츠 결제</strong>
               <span>카드, 계좌이체, 간편결제는 토스 결제창 안에서 선택하게 됩니다.</span>
             </div>
           </aside>
@@ -253,10 +253,10 @@
             <label>요청사항<textarea id="pickupMemo" rows="3" placeholder="예: 아이스박스 포장, 술은 별도 박스"></textarea></label>
             <div id="cartSummary"></div>
             <div class="toss-ready-card">
-              <strong>토스페이먼츠 결제 예정</strong>
+              <strong>토스페이먼츠 결제</strong>
               <span>주문 금액을 확인한 뒤 토스 결제창으로 이동합니다.</span>
             </div>
-            <button class="primary-btn" type="submit"><i data-lucide="send"></i>주문 요청하기</button>
+            <button class="primary-btn" type="submit"><i data-lucide="credit-card"></i>주문 결제 준비하기</button>
           </form>
         </div>
       </section>
@@ -266,7 +266,7 @@
           <section class="payment-main">
             <div class="view-title compact">
               <div>
-                <p class="eyebrow">토스페이먼츠 테스트 결제</p>
+                <p class="eyebrow">토스페이먼츠 결제</p>
                 <h1>결제창으로 넘어가기 전 마지막 확인</h1>
               </div>
             </div>
@@ -274,35 +274,25 @@
             <div class="toss-widget-box">
               <div class="toss-widget-header">
                 <i data-lucide="credit-card"></i>
-                <strong>토스페이먼츠 테스트 결제위젯</strong>
+                <strong>토스페이먼츠 결제위젯</strong>
               </div>
-              <p>문서용 테스트 키로 토스 결제수단 선택창을 띄웁니다. 결제 후에는 서버 승인 전 단계로 돌아옵니다.</p>
+              <p>결제수단과 약관을 확인하면 토스 결제창으로 이동합니다.</p>
               <div id="tossPaymentMethods" class="toss-widget-area"></div>
               <div id="tossAgreement" class="toss-widget-area"></div>
               <p id="tossWidgetStatus" class="toss-widget-status">결제위젯을 준비하고 있습니다.</p>
-              <div class="key-row">
-                <span>clientKey</span>
-                <code>test_gck_docs_...7xlzm</code>
-              </div>
-              <div class="key-row">
-                <span>server 승인</span>
-                <code>다음 단계에서 연결</code>
-              </div>
+              <div class="key-row"><span>결제 승인</span><code>moTF 보안 서버에서 처리</code></div>
             </div>
             <div class="button-row">
-              <button class="primary-btn" data-toss-payment><i data-lucide="external-link"></i>토스 테스트 결제하기</button>
-              <button class="secondary-btn" data-payment-action="success"><i data-lucide="check-circle"></i>시연용 결제 완료</button>
-              <button class="ghost-btn" data-payment-action="fail"><i data-lucide="x-circle"></i>결제 실패 보기</button>
-              <button class="ghost-btn" data-payment-action="cancel"><i data-lucide="rotate-ccw"></i>결제 취소 보기</button>
+              <button class="primary-btn" data-toss-payment><i data-lucide="external-link"></i>토스로 결제하기</button>
             </div>
           </section>
           <aside class="summary-panel">
-            <h2>실제 연동 때 필요한 것</h2>
+            <h2>결제 처리 순서</h2>
             <ol class="plain-steps">
-              <li>토스 개발자센터에서 테스트 키 준비</li>
-              <li>결제 성공 후 서버에서 금액 확인</li>
-              <li>문제 없을 때 예약/주문을 결제 완료로 변경</li>
-              <li>실패나 취소는 다시 결제할 수 있게 안내</li>
+              <li>DB에서 실제 상품 가격 확인</li>
+              <li>토스 결제수단 선택 및 인증</li>
+              <li>서버에서 주문번호와 금액 재검증</li>
+              <li>승인 성공 후 예약·주문 생성</li>
             </ol>
           </aside>
         </div>
@@ -639,11 +629,11 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="config.js?v=20260620-auth1"></script>
-    <script src="app.js?v=20260621-hardening1"></script>
+    <script src="config.js?v=20260622-toss1"></script>
+    <script src="app.js?v=20260622-toss1"></script>
     <script src="auth.js?v=20260621-email-confirm1"></script>
     <script src="catalog.js?v=20260621-hardening1"></script>
-    <script src="transactions.js?v=20260621-hardening1"></script>
+    <script src="transactions.js?v=20260622-toss1"></script>
     <script src="chat-data.js?v=20260621-chat2"></script>
     <script src="support-data.js?v=20260621-support1"></script>
   </body>
