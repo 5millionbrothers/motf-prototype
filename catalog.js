@@ -20,7 +20,16 @@
     return text(business.region || business.address?.split(/[ ,]/).filter(Boolean)[0] || "지역 미정");
   }
 
-  function buildStay(business, offerings, index) {
+  function locationOf(business) {
+    if (business.latitude == null || business.longitude == null || business.latitude === "" || business.longitude === "") return null;
+    const lat = Number(business.latitude);
+    const lng = Number(business.longitude);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+    return { lat, lng };
+  }
+
+  function buildStay(business, offerings) {
     const rooms = offerings.map((item) => ({
       id: item.id,
       name: text(item.name),
@@ -39,7 +48,7 @@
       rating: 0,
       reviews: 0,
       distance: text(business.address || "주소 문의"),
-      location: { lat: 37.8314 + index * 0.006, lng: 127.5098 + index * 0.006 },
+      location: locationOf(business),
       detailTags: [],
       roomCount: rooms.length,
       bathCount: 0,
@@ -53,7 +62,7 @@
     };
   }
 
-  function buildStore(business, offerings, index) {
+  function buildStore(business, offerings) {
     const products = offerings.map((item) => ({
       id: item.id,
       category: text(item.category || "기타"),
@@ -70,7 +79,7 @@
       region: regionOf(business),
       type: "moTF 제휴 공판장",
       rating: 0,
-      location: { lat: 37.8329 + index * 0.006, lng: 127.5107 + index * 0.006 },
+      location: locationOf(business),
       image: imageUrl(business.cover_image_url, products[0]?.image || marketFallback),
       intro: text(business.description || "단체 행사 물품을 준비할 수 있는 제휴 공판장입니다."),
       products,
@@ -80,7 +89,7 @@
   (async () => {
     const [businessResult, offeringResult] = await Promise.all([
       client.from("businesses")
-        .select("id, business_type, business_name, address, description, region, cover_image_url, facilities, approval_status")
+        .select("id, business_type, business_name, address, description, region, cover_image_url, facilities, approval_status, latitude, longitude, location_verified_at")
         .eq("approval_status", "approved"),
       client.from("offerings")
         .select("id, business_id, name, description, price, is_active, max_people, unit, category, image_url, sort_order")
@@ -97,11 +106,11 @@
     const offerings = offeringResult.data || [];
     const stays = businesses
       .filter((business) => business.business_type === "stay")
-      .map((business, index) => buildStay(business, offerings.filter((item) => item.business_id === business.id), index))
+      .map((business) => buildStay(business, offerings.filter((item) => item.business_id === business.id)))
       .filter((business) => business.rooms.length);
     const stores = businesses
       .filter((business) => business.business_type === "market")
-      .map((business, index) => buildStore(business, offerings.filter((item) => item.business_id === business.id), index))
+      .map((business) => buildStore(business, offerings.filter((item) => item.business_id === business.id)))
       .filter((business) => business.products.length);
 
     window.motfApplyCatalog(stays, stores);
