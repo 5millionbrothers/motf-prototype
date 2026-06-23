@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>moTF - 모두의 TF 이용자 프로토타입</title>
     <link rel="icon" href="assets/motf-logo-cream.png" />
-    <link rel="stylesheet" href="styles.css?v=20260622-naver2" />
+    <link rel="stylesheet" href="styles.css?v=20260624-legal1" />
     <link rel="stylesheet" href="auth.css?v=20260620-auth3" />
     <script async src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" onload="window.__motfRefreshIcons && window.__motfRefreshIcons()"></script>
     <script async src="https://cdn.portone.io/v2/browser-sdk.js"></script>
@@ -572,11 +572,107 @@
             <div id="supportCaseHistory" class="support-case-history"></div>
           </form>
           <section class="policy-list">
-            <button class="policy-link"><i data-lucide="file-text"></i><span>이용약관</span></button>
-            <button class="policy-link"><i data-lucide="lock-keyhole"></i><span>개인정보 처리방침</span></button>
-            <button class="policy-link"><i data-lucide="rotate-ccw"></i><span>환불 및 취소 규정</span></button>
-            <button class="policy-link"><i data-lucide="messages-square"></i><span>분쟁 중개 안내</span></button>
+            <button class="policy-link" data-route="terms"><i data-lucide="file-text"></i><span>이용약관</span></button>
+            <button class="policy-link" data-route="privacy"><i data-lucide="lock-keyhole"></i><span>개인정보 처리방침</span></button>
+            <button class="policy-link" data-route="refundPolicy"><i data-lucide="rotate-ccw"></i><span>환불 및 취소 규정</span></button>
+            <button class="policy-link" data-route="businessInfo"><i data-lucide="badge-info"></i><span>사업자 정보</span></button>
           </section>
+        </div>
+      </section>
+
+      <section id="businessInfo" class="view legal-view">
+        <button class="ghost-btn back-btn" data-route="home"><i data-lucide="chevron-left"></i>메인으로</button>
+        <div class="legal-layout">
+          <div class="view-title compact">
+            <div>
+              <p class="eyebrow">Company</p>
+              <h1>사업자 정보</h1>
+            </div>
+          </div>
+          <div class="legal-card">
+            <dl class="business-table">
+              <div><dt>상호</dt><dd>moTF</dd></div>
+              <div><dt>서비스명</dt><dd>moTF 모두의 TF</dd></div>
+              <div><dt>대표자명</dt><dd>심사 전 실제 대표자명 입력 필요</dd></div>
+              <div><dt>사업자등록번호</dt><dd>심사 전 실제 사업자등록번호 입력 필요</dd></div>
+              <div><dt>사업장 주소</dt><dd>심사 전 실제 사업장 주소 입력 필요</dd></div>
+              <div><dt>유선번호</dt><dd>심사 전 실제 유선번호 입력 필요</dd></div>
+              <div><dt>이메일</dt><dd>support@motf.co.kr</dd></div>
+              <div><dt>통신판매업 신고번호</dt><dd>해당 시 실제 신고번호 입력</dd></div>
+            </dl>
+          </div>
+        </div>
+      </section>
+
+      <section id="terms" class="view legal-view">
+        <button class="ghost-btn back-btn" data-route="home"><i data-lucide="chevron-left"></i>메인으로</button>
+        <div class="legal-layout">
+          <div class="view-title compact">
+            <div>
+              <p class="eyebrow">Terms</p>
+              <h1>이용약관</h1>
+            </div>
+          </div>
+          <article class="legal-card">
+            <h2>제1조 목적</h2>
+            <p>본 약관은 moTF가 제공하는 숙소 예약, 공판장 주문, 커뮤니티 및 관련 중개 서비스의 이용 조건과 절차를 정합니다.</p>
+            <h2>제2조 서비스의 성격</h2>
+            <p>moTF는 이용자와 숙소·공판장 제공자 사이의 거래를 연결하고, 예약·주문 접수, 결제, 문의, 분쟁 중개를 지원하는 플랫폼입니다.</p>
+            <h2>제3조 회원의 의무</h2>
+            <p>회원은 정확한 정보를 입력해야 하며, 타인의 권리를 침해하거나 허위 예약·주문, 부정 결제, 서비스 운영 방해 행위를 해서는 안 됩니다.</p>
+            <h2>제4조 예약 및 주문</h2>
+            <p>이용자가 가상계좌 입금을 완료하면 예약 또는 주문 요청이 접수됩니다. 제공자의 재고, 일정, 현장 사정에 따라 요청이 승인 또는 거절될 수 있습니다.</p>
+            <h2>제5조 분쟁 처리</h2>
+            <p>거래 관련 분쟁이 발생할 경우 moTF는 채팅, 결제내역, 예약·주문 정보를 바탕으로 양 당사자의 소통과 해결을 중개할 수 있습니다.</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="privacy" class="view legal-view">
+        <button class="ghost-btn back-btn" data-route="home"><i data-lucide="chevron-left"></i>메인으로</button>
+        <div class="legal-layout">
+          <div class="view-title compact">
+            <div>
+              <p class="eyebrow">Privacy</p>
+              <h1>개인정보 처리방침</h1>
+            </div>
+          </div>
+          <article class="legal-card">
+            <h2>수집 항목</h2>
+            <p>이메일, 이름, 연락처, 학교·소속, 예약·주문 정보, 결제 상태, 문의 및 채팅 내역을 서비스 제공에 필요한 범위에서 수집합니다.</p>
+            <h2>이용 목적</h2>
+            <p>회원 식별, 예약·주문 처리, 결제 확인, 고객 문의, 분쟁 중개, 부정 이용 방지, 공지 전달을 위해 개인정보를 이용합니다.</p>
+            <h2>보관 기간</h2>
+            <p>회원 탈퇴 시 개인정보는 지체 없이 파기합니다. 단, 전자상거래 등 관계 법령에 따라 보관이 필요한 거래 기록은 해당 기간 동안 보관합니다.</p>
+            <h2>제3자 제공</h2>
+            <p>예약·주문 처리를 위해 필요한 범위에서 숙소 및 공판장 제공자에게 대표자명, 연락처, 이용 일정, 주문 정보를 제공할 수 있습니다.</p>
+            <h2>문의</h2>
+            <p>개인정보 관련 문의는 support@motf.co.kr로 접수할 수 있습니다.</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="refundPolicy" class="view legal-view">
+        <button class="ghost-btn back-btn" data-route="home"><i data-lucide="chevron-left"></i>메인으로</button>
+        <div class="legal-layout">
+          <div class="view-title compact">
+            <div>
+              <p class="eyebrow">Refund</p>
+              <h1>환불 및 취소 규정</h1>
+            </div>
+          </div>
+          <article class="legal-card">
+            <h2>가상계좌 입금 전</h2>
+            <p>가상계좌를 발급받았더라도 입금 전에는 예약·주문 요청이 최종 접수되지 않습니다. 입금하지 않으면 요청은 자동 만료될 수 있습니다.</p>
+            <h2>입금 후 승인 대기</h2>
+            <p>입금 완료 후 사장님 또는 운영팀이 요청을 확인합니다. 제공자가 요청을 거절하는 경우 결제 취소 또는 환불 절차를 진행합니다.</p>
+            <h2>숙소 취소 기준</h2>
+            <p>숙소별 상세 페이지에 고지된 취소·환불 기준이 우선 적용됩니다. 별도 고지가 없는 경우 이용일 7일 전까지 전액 환불, 3일 전까지 50% 환불, 이후 환불 불가를 기본 기준으로 합니다.</p>
+            <h2>공판장 주문 취소 기준</h2>
+            <p>식재료, 주류, 일회용품 등 상품 준비가 시작된 뒤에는 취소가 제한될 수 있습니다. 신선식품 및 맞춤 준비 상품은 제공자 확인 후 환불 가능 여부를 결정합니다.</p>
+            <h2>환불 처리 기간</h2>
+            <p>환불 승인 후 실제 입금까지는 결제사와 금융기관 처리 일정에 따라 영업일 기준 3~7일이 소요될 수 있습니다.</p>
+          </article>
         </div>
       </section>
 
@@ -627,13 +723,30 @@
       </section>
     </main>
 
+    <footer class="site-footer">
+      <div class="footer-brand">
+        <strong>moTF 모두의 TF</strong>
+        <span>대학생 MT 준비를 위한 숙소 예약·공판장 주문 플랫폼</span>
+      </div>
+      <div class="footer-links">
+        <button type="button" data-route="businessInfo">사업자 정보</button>
+        <button type="button" data-route="terms">이용약관</button>
+        <button type="button" data-route="privacy">개인정보 처리방침</button>
+        <button type="button" data-route="refundPolicy">환불 및 취소 규정</button>
+      </div>
+      <address>
+        상호 moTF · 대표자명 실제 정보 입력 필요 · 사업자등록번호 실제 정보 입력 필요 · 유선번호 실제 정보 입력 필요<br />
+        주소 실제 사업장 주소 입력 필요 · 고객문의 support@motf.co.kr
+      </address>
+    </footer>
+
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="config.js?v=20260622-naver1"></script>
-    <script src="app.js?v=20260623-prepay-refund1"></script>
+    <script src="app.js?v=20260624-portone-legal1"></script>
     <script src="auth.js?v=20260621-email-confirm1"></script>
     <script src="catalog.js?v=20260621-hardening1"></script>
-    <script src="transactions.js?v=20260623-refund1"></script>
+    <script src="transactions.js?v=20260624-portone1"></script>
     <script src="chat-data.js?v=20260621-chat2"></script>
     <script src="support-data.js?v=20260621-support1"></script>
   </body>

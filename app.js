@@ -630,6 +630,10 @@ const routeParents = {
   myAccount: "mypage",
   myGuide: "mypage",
   review: "mypage",
+  businessInfo: "home",
+  terms: "home",
+  privacy: "home",
+  refundPolicy: "home",
   complete: "",
 };
 
@@ -656,6 +660,10 @@ const appRoutes = new Set([
   "myAccount",
   "myGuide",
   "review",
+  "businessInfo",
+  "terms",
+  "privacy",
+  "refundPolicy",
   "complete",
 ]);
 
