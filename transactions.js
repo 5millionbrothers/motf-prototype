@@ -12,17 +12,27 @@
     cancelled: "취소",
     completed: "이용 완료",
   };
+  const refundText = {
+    required: "거절·환불 예정",
+    processing: "환불 처리 중",
+    refunded: "환불 완료",
+    failed: "환불 확인 필요",
+  };
+  function displayStatus(item) {
+    if (item.refund_status && item.refund_status !== "none") return refundText[item.refund_status] || statusText[item.status] || item.status;
+    return statusText[item.status] || item.status;
+  }
 
   async function loadMyTransactions() {
     const { data: authData } = await client.auth.getSession();
     if (!authData.session?.user) return;
     const [reservationResult, orderResult] = await Promise.all([
       client.from("reservations")
-        .select("id, event_date, guest_count, offering_name, total_amount, status, businesses(business_name)")
+        .select("id, event_date, guest_count, offering_name, total_amount, status, refund_status, refund_amount, businesses(business_name)")
         .eq("customer_id", authData.session.user.id)
         .order("created_at", { ascending: false }),
       client.from("market_orders")
-        .select("id, pickup_time, total_amount, status, businesses(business_name), market_order_items(id)")
+        .select("id, pickup_time, total_amount, status, refund_status, refund_amount, businesses(business_name), market_order_items(id)")
         .eq("customer_id", authData.session.user.id)
         .order("created_at", { ascending: false }),
     ]);
@@ -34,14 +44,16 @@
       date: item.event_date,
       people: item.guest_count,
       amount: item.total_amount,
-      status: statusText[item.status] || item.status,
+      status: displayStatus(item),
+      refundAmount: item.refund_amount,
     }));
     const orders = (orderResult.data || []).map((item) => ({
       id: item.id,
       storeName: item.businesses?.business_name || "공판장",
       pickupTime: String(item.pickup_time || "").slice(0, 5),
       amount: item.total_amount,
-      status: statusText[item.status] || item.status,
+      status: displayStatus(item),
+      refundAmount: item.refund_amount,
       items: item.market_order_items || [],
     }));
     window.motfApplyMyTransactions?.(reservations, orders);

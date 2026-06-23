@@ -2130,6 +2130,7 @@ function reservationCard(item) {
         </div>
         <h3>${item.stayName}</h3>
         <p>${item.roomName} · ${money(item.amount)}</p>
+        ${item.refundAmount ? `<p class="muted">환불 예정 금액 ${money(item.refundAmount)}</p>` : ""}
         <div class="button-row">
           <button class="secondary-btn" data-budget-file="${item.id}"><i data-lucide="file-spreadsheet"></i>예결산 엑셀 생성</button>
           <button class="ghost-btn" data-route="review"><i data-lucide="star"></i>리뷰</button>
@@ -2149,6 +2150,7 @@ function orderCard(item) {
         </div>
         <h3>${item.storeName}</h3>
         <p>${item.items.length}개 품목 · ${money(item.amount)}</p>
+        ${item.refundAmount ? `<p class="muted">환불 예정 금액 ${money(item.refundAmount)}</p>` : ""}
         <div class="button-row">
           <button class="secondary-btn" data-budget-file="${item.id}"><i data-lucide="file-spreadsheet"></i>예결산 엑셀 생성</button>
           <button class="ghost-btn" data-route="review"><i data-lucide="star"></i>리뷰</button>
