@@ -22,8 +22,11 @@
 - 문의·분쟁 접수
 - 네이버 Dynamic Map 기반 숙소·공판장 지도와 마커
 
-커뮤니티, 후기, 지도 좌표와 첨부파일 업로드는 아직 완성 전입니다. 토스 결제는
-`motf-database`의 21번 SQL과 Vercel 환경변수를 적용한 뒤 테스트 결제로 검증합니다.
+커뮤니티와 후기는 현재 프로토타입 UI 중심입니다. 지도는 네이버 Dynamic Map과
+사장님 앱에서 저장한 좌표를 사용합니다. 주소 검색과 좌표 저장은 사장님 앱에서
+처리하며, 이용자 화면은 저장된 좌표가 있는 승인 업장만 지도 마커로 표시합니다.
+토스 결제는 `motf-database`의 21번 SQL과 Vercel 환경변수를 적용한 뒤 테스트 결제로
+검증합니다.
 
 ## 설정과 배포
 
@@ -49,6 +52,19 @@ SUPABASE_SERVICE_ROLE_KEY=Supabase service_role Key
 절대 입력하지 않습니다. Vercel 서버 환경변수에만 저장합니다.
 
 비밀 키와 `service_role` 키는 브라우저 코드나 GitHub에 넣지 않습니다.
+
+## 도메인 기준 설정
+
+운영 기준 이용자 도메인은 아래 주소입니다.
+
+```text
+https://motf.co.kr
+https://www.motf.co.kr
+```
+
+Supabase Authentication의 Redirect URLs, 네이버 클라우드 Maps 허용 도메인, 토스페이먼츠
+성공/실패 URL 검수에는 위 도메인을 우선 등록합니다. Vercel 기본 주소는 테스트용으로만
+유지합니다.
 
 ## 배포 전 핵심 확인
 
