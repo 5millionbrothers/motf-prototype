@@ -6,7 +6,7 @@
   }
   const isUuid = (value) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value || "");
   const statusText = {
-    pending: "요청 대기",
+    pending: "결제 완료·승인 대기",
     confirmed: "확정",
     rejected: "거절",
     cancelled: "취소",

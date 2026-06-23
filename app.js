@@ -1790,8 +1790,10 @@ function setPaymentResult(status) {
   const resultText = {
     success: {
       eyebrow: "토스페이먼츠 승인 완료",
-      title: payment.type === "stay" ? "숙소 예약 결제가 완료되었습니다" : "공판장 주문 결제가 완료되었습니다",
-      text: "Vercel 서버가 토스 결제를 확인했고 Supabase 장부에 저장했습니다.",
+      title: payment.type === "stay" ? "결제 완료, 숙소 예약 요청이 접수되었습니다" : "결제 완료, 공판장 주문 요청이 접수되었습니다",
+      text: payment.type === "stay"
+        ? "사장님이 예약 가능 여부를 확인한 뒤 확정합니다. 거절 시 결제 취소·환불 처리가 필요합니다."
+        : "사장님이 주문 가능 여부를 확인한 뒤 확정합니다. 거절 시 결제 취소·환불 처리가 필요합니다.",
       icon: "check",
       className: "",
     },
