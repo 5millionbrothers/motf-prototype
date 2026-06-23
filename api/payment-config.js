@@ -7,7 +7,8 @@ module.exports = async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
   return json(res, 200, {
     ok: true,
-    clientKey: process.env.TOSS_CLIENT_KEY || "",
+    portoneStoreId: process.env.PORTONE_STORE_ID || "",
+    portoneChannelKey: process.env.PORTONE_CHANNEL_KEY || "",
     naverMapKeyId: process.env.NAVER_MAP_KEY_ID || "",
   });
 };

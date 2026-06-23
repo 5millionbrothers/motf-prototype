@@ -16,7 +16,7 @@
 
 - 이용자 회원가입, 로그인, 계정 정보
 - 승인된 숙소·공판장과 상품 조회
-- DB 가격 검증과 토스 승인 후 생성되는 예약·공판장 주문
+- DB 가격 검증과 포트원 KG이니시스 가상계좌 입금 완료 후 생성되는 예약·공판장 주문
 - 예약·주문 이용내역
 - 실시간 채팅과 읽음 표시
 - 문의·분쟁 접수
@@ -25,8 +25,8 @@
 커뮤니티와 후기는 현재 프로토타입 UI 중심입니다. 지도는 네이버 Dynamic Map과
 사장님 앱에서 저장한 좌표를 사용합니다. 주소 검색과 좌표 저장은 사장님 앱에서
 처리하며, 이용자 화면은 저장된 좌표가 있는 승인 업장만 지도 마커로 표시합니다.
-토스 결제는 `motf-database`의 21번 SQL과 Vercel 환경변수를 적용한 뒤 테스트 결제로
-검증합니다.
+포트원 KG이니시스 가상계좌 결제는 `motf-database`의 21번, 26번 SQL과 Vercel 환경변수를
+적용한 뒤 테스트 결제로 검증합니다.
 
 ## 설정과 배포
 
@@ -35,20 +35,21 @@
 3. 변경사항을 별도 브랜치에 올리고 Pull Request 검사를 통과시킵니다.
 4. 승인 후 `main`에 합치면 Vercel이 배포합니다.
 
-## 토스 결제 환경변수
+## 포트원 가상계좌 결제 환경변수
 
 Vercel 프로젝트의 Development, Preview, Production 환경에 아래 값을 설정합니다.
 
 ```text
-TOSS_CLIENT_KEY=토스 테스트 클라이언트 키
-TOSS_SECRET_KEY=토스 테스트 시크릿 키
+PORTONE_STORE_ID=포트원 상점 ID
+PORTONE_CHANNEL_KEY=KG이니시스 채널 키
+PORTONE_API_SECRET=포트원 V2 API Secret
 NAVER_MAP_KEY_ID=네이버 지도 API Key ID
 SUPABASE_URL=https://프로젝트.supabase.co
 SUPABASE_PUBLISHABLE_KEY=Supabase Publishable Key
 SUPABASE_SERVICE_ROLE_KEY=Supabase service_role Key
 ```
 
-`TOSS_SECRET_KEY`와 `SUPABASE_SERVICE_ROLE_KEY`는 GitHub, `config.js`, 브라우저 코드에
+`PORTONE_API_SECRET`와 `SUPABASE_SERVICE_ROLE_KEY`는 GitHub, `config.js`, 브라우저 코드에
 절대 입력하지 않습니다. Vercel 서버 환경변수에만 저장합니다.
 
 비밀 키와 `service_role` 키는 브라우저 코드나 GitHub에 넣지 않습니다.

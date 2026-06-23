@@ -26,7 +26,7 @@
   async function loadMyTransactions() {
     const { data: authData } = await client.auth.getSession();
     if (!authData.session?.user) return;
-    const [reservationResult, orderResult] = await Promise.all([
+    const [reservationResult, orderResult, intentResult] = await Promise.all([
       client.from("reservations")
         .select("id, event_date, guest_count, offering_name, total_amount, status, refund_status, refund_amount, businesses(business_name)")
         .eq("customer_id", authData.session.user.id)
@@ -35,8 +35,13 @@
         .select("id, pickup_time, total_amount, status, refund_status, refund_amount, businesses(business_name), market_order_items(id)")
         .eq("customer_id", authData.session.user.id)
         .order("created_at", { ascending: false }),
+      client.from("payment_intents")
+        .select("order_id, kind, amount, order_name, status, virtual_account_issued_at, created_at")
+        .eq("customer_id", authData.session.user.id)
+        .eq("status", "virtual_account_issued")
+        .order("created_at", { ascending: false }),
     ]);
-    if (reservationResult.error || orderResult.error) return;
+    if (reservationResult.error || orderResult.error || intentResult.error) return;
     const reservations = (reservationResult.data || []).map((item) => ({
       id: item.id,
       stayName: item.businesses?.business_name || "숙소",
@@ -56,6 +61,29 @@
       refundAmount: item.refund_amount,
       items: item.market_order_items || [],
     }));
+    (intentResult.data || []).forEach((item) => {
+      const pendingItem = {
+        id: item.order_id,
+        amount: item.amount,
+        status: "입금 대기",
+      };
+      if (item.kind === "stay") {
+        reservations.unshift({
+          ...pendingItem,
+          stayName: "가상계좌 입금 대기",
+          roomName: item.order_name,
+          date: String(item.virtual_account_issued_at || item.created_at || "").slice(0, 10),
+          people: "-",
+        });
+      } else {
+        orders.unshift({
+          ...pendingItem,
+          storeName: "가상계좌 입금 대기",
+          pickupTime: String(item.virtual_account_issued_at || item.created_at || "").slice(11, 16),
+          items: [{ id: item.order_id }],
+        });
+      }
+    });
     window.motfApplyMyTransactions?.(reservations, orders);
   }
   window.motfReloadTransactions = loadMyTransactions;

@@ -8,10 +8,9 @@ const escapeHtml = (value) => String(value ?? "").replace(/[&<>'"]/g, (character
 }[character]));
 window.motfEscapeHtml = escapeHtml;
 
-let TOSS_CLIENT_KEY = window.MOTF_CONFIG?.TOSS_CLIENT_KEY?.trim() || "";
-const TOSS_PENDING_PAYMENT_KEY = "motf.pendingPayment";
-let tossWidgets = null;
-let tossWidgetOrderId = null;
+let PORTONE_STORE_ID = window.MOTF_CONFIG?.PORTONE_STORE_ID?.trim() || "";
+let PORTONE_CHANNEL_KEY = window.MOTF_CONFIG?.PORTONE_CHANNEL_KEY?.trim() || "";
+const PORTONE_PENDING_PAYMENT_KEY = "motf.pendingPayment";
 
 let NAVER_MAP_KEY_ID = window.MOTF_CONFIG?.NAVER_MAP_KEY_ID?.trim() || "";
 const NAVER_MAP_SCRIPT_ID = "motf-naver-map-sdk";
@@ -1501,7 +1500,7 @@ function getBaseUrl() {
 
 function getStoredPendingPayment() {
   try {
-    const rawPayment = window.localStorage.getItem(TOSS_PENDING_PAYMENT_KEY);
+    const rawPayment = window.localStorage.getItem(PORTONE_PENDING_PAYMENT_KEY);
     return rawPayment ? JSON.parse(rawPayment) : null;
   } catch {
     return null;
@@ -1509,11 +1508,11 @@ function getStoredPendingPayment() {
 }
 
 function savePendingPayment(payment) {
-  window.localStorage.setItem(TOSS_PENDING_PAYMENT_KEY, JSON.stringify(payment));
+  window.localStorage.setItem(PORTONE_PENDING_PAYMENT_KEY, JSON.stringify(payment));
 }
 
 function clearPendingPayment() {
-  window.localStorage.removeItem(TOSS_PENDING_PAYMENT_KEY);
+  window.localStorage.removeItem(PORTONE_PENDING_PAYMENT_KEY);
 }
 
 function normalizePhone(value) {
@@ -1527,17 +1526,17 @@ function setTossWidgetStatus(message, isError = false) {
   status.style.color = isError ? "#b74332" : "#6d7368";
 }
 
-function loadTossSdk() {
-  if (window.TossPayments) return Promise.resolve();
+function loadPortOneSdk() {
+  if (window.PortOne) return Promise.resolve();
   return new Promise((resolve, reject) => {
-    const existingScript = document.querySelector('script[src="https://js.tosspayments.com/v2/standard"]');
+    const existingScript = document.querySelector('script[src="https://cdn.portone.io/v2/browser-sdk.js"]');
     if (existingScript) {
       existingScript.addEventListener("load", resolve, { once: true });
       existingScript.addEventListener("error", reject, { once: true });
       return;
     }
     const script = document.createElement("script");
-    script.src = "https://js.tosspayments.com/v2/standard";
+    script.src = "https://cdn.portone.io/v2/browser-sdk.js";
     script.async = true;
     script.onload = resolve;
     script.onerror = reject;
@@ -1549,10 +1548,11 @@ async function loadPaymentConfig() {
   try {
     const response = await fetch("/api/payment-config", { cache: "no-store" });
     const data = await response.json();
-    if (response.ok && data.clientKey) TOSS_CLIENT_KEY = data.clientKey;
+    if (response.ok && data.portoneStoreId) PORTONE_STORE_ID = data.portoneStoreId;
+    if (response.ok && data.portoneChannelKey) PORTONE_CHANNEL_KEY = data.portoneChannelKey;
     if (response.ok && data.naverMapKeyId) NAVER_MAP_KEY_ID = data.naverMapKeyId;
   } catch (error) {
-    console.warn("토스 결제 공개 설정을 불러오지 못했습니다.", error);
+    console.warn("포트원 결제 공개 설정을 불러오지 못했습니다.", error);
   }
 }
 
@@ -2117,6 +2117,116 @@ function renderMypage() {
     ? state.orders.map(orderCard).join("")
     : `<div class="empty-state">아직 공판장 주문이 없습니다.</div>`;
   refreshIcons();
+}
+
+async function renderTossWidgets(payment) {
+  const paymentMethods = qs("#tossPaymentMethods");
+  const agreement = qs("#tossAgreement");
+  if (!paymentMethods || !agreement || !payment) return;
+  paymentMethods.innerHTML = `<div class="empty-state">KG이니시스 가상계좌만 사용할 수 있습니다.</div>`;
+  agreement.innerHTML = `<div class="summary-line"><span>입금 후 처리</span><strong>입금 완료 후 예약·주문 요청이 접수됩니다</strong></div>`;
+  setTossWidgetStatus("가상계좌 발급 버튼을 누르면 포트원 결제창이 열립니다.");
+}
+
+async function confirmPaymentOnServer(payment, params = new URLSearchParams()) {
+  for (let i = 0; i < 20 && !window.motfSupabase; i += 1) {
+    await new Promise((resolve) => window.setTimeout(resolve, 100));
+  }
+  if (!window.motfSupabase) throw new Error("Login config was not loaded.");
+  const { data: sessionData } = await window.motfSupabase.auth.getSession();
+  const accessToken = sessionData.session?.access_token;
+  if (!accessToken) throw new Error("Login expired. Please sign in again.");
+  const response = await fetch("/api/confirm-payment", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({
+      paymentId: params.get("paymentId") || params.get("orderId") || payment.orderId,
+    }),
+  });
+  const data = await response.json();
+  if (!response.ok || !data.ok) {
+    throw new Error(data.message || "Payment confirmation failed.");
+  }
+  return data;
+}
+
+async function requestTossPayment() {
+  const payment = state.pendingPayment;
+  if (!payment) {
+    toast("결제할 내역이 없습니다.");
+    return;
+  }
+  savePendingPayment(payment);
+  try {
+    if (!PORTONE_STORE_ID || !PORTONE_CHANNEL_KEY) {
+      throw new Error("PortOne Store ID 또는 Channel Key가 설정되지 않았습니다.");
+    }
+    await loadPortOneSdk();
+    const mobilePhone = normalizePhone(payment.customerPhone);
+    const response = await window.PortOne.requestPayment({
+      storeId: PORTONE_STORE_ID,
+      channelKey: PORTONE_CHANNEL_KEY,
+      paymentId: payment.orderId,
+      orderName: payment.itemName,
+      totalAmount: payment.amount,
+      currency: "CURRENCY_KRW",
+      payMethod: "VIRTUAL_ACCOUNT",
+      customer: {
+        fullName: payment.customerName || "moTF user",
+        ...(mobilePhone ? { phoneNumber: mobilePhone } : {}),
+      },
+    });
+    if (response?.code) throw new Error(response.message || "PortOne payment window failed.");
+    const result = await confirmPaymentOnServer(payment, new URLSearchParams({ paymentId: payment.orderId }));
+    if (result.status === "paid") {
+      await window.motfReloadTransactions?.();
+      setPaymentResult("success");
+      return;
+    }
+    const account = result.virtualAccount || {};
+    const accountLabel = [
+      account.bankName || account.bank || account.bankCode,
+      account.accountNumber || account.account_number,
+      account.holderName || account.accountHolder || account.customerName,
+    ].filter(Boolean).join(" / ");
+    state.paymentResult = {
+      status: "virtual_account_issued",
+      type: payment.type,
+      eyebrow: "가상계좌 발급 완료",
+      title: "입금이 확인되면 예약·주문 요청이 접수됩니다",
+      text: "아직 실제 결제 완료가 아닙니다. 발급된 가상계좌로 입금하면 포트원 웹훅을 통해 자동으로 예약·주문이 생성됩니다.",
+      icon: "landmark",
+      className: "",
+      orderId: payment.orderId,
+      itemName: payment.itemName,
+      amount: payment.amount,
+      paymentKey: accountLabel || payment.orderId,
+      backRoute: paymentBackRoute(),
+    };
+    navigate("paymentResult");
+  } catch (error) {
+    state.paymentResult = {
+      status: "fail",
+      type: payment.type,
+      eyebrow: "가상계좌 발급 실패",
+      title: "포트원 결제창을 완료하지 못했습니다",
+      text: error.message || "브라우저 또는 결제 설정을 확인한 뒤 다시 시도해주세요.",
+      icon: "x",
+      className: "fail",
+      orderId: payment.orderId,
+      itemName: payment.itemName,
+      amount: payment.amount,
+      backRoute: paymentBackRoute(),
+    };
+    navigate("paymentResult");
+  }
+}
+
+async function handleTossRedirect() {
+  return false;
 }
 
 function reservationCard(item) {

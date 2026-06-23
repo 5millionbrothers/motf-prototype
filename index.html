@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="styles.css?v=20260622-naver2" />
     <link rel="stylesheet" href="auth.css?v=20260620-auth3" />
     <script async src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" onload="window.__motfRefreshIcons && window.__motfRefreshIcons()"></script>
-    <script async src="https://js.tosspayments.com/v2/standard"></script>
+    <script async src="https://cdn.portone.io/v2/browser-sdk.js"></script>
   </head>
   <body data-current-route="home">
     <header class="app-header">
@@ -207,8 +207,8 @@
             <h2>최종 금액</h2>
             <div id="bookingSummary"></div>
             <div class="toss-ready-card">
-              <strong>토스페이먼츠 결제</strong>
-              <span>카드, 계좌이체, 간편결제는 토스 결제창 안에서 선택하게 됩니다.</span>
+              <strong>포트원 KG이니시스 가상계좌</strong>
+              <span>가상계좌 발급 후 입금이 확인되면 요청이 접수됩니다.</span>
             </div>
           </aside>
         </div>
@@ -253,8 +253,8 @@
             <label>요청사항<textarea id="pickupMemo" rows="3" placeholder="예: 아이스박스 포장, 술은 별도 박스"></textarea></label>
             <div id="cartSummary"></div>
             <div class="toss-ready-card">
-              <strong>토스페이먼츠 결제</strong>
-              <span>주문 금액을 확인한 뒤 토스 결제창으로 이동합니다.</span>
+              <strong>포트원 KG이니시스 가상계좌</strong>
+              <span>주문 금액을 확인한 뒤 가상계좌를 발급합니다.</span>
             </div>
             <button class="primary-btn" type="submit"><i data-lucide="credit-card"></i>주문 결제 준비하기</button>
           </form>
@@ -266,33 +266,33 @@
           <section class="payment-main">
             <div class="view-title compact">
               <div>
-                <p class="eyebrow">토스페이먼츠 결제</p>
-                <h1>결제창으로 넘어가기 전 마지막 확인</h1>
+                <p class="eyebrow">포트원 KG이니시스 가상계좌</p>
+                <h1>가상계좌 발급 전 마지막 확인</h1>
               </div>
             </div>
             <div id="paymentSummary"></div>
             <div class="toss-widget-box">
               <div class="toss-widget-header">
                 <i data-lucide="credit-card"></i>
-                <strong>토스페이먼츠 결제위젯</strong>
+                <strong>KG이니시스 가상계좌 결제</strong>
               </div>
-              <p>결제수단과 약관을 확인하면 토스 결제창으로 이동합니다.</p>
+              <p>가상계좌를 발급받고 입금하면 예약·주문 요청이 접수됩니다.</p>
               <div id="tossPaymentMethods" class="toss-widget-area"></div>
               <div id="tossAgreement" class="toss-widget-area"></div>
               <p id="tossWidgetStatus" class="toss-widget-status">결제위젯을 준비하고 있습니다.</p>
               <div class="key-row"><span>결제 승인</span><code>moTF 보안 서버에서 처리</code></div>
             </div>
             <div class="button-row">
-              <button class="primary-btn" data-toss-payment><i data-lucide="external-link"></i>토스로 결제하기</button>
+              <button class="primary-btn" data-toss-payment><i data-lucide="landmark"></i>가상계좌 발급하기</button>
             </div>
           </section>
           <aside class="summary-panel">
             <h2>결제 처리 순서</h2>
             <ol class="plain-steps">
               <li>DB에서 실제 상품 가격 확인</li>
-              <li>토스 결제수단 선택 및 인증</li>
-              <li>서버에서 주문번호와 금액 재검증</li>
-              <li>승인 성공 후 예약·주문 생성</li>
+              <li>포트원 KG이니시스 가상계좌 발급</li>
+              <li>서버에서 결제번호와 금액 재검증</li>
+              <li>입금 완료 웹훅 수신 후 예약·주문 생성</li>
             </ol>
           </aside>
         </div>
