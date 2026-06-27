@@ -88,8 +88,12 @@
 
         <form class="filter-panel" id="stayFilters">
           <label>
-            날짜
-            <input type="date" id="stayDate" value="2026-06-12" />
+            체크인
+            <input type="date" id="stayCheckInDate" />
+          </label>
+          <label>
+            체크아웃
+            <input type="date" id="stayCheckOutDate" />
           </label>
           <label>
             지역
@@ -103,7 +107,7 @@
           </label>
           <label>
             인원
-            <input type="number" id="stayPeople" min="10" max="120" value="32" />
+            <input type="number" id="stayPeople" min="10" max="120" value="10" />
           </label>
           <label class="range-label">
             1박 예산
@@ -186,7 +190,9 @@
             <label>대표자 이름<input required id="bookingName" placeholder="예: 김모두" /></label>
             <label>대표 연락처<input required id="bookingPhone" placeholder="010-0000-0000" /></label>
             <div class="form-grid">
-              <label>인원<input required type="number" id="bookingPeople" min="10" value="32" /></label>
+              <label>체크인 날짜<input required type="date" data-stay-search-field="checkIn" /></label>
+              <label>체크아웃 날짜<input required type="date" data-stay-search-field="checkOut" /></label>
+              <label>인원<input required type="number" id="bookingPeople" min="10" value="10" /></label>
               <label>체크인<input required type="time" id="bookingCheckIn" value="15:00" /></label>
               <label>체크아웃<input required type="time" id="bookingCheckOut" value="11:00" /></label>
               <label>시설 이용

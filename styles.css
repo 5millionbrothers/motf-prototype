@@ -471,7 +471,7 @@ h3 {
 
 .filter-panel {
   display: grid;
-  grid-template-columns: 1.1fr 0.95fr 0.75fr 1.45fr auto;
+  grid-template-columns: 1fr 1fr 0.95fr 0.75fr 1.35fr auto;
   gap: 12px;
   padding: 16px;
   margin-bottom: 18px;
@@ -479,6 +479,27 @@ h3 {
   border: 1px solid var(--line);
   border-radius: 8px;
   box-shadow: none;
+}
+
+.stay-context-filter {
+  grid-template-columns: 1fr 1fr 0.9fr 0.75fr 1.1fr;
+}
+
+.stay-context-note {
+  display: grid;
+  align-content: center;
+  gap: 4px;
+  min-height: 42px;
+  padding: 10px 12px;
+  color: var(--teal-dark);
+  background: var(--warm);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+.stay-context-note span {
+  color: var(--muted);
 }
 
 label {

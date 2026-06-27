@@ -11,6 +11,8 @@ window.motfEscapeHtml = escapeHtml;
 let PORTONE_STORE_ID = window.MOTF_CONFIG?.PORTONE_STORE_ID?.trim() || "";
 let PORTONE_CHANNEL_KEY = window.MOTF_CONFIG?.PORTONE_CHANNEL_KEY?.trim() || "";
 const PORTONE_PENDING_PAYMENT_KEY = "motf.pendingPayment";
+const DEFAULT_STAY_REGION = "대성리";
+const DEFAULT_STAY_PEOPLE = 10;
 
 let NAVER_MAP_KEY_ID = window.MOTF_CONFIG?.NAVER_MAP_KEY_ID?.trim() || "";
 const NAVER_MAP_SCRIPT_ID = "motf-naver-map-sdk";
@@ -545,6 +547,7 @@ window.motfApplyCatalog = function applyCatalog(nextStays, nextStores) {
 
 window.motfGetReservationDraft = function getReservationDraft() {
   const requestDetails = [
+    stayDateRangeLabel(),
     `체크인 ${qs("#bookingCheckIn").value}`,
     `체크아웃 ${qs("#bookingCheckOut").value}`,
     `시설 이용 ${qs("#bookingFacility").value}`,
@@ -556,7 +559,8 @@ window.motfGetReservationDraft = function getReservationDraft() {
     customer_name: qs("#bookingName").value.trim(),
     group_name: qs("#bookingOrg").value.trim() || null,
     contact_phone: qs("#bookingPhone").value.trim() || null,
-    event_date: qs("#stayDate").value,
+    event_date: qs("#stayCheckInDate").value,
+    check_out_date: qs("#stayCheckOutDate").value,
     guest_count: Number(qs("#bookingPeople").value),
     request_memo: requestDetails || null,
   };
@@ -597,9 +601,13 @@ window.motfStartPreparedPayment = function startPreparedPayment(intent, draft) {
     roomName: isStay ? state.selectedRoom.name : undefined,
     storeName: isStay ? undefined : state.selectedStore.name,
     date: isStay ? draft.event_date : undefined,
+    checkOutDate: isStay ? draft.check_out_date : undefined,
     people: isStay ? draft.guest_count : undefined,
     pickupTime: isStay ? undefined : draft.pickup_time,
-    lines: [[isStay ? "객실 결제 금액" : "상품 결제 금액", amount]],
+    lines: [
+      ...(isStay ? [["숙박일", `${draft.event_date} ~ ${draft.check_out_date}`]] : []),
+      [isStay ? "객실 결제 금액" : "상품 결제 금액", amount],
+    ],
   };
   savePendingPayment(state.pendingPayment);
   routeParents.payment = isStay ? "stays" : "market";
@@ -984,6 +992,7 @@ function stayMatchesDetailFilters(stay, filters) {
 }
 
 function getStayMatches() {
+  normalizeStaySearchDates();
   const region = qs("#stayRegion").value;
   const people = Number(qs("#stayPeople").value || 0);
   const maxPrice = Number(qs("#stayPrice").value || 0);
@@ -995,6 +1004,7 @@ function getStayMatches() {
 }
 
 function renderStays() {
+  normalizeStaySearchDates();
   const price = Number(qs("#stayPrice").value);
   qs("#stayPriceLabel").textContent = `${money(price)} 이하`;
   const detailFilters = getStayDetailFilters();
@@ -1010,6 +1020,7 @@ function renderStays() {
     ? matches.map(stayCard).join("")
     : `<div class="empty-state">조건에 맞는 숙소가 없습니다. 인원이나 예산을 넓혀보세요.</div>`;
   renderListingMap("stays", matches);
+  syncStaySearchPanel();
   refreshIcons();
 }
 
@@ -1151,6 +1162,10 @@ function renderStayDetail() {
     </section>
 
     <section>
+      ${renderStaySearchPanel("이 숙소 예약 조건")}
+    </section>
+
+    <section>
       <div class="section-toolbar">
         <h2>객실 유형 및 타입</h2>
         <span>객실을 누르면 상세 정보로 이동합니다</span>
@@ -1202,6 +1217,10 @@ function renderRoomDetail() {
       ${renderStayGallery(gallery, room.name)}
     </section>
 
+    <section>
+      ${renderStaySearchPanel("이 객실 예약 조건")}
+    </section>
+
     <div class="room-detail-grid">
       <section class="info-panel">
         <h2>객실 세부사항</h2>
@@ -1244,11 +1263,16 @@ function bookingAmount() {
 function renderBooking() {
   const stay = state.selectedStay;
   const room = state.selectedRoom;
-  qs("#bookingPeople").value = Math.min(stay.maxPeople, Number(qs("#stayPeople").value || 32));
+  const values = staySearchValues();
+  qs("#bookingPeople").value = Math.min(stay.maxPeople, values.people);
+  syncStaySearchPanel(qs("#bookingForm"));
   const update = () => {
+    applyStaySearchField("people", qs("#bookingPeople").value);
     const amount = bookingAmount();
     qs("#bookingSummary").innerHTML = `
       <div class="summary-line"><span>${stay.name}</span><strong>${room.name}</strong></div>
+      <div class="summary-line"><span>숙박일</span><strong>${stayDateRangeLabel().replace("숙박일 ", "")}</strong></div>
+      <div class="summary-line"><span>예약 인원</span><strong>${qs("#bookingPeople").value}명</strong></div>
       <div class="summary-line"><span>사장님 등록 객실 금액</span><strong>${money(amount.roomFee)}</strong></div>
       <div class="summary-line"><span>시설 이용 요청</span><strong>결제 후 사장님 확인</strong></div>
       <div class="summary-line total"><span>총 결제 금액</span><strong>${money(amount.total)}</strong></div>
@@ -1506,6 +1530,104 @@ function getBaseUrl() {
   return `${window.location.origin}${window.location.pathname}`;
 }
 
+function addDays(date, days) {
+  const nextDate = new Date(date);
+  nextDate.setDate(nextDate.getDate() + days);
+  return nextDate;
+}
+
+function formatDateInput(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function normalizeStaySearchDates() {
+  const checkInInput = qs("#stayCheckInDate");
+  const checkOutInput = qs("#stayCheckOutDate");
+  if (!checkInInput || !checkOutInput) return;
+  const today = new Date();
+  if (!checkInInput.value || checkInInput.value === "2026-06-12") {
+    checkInInput.value = formatDateInput(today);
+  }
+  if (!checkOutInput.value || checkOutInput.value === "2026-06-12") {
+    checkOutInput.value = formatDateInput(addDays(today, 1));
+  }
+  if (checkOutInput.value <= checkInInput.value) {
+    checkOutInput.value = formatDateInput(addDays(new Date(`${checkInInput.value}T00:00:00`), 1));
+  }
+  checkOutInput.min = checkInInput.value;
+}
+
+function initializeStaySearchDefaults() {
+  normalizeStaySearchDates();
+  const regionInput = qs("#stayRegion");
+  const peopleInput = qs("#stayPeople");
+  if (regionInput && !regionInput.dataset.initialized) {
+    regionInput.value = DEFAULT_STAY_REGION;
+    regionInput.dataset.initialized = "true";
+  }
+  if (peopleInput && !peopleInput.dataset.initialized) {
+    peopleInput.value = DEFAULT_STAY_PEOPLE;
+    peopleInput.dataset.initialized = "true";
+  }
+}
+
+function staySearchValues() {
+  normalizeStaySearchDates();
+  return {
+    checkIn: qs("#stayCheckInDate")?.value || "",
+    checkOut: qs("#stayCheckOutDate")?.value || "",
+    region: qs("#stayRegion")?.value || DEFAULT_STAY_REGION,
+    people: Number(qs("#stayPeople")?.value || DEFAULT_STAY_PEOPLE),
+  };
+}
+
+function stayDateRangeLabel() {
+  const values = staySearchValues();
+  return `숙박일 ${values.checkIn} ~ ${values.checkOut}`;
+}
+
+function syncStaySearchPanel(container = document) {
+  const values = staySearchValues();
+  container.querySelectorAll("[data-stay-search-field]").forEach((input) => {
+    const field = input.dataset.staySearchField;
+    if (field === "checkIn") input.value = values.checkIn;
+    if (field === "checkOut") input.value = values.checkOut;
+    if (field === "region") input.value = values.region;
+    if (field === "people") input.value = values.people;
+  });
+}
+
+function applyStaySearchField(field, value) {
+  if (field === "checkIn") qs("#stayCheckInDate").value = value;
+  if (field === "checkOut") qs("#stayCheckOutDate").value = value;
+  if (field === "region") qs("#stayRegion").value = value;
+  if (field === "people") qs("#stayPeople").value = Math.max(DEFAULT_STAY_PEOPLE, Number(value || DEFAULT_STAY_PEOPLE));
+  normalizeStaySearchDates();
+}
+
+function renderStaySearchPanel(title = "예약 조건") {
+  const values = staySearchValues();
+  return `
+    <form class="filter-panel stay-context-filter" data-stay-context-search>
+      <label>체크인<input type="date" data-stay-search-field="checkIn" value="${values.checkIn}" /></label>
+      <label>체크아웃<input type="date" data-stay-search-field="checkOut" value="${values.checkOut}" /></label>
+      <label>지역
+        <select data-stay-search-field="region">
+          ${["전체", "가평", "양평", "강촌", "대성리"].map((region) => `<option value="${region}" ${region === values.region ? "selected" : ""}>${region}</option>`).join("")}
+        </select>
+      </label>
+      <label>인원<input type="number" min="10" max="120" data-stay-search-field="people" value="${values.people}" /></label>
+      <div class="stay-context-note">
+        <strong>${title}</strong>
+        <span>${values.checkIn} ~ ${values.checkOut} · ${values.people}명</span>
+      </div>
+    </form>
+  `;
+}
+
 function getStoredPendingPayment() {
   try {
     const rawPayment = window.localStorage.getItem(PORTONE_PENDING_PAYMENT_KEY);
@@ -1574,7 +1696,7 @@ function renderPayment() {
   qs("#paymentSummary").innerHTML = `
     <div class="summary-line"><span>결제 대상</span><strong>${payment.title}</strong></div>
     <div class="summary-line"><span>상품명</span><strong>${payment.itemName}</strong></div>
-    ${payment.lines.map(([label, value]) => `<div class="summary-line"><span>${label}</span><strong>${money(value)}</strong></div>`).join("")}
+    ${payment.lines.map(([label, value]) => `<div class="summary-line"><span>${label}</span><strong>${typeof value === "number" ? money(value) : value}</strong></div>`).join("")}
     <div class="summary-line"><span>주문번호</span><strong>${payment.orderId}</strong></div>
     <div class="summary-line total"><span>총 결제 금액</span><strong>${money(payment.amount)}</strong></div>
   `;
@@ -2182,6 +2304,11 @@ async function requestTossPayment() {
       totalAmount: payment.amount,
       currency: "CURRENCY_KRW",
       payMethod: "VIRTUAL_ACCOUNT",
+      virtualAccount: {
+        accountExpiry: {
+          validHours: 24,
+        },
+      },
       customer: {
         fullName: payment.customerName || "moTF user",
         ...(mobilePhone ? { phoneNumber: mobilePhone } : {}),
@@ -2541,7 +2668,17 @@ document.addEventListener("click", (event) => {
 });
 
 document.addEventListener("input", (event) => {
-  if (event.target.matches("#stayPrice, #stayRegion, #stayPeople, #stayDate, #stayMinRooms, #stayMinBaths")) renderStays();
+  if (event.target.matches("[data-stay-search-field]")) {
+    applyStaySearchField(event.target.dataset.staySearchField, event.target.value);
+    syncStaySearchPanel();
+    if (currentRoute() === "stays") renderStays();
+    if (currentRoute() === "booking") renderBooking();
+    return;
+  }
+  if (event.target.matches("#stayPrice, #stayRegion, #stayPeople, #stayCheckInDate, #stayCheckOutDate, #stayMinRooms, #stayMinBaths")) {
+    normalizeStaySearchDates();
+    renderStays();
+  }
   if (event.target.matches("#marketPeople")) renderStores();
   if (event.target.matches("#recommendPeople, #mealStyle")) renderCommunity();
   if (event.target.matches("#activityPeople, #activitySpace, #activityMood")) renderRecreation();
@@ -2555,7 +2692,17 @@ document.addEventListener("input", (event) => {
 });
 
 document.addEventListener("change", (event) => {
-  if (event.target.matches("#stayRegion, #stayDate, [data-stay-filter], #stayMinRooms, #stayMinBaths")) renderStays();
+  if (event.target.matches("[data-stay-search-field]")) {
+    applyStaySearchField(event.target.dataset.staySearchField, event.target.value);
+    syncStaySearchPanel();
+    if (currentRoute() === "stays") renderStays();
+    if (currentRoute() === "booking") renderBooking();
+    return;
+  }
+  if (event.target.matches("#stayRegion, #stayCheckInDate, #stayCheckOutDate, [data-stay-filter], #stayMinRooms, #stayMinBaths")) {
+    normalizeStaySearchDates();
+    renderStays();
+  }
   if (event.target.matches("#marketPeople")) renderStores();
   if (event.target.matches("#mealStyle")) renderCommunity();
   if (event.target.matches("#activityPeople, #activitySpace, #activityMood")) renderRecreation();
@@ -2689,6 +2836,7 @@ window.addEventListener("popstate", () => {
 });
 
 (async function boot() {
+  initializeStaySearchDefaults();
   await loadPaymentConfig();
   const handledRedirect = await handleTossRedirect();
   if (!handledRedirect) {
