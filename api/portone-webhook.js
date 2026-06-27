@@ -49,6 +49,21 @@ function paymentKey(payment) {
   return payment?.transactionId || payment?.txId || payment?.id;
 }
 
+function canonicalOrderId(value) {
+  return String(value || "")
+    .replace(/^MS-/, "MOTF-STAY-")
+    .replace(/^MM-/, "MOTF-MARKET-");
+}
+
+function normalizePaymentForIntent(payment, orderId) {
+  return {
+    ...payment,
+    id: orderId,
+    paymentId: orderId,
+    orderId,
+  };
+}
+
 module.exports = async function handler(req, res) {
   if (req.method !== "POST") {
     return json(res, 405, { ok: false, message: "POST only." });
@@ -63,13 +78,14 @@ module.exports = async function handler(req, res) {
     const body = typeof req.body === "string" ? JSON.parse(req.body) : (req.body || {});
     const paymentId = extractPaymentId(body);
     if (!paymentId) return json(res, 400, { ok: false, message: "paymentId is required." });
+    const orderId = canonicalOrderId(paymentId);
 
     const payment = await getPortOnePayment(paymentId);
     if (paymentStatus(payment) !== "PAID") {
       return json(res, 200, { ok: true, ignored: true, status: paymentStatus(payment) });
     }
 
-    const query = `/rest/v1/payment_intents?select=order_id,customer_id,status&order_id=eq.${encodeURIComponent(paymentId)}&limit=1`;
+    const query = `/rest/v1/payment_intents?select=order_id,customer_id,status&order_id=eq.${encodeURIComponent(orderId)}&limit=1`;
     const intents = await supabaseRequest(query, process.env.SUPABASE_SERVICE_ROLE_KEY);
     const intent = intents?.[0];
     if (!intent) return json(res, 404, { ok: false, message: "Payment intent was not found." });
@@ -84,9 +100,9 @@ module.exports = async function handler(req, res) {
         method: "POST",
         body: JSON.stringify({
           target_customer_id: intent.customer_id,
-          target_order_id: paymentId,
+          target_order_id: orderId,
           target_payment_key: paymentKey(payment),
-          portone_response: payment,
+          portone_response: normalizePaymentForIntent(payment, orderId),
         }),
       },
     );

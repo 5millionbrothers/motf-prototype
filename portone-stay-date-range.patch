@@ -1,5 +1,126 @@
+diff --git a/api/confirm-payment.js b/api/confirm-payment.js
+index ddfbfe7..746e432 100644
+--- a/api/confirm-payment.js
++++ b/api/confirm-payment.js
+@@ -72,7 +72,23 @@ function paymentKey(payment) {
+   return payment?.transactionId || payment?.txId || payment?.id;
+ }
+ 
++function canonicalOrderId(value) {
++  return String(value || "")
++    .replace(/^MS-/, "MOTF-STAY-")
++    .replace(/^MM-/, "MOTF-MARKET-");
++}
++
++function normalizePaymentForIntent(payment, orderId) {
++  return {
++    ...payment,
++    id: orderId,
++    paymentId: orderId,
++    orderId,
++  };
++}
++
+ async function applyPortOnePayment(userId, orderId, payment) {
++  const intentPayment = normalizePaymentForIntent(payment, orderId);
+   const status = paymentStatus(payment);
+   if (status === "PAID") {
+     const finalized = await supabaseRequest(
+@@ -84,7 +100,7 @@ async function applyPortOnePayment(userId, orderId, payment) {
+           target_customer_id: userId,
+           target_order_id: orderId,
+           target_payment_key: paymentKey(payment),
+-          portone_response: payment,
++          portone_response: intentPayment,
+         }),
+       },
+     );
+@@ -101,7 +117,7 @@ async function applyPortOnePayment(userId, orderId, payment) {
+         body: JSON.stringify({
+           target_customer_id: userId,
+           target_order_id: orderId,
+-          portone_response: payment,
++          portone_response: intentPayment,
+         }),
+       },
+     );
+@@ -131,8 +147,9 @@ module.exports = async function handler(req, res) {
+     if (!user?.id) return json(res, 401, { ok: false, message: "Login expired. Please sign in again." });
+ 
+     const body = typeof req.body === "string" ? JSON.parse(req.body) : (req.body || {});
+-    const orderId = body.paymentId || body.orderId;
+-    if (!orderId) return json(res, 400, { ok: false, message: "paymentId is required." });
++    const paymentId = body.paymentId || body.orderId;
++    const orderId = canonicalOrderId(body.orderId || body.paymentId);
++    if (!paymentId || !orderId) return json(res, 400, { ok: false, message: "paymentId is required." });
+ 
+     const intent = await getPaymentIntent(orderId);
+     if (!intent || intent.customer_id !== user.id) {
+@@ -145,7 +162,7 @@ module.exports = async function handler(req, res) {
+       return json(res, 410, { ok: false, message: "Prepared payment expired. Please try again." });
+     }
+ 
+-    const payment = await getPortOnePayment(orderId);
++    const payment = await getPortOnePayment(paymentId);
+     if (paymentAmount(payment) !== Number(intent.amount)) {
+       return json(res, 400, { ok: false, message: "Payment amount does not match the server ledger." });
+     }
+diff --git a/api/portone-webhook.js b/api/portone-webhook.js
+index fa005de..0ebf575 100644
+--- a/api/portone-webhook.js
++++ b/api/portone-webhook.js
+@@ -49,6 +49,21 @@ function paymentKey(payment) {
+   return payment?.transactionId || payment?.txId || payment?.id;
+ }
+ 
++function canonicalOrderId(value) {
++  return String(value || "")
++    .replace(/^MS-/, "MOTF-STAY-")
++    .replace(/^MM-/, "MOTF-MARKET-");
++}
++
++function normalizePaymentForIntent(payment, orderId) {
++  return {
++    ...payment,
++    id: orderId,
++    paymentId: orderId,
++    orderId,
++  };
++}
++
+ module.exports = async function handler(req, res) {
+   if (req.method !== "POST") {
+     return json(res, 405, { ok: false, message: "POST only." });
+@@ -63,13 +78,14 @@ module.exports = async function handler(req, res) {
+     const body = typeof req.body === "string" ? JSON.parse(req.body) : (req.body || {});
+     const paymentId = extractPaymentId(body);
+     if (!paymentId) return json(res, 400, { ok: false, message: "paymentId is required." });
++    const orderId = canonicalOrderId(paymentId);
+ 
+     const payment = await getPortOnePayment(paymentId);
+     if (paymentStatus(payment) !== "PAID") {
+       return json(res, 200, { ok: true, ignored: true, status: paymentStatus(payment) });
+     }
+ 
+-    const query = `/rest/v1/payment_intents?select=order_id,customer_id,status&order_id=eq.${encodeURIComponent(paymentId)}&limit=1`;
++    const query = `/rest/v1/payment_intents?select=order_id,customer_id,status&order_id=eq.${encodeURIComponent(orderId)}&limit=1`;
+     const intents = await supabaseRequest(query, process.env.SUPABASE_SERVICE_ROLE_KEY);
+     const intent = intents?.[0];
+     if (!intent) return json(res, 404, { ok: false, message: "Payment intent was not found." });
+@@ -84,9 +100,9 @@ module.exports = async function handler(req, res) {
+         method: "POST",
+         body: JSON.stringify({
+           target_customer_id: intent.customer_id,
+-          target_order_id: paymentId,
++          target_order_id: orderId,
+           target_payment_key: paymentKey(payment),
+-          portone_response: payment,
++          portone_response: normalizePaymentForIntent(payment, orderId),
+         }),
+       },
+     );
 diff --git a/app.js b/app.js
-index 0cc7af6..1cd4eef 100644
+index 0cc7af6..17e7b61 100644
 --- a/app.js
 +++ b/app.js
 @@ -11,6 +11,8 @@ window.motfEscapeHtml = escapeHtml;
@@ -227,7 +348,21 @@ index 0cc7af6..1cd4eef 100644
  function getStoredPendingPayment() {
    try {
      const rawPayment = window.localStorage.getItem(PORTONE_PENDING_PAYMENT_KEY);
-@@ -1574,7 +1697,7 @@ function renderPayment() {
+@@ -1523,6 +1646,13 @@ function clearPendingPayment() {
+   window.localStorage.removeItem(PORTONE_PENDING_PAYMENT_KEY);
+ }
+ 
++function portOnePaymentId(orderId) {
++  return String(orderId || "")
++    .replace(/^MOTF-STAY-/, "MS-")
++    .replace(/^MOTF-MARKET-/, "MM-")
++    .slice(0, 40);
++}
++
+ function normalizePhone(value) {
+   return String(value || "").replace(/\D/g, "").slice(0, 20);
+ }
+@@ -1574,7 +1704,7 @@ function renderPayment() {
    qs("#paymentSummary").innerHTML = `
      <div class="summary-line"><span>결제 대상</span><strong>${payment.title}</strong></div>
      <div class="summary-line"><span>상품명</span><strong>${payment.itemName}</strong></div>
@@ -236,7 +371,17 @@ index 0cc7af6..1cd4eef 100644
      <div class="summary-line"><span>주문번호</span><strong>${payment.orderId}</strong></div>
      <div class="summary-line total"><span>총 결제 금액</span><strong>${money(payment.amount)}</strong></div>
    `;
-@@ -2173,6 +2296,11 @@ async function requestTossPayment() {
+@@ -2151,7 +2281,8 @@ async function confirmPaymentOnServer(payment, params = new URLSearchParams()) {
+       Authorization: `Bearer ${accessToken}`,
+     },
+     body: JSON.stringify({
+-      paymentId: params.get("paymentId") || params.get("orderId") || payment.orderId,
++      paymentId: params.get("paymentId") || portOnePaymentId(payment.orderId),
++      orderId: params.get("orderId") || payment.orderId,
+     }),
+   });
+   const data = await response.json();
+@@ -2173,27 +2304,36 @@ async function requestTossPayment() {
        throw new Error("PortOne Store ID 또는 Channel Key가 설정되지 않았습니다.");
      }
      await loadPortOneSdk();
@@ -248,7 +393,12 @@ index 0cc7af6..1cd4eef 100644
      const mobilePhone = normalizePhone(payment.customerPhone);
      const response = await window.PortOne.requestPayment({
        storeId: PORTONE_STORE_ID,
-@@ -2184,11 +2312,12 @@ async function requestTossPayment() {
+       channelKey: PORTONE_CHANNEL_KEY,
+-      paymentId: payment.orderId,
++      paymentId: portOnePaymentId(payment.orderId),
+       orderName: payment.itemName,
+       totalAmount: payment.amount,
+       currency: "CURRENCY_KRW",
        payMethod: "VIRTUAL_ACCOUNT",
        virtualAccount: {
          accountExpiry: {
@@ -262,7 +412,16 @@ index 0cc7af6..1cd4eef 100644
          ...(mobilePhone ? { phoneNumber: mobilePhone } : {}),
        },
      });
-@@ -2546,7 +2675,17 @@ document.addEventListener("click", (event) => {
+     if (response?.code) throw new Error(response.message || "PortOne payment window failed.");
+-    const result = await confirmPaymentOnServer(payment, new URLSearchParams({ paymentId: payment.orderId }));
++    const result = await confirmPaymentOnServer(payment, new URLSearchParams({
++      paymentId: portOnePaymentId(payment.orderId),
++      orderId: payment.orderId,
++    }));
+     if (result.status === "paid") {
+       await window.motfReloadTransactions?.();
+       setPaymentResult("success");
+@@ -2546,7 +2686,17 @@ document.addEventListener("click", (event) => {
  });
  
  document.addEventListener("input", (event) => {
@@ -281,7 +440,7 @@ index 0cc7af6..1cd4eef 100644
    if (event.target.matches("#marketPeople")) renderStores();
    if (event.target.matches("#recommendPeople, #mealStyle")) renderCommunity();
    if (event.target.matches("#activityPeople, #activitySpace, #activityMood")) renderRecreation();
-@@ -2560,7 +2699,17 @@ document.addEventListener("input", (event) => {
+@@ -2560,7 +2710,17 @@ document.addEventListener("input", (event) => {
  });
  
  document.addEventListener("change", (event) => {
@@ -300,7 +459,7 @@ index 0cc7af6..1cd4eef 100644
    if (event.target.matches("#marketPeople")) renderStores();
    if (event.target.matches("#mealStyle")) renderCommunity();
    if (event.target.matches("#activityPeople, #activitySpace, #activityMood")) renderRecreation();
-@@ -2694,6 +2843,8 @@ window.addEventListener("popstate", () => {
+@@ -2694,6 +2854,8 @@ window.addEventListener("popstate", () => {
  });
  
  (async function boot() {

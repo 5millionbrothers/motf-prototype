@@ -72,7 +72,23 @@ function paymentKey(payment) {
   return payment?.transactionId || payment?.txId || payment?.id;
 }
 
+function canonicalOrderId(value) {
+  return String(value || "")
+    .replace(/^MS-/, "MOTF-STAY-")
+    .replace(/^MM-/, "MOTF-MARKET-");
+}
+
+function normalizePaymentForIntent(payment, orderId) {
+  return {
+    ...payment,
+    id: orderId,
+    paymentId: orderId,
+    orderId,
+  };
+}
+
 async function applyPortOnePayment(userId, orderId, payment) {
+  const intentPayment = normalizePaymentForIntent(payment, orderId);
   const status = paymentStatus(payment);
   if (status === "PAID") {
     const finalized = await supabaseRequest(
@@ -84,7 +100,7 @@ async function applyPortOnePayment(userId, orderId, payment) {
           target_customer_id: userId,
           target_order_id: orderId,
           target_payment_key: paymentKey(payment),
-          portone_response: payment,
+          portone_response: intentPayment,
         }),
       },
     );
@@ -101,7 +117,7 @@ async function applyPortOnePayment(userId, orderId, payment) {
         body: JSON.stringify({
           target_customer_id: userId,
           target_order_id: orderId,
-          portone_response: payment,
+          portone_response: intentPayment,
         }),
       },
     );
@@ -131,8 +147,9 @@ module.exports = async function handler(req, res) {
     if (!user?.id) return json(res, 401, { ok: false, message: "Login expired. Please sign in again." });
 
     const body = typeof req.body === "string" ? JSON.parse(req.body) : (req.body || {});
-    const orderId = body.paymentId || body.orderId;
-    if (!orderId) return json(res, 400, { ok: false, message: "paymentId is required." });
+    const paymentId = body.paymentId || body.orderId;
+    const orderId = canonicalOrderId(body.orderId || body.paymentId);
+    if (!paymentId || !orderId) return json(res, 400, { ok: false, message: "paymentId is required." });
 
     const intent = await getPaymentIntent(orderId);
     if (!intent || intent.customer_id !== user.id) {
@@ -145,7 +162,7 @@ module.exports = async function handler(req, res) {
       return json(res, 410, { ok: false, message: "Prepared payment expired. Please try again." });
     }
 
-    const payment = await getPortOnePayment(orderId);
+    const payment = await getPortOnePayment(paymentId);
     if (paymentAmount(payment) !== Number(intent.amount)) {
       return json(res, 400, { ok: false, message: "Payment amount does not match the server ledger." });
     }

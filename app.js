@@ -1646,6 +1646,13 @@ function clearPendingPayment() {
   window.localStorage.removeItem(PORTONE_PENDING_PAYMENT_KEY);
 }
 
+function portOnePaymentId(orderId) {
+  return String(orderId || "")
+    .replace(/^MOTF-STAY-/, "MS-")
+    .replace(/^MOTF-MARKET-/, "MM-")
+    .slice(0, 40);
+}
+
 function normalizePhone(value) {
   return String(value || "").replace(/\D/g, "").slice(0, 20);
 }
@@ -2274,7 +2281,8 @@ async function confirmPaymentOnServer(payment, params = new URLSearchParams()) {
       Authorization: `Bearer ${accessToken}`,
     },
     body: JSON.stringify({
-      paymentId: params.get("paymentId") || params.get("orderId") || payment.orderId,
+      paymentId: params.get("paymentId") || portOnePaymentId(payment.orderId),
+      orderId: params.get("orderId") || payment.orderId,
     }),
   });
   const data = await response.json();
@@ -2305,7 +2313,7 @@ async function requestTossPayment() {
     const response = await window.PortOne.requestPayment({
       storeId: PORTONE_STORE_ID,
       channelKey: PORTONE_CHANNEL_KEY,
-      paymentId: payment.orderId,
+      paymentId: portOnePaymentId(payment.orderId),
       orderName: payment.itemName,
       totalAmount: payment.amount,
       currency: "CURRENCY_KRW",
@@ -2322,7 +2330,10 @@ async function requestTossPayment() {
       },
     });
     if (response?.code) throw new Error(response.message || "PortOne payment window failed.");
-    const result = await confirmPaymentOnServer(payment, new URLSearchParams({ paymentId: payment.orderId }));
+    const result = await confirmPaymentOnServer(payment, new URLSearchParams({
+      paymentId: portOnePaymentId(payment.orderId),
+      orderId: payment.orderId,
+    }));
     if (result.status === "paid") {
       await window.motfReloadTransactions?.();
       setPaymentResult("success");
