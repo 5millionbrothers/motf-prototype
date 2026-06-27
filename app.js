@@ -597,6 +597,7 @@ window.motfStartPreparedPayment = function startPreparedPayment(intent, draft) {
     orderId: intent.order_id,
     customerName: draft.customer_name || window.motfCurrentUserProfile?.full_name || "이용자",
     customerPhone: draft.contact_phone || window.motfCurrentUserProfile?.phone || "",
+    customerEmail: window.motfCurrentUserEmail || "",
     stayName: isStay ? state.selectedStay.name : undefined,
     roomName: isStay ? state.selectedRoom.name : undefined,
     storeName: isStay ? undefined : state.selectedStore.name,
@@ -2295,6 +2296,11 @@ async function requestTossPayment() {
       throw new Error("PortOne Store ID 또는 Channel Key가 설정되지 않았습니다.");
     }
     await loadPortOneSdk();
+    const { data: sessionData } = await window.motfSupabase.auth.getSession();
+    const customerEmail = payment.customerEmail || sessionData.session?.user?.email || "";
+    if (!customerEmail) {
+      throw new Error("KG이니시스 결제창 호출을 위해 구매자 이메일이 필요합니다. 로그인 이메일을 확인해주세요.");
+    }
     const mobilePhone = normalizePhone(payment.customerPhone);
     const response = await window.PortOne.requestPayment({
       storeId: PORTONE_STORE_ID,
@@ -2311,6 +2317,7 @@ async function requestTossPayment() {
       },
       customer: {
         fullName: payment.customerName || "moTF user",
+        email: customerEmail,
         ...(mobilePhone ? { phoneNumber: mobilePhone } : {}),
       },
     });
