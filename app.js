@@ -2299,6 +2299,29 @@ async function requestTossPayment() {
     return;
   }
   savePendingPayment(payment);
+  const showVirtualAccountIssued = (virtualAccount = {}, note = "") => {
+    const accountLabel = [
+      virtualAccount.bankName || virtualAccount.bank || virtualAccount.bankCode,
+      virtualAccount.accountNumber || virtualAccount.account_number,
+      virtualAccount.holderName || virtualAccount.accountHolder || virtualAccount.customerName,
+    ].filter(Boolean).join(" / ");
+    state.paymentResult = {
+      status: "virtual_account_issued",
+      type: payment.type,
+      eyebrow: "가상계좌 발급 완료",
+      title: "포트원 결제창 호출이 완료되었습니다",
+      text: note || "입금이 확인되면 예약·주문 요청이 접수됩니다. 서버 확인은 포트원 웹훅과 관리자 확인으로 이어집니다.",
+      icon: "landmark",
+      className: "",
+      orderId: payment.orderId,
+      itemName: payment.itemName,
+      amount: payment.amount,
+      paymentKey: accountLabel || portOnePaymentId(payment.orderId),
+      backRoute: paymentBackRoute(),
+    };
+    navigate("paymentResult");
+  };
+
   try {
     if (!PORTONE_STORE_ID || !PORTONE_CHANNEL_KEY) {
       throw new Error("PortOne Store ID 또는 Channel Key가 설정되지 않았습니다.");
@@ -2330,36 +2353,21 @@ async function requestTossPayment() {
       },
     });
     if (response?.code) throw new Error(response.message || "PortOne payment window failed.");
-    const result = await confirmPaymentOnServer(payment, new URLSearchParams({
-      paymentId: portOnePaymentId(payment.orderId),
-      orderId: payment.orderId,
-    }));
-    if (result.status === "paid") {
-      await window.motfReloadTransactions?.();
-      setPaymentResult("success");
-      return;
+    try {
+      const result = await confirmPaymentOnServer(payment, new URLSearchParams({
+        paymentId: portOnePaymentId(payment.orderId),
+        orderId: payment.orderId,
+      }));
+      if (result.status === "paid") {
+        await window.motfReloadTransactions?.();
+        setPaymentResult("success");
+        return;
+      }
+      showVirtualAccountIssued(result.virtualAccount || response?.virtualAccount || response?.virtual_account);
+    } catch (confirmError) {
+      console.warn("PortOne server confirmation pending", confirmError);
+      showVirtualAccountIssued(response?.virtualAccount || response?.virtual_account, "포트원 결제창 호출은 완료되었습니다. 서버 결제 조회가 지연되어 관리자 확인이 필요합니다.");
     }
-    const account = result.virtualAccount || {};
-    const accountLabel = [
-      account.bankName || account.bank || account.bankCode,
-      account.accountNumber || account.account_number,
-      account.holderName || account.accountHolder || account.customerName,
-    ].filter(Boolean).join(" / ");
-    state.paymentResult = {
-      status: "virtual_account_issued",
-      type: payment.type,
-      eyebrow: "가상계좌 발급 완료",
-      title: "입금이 확인되면 예약·주문 요청이 접수됩니다",
-      text: "아직 실제 결제 완료가 아닙니다. 발급된 가상계좌로 입금하면 포트원 웹훅을 통해 자동으로 예약·주문이 생성됩니다.",
-      icon: "landmark",
-      className: "",
-      orderId: payment.orderId,
-      itemName: payment.itemName,
-      amount: payment.amount,
-      paymentKey: accountLabel || payment.orderId,
-      backRoute: paymentBackRoute(),
-    };
-    navigate("paymentResult");
   } catch (error) {
     state.paymentResult = {
       status: "fail",

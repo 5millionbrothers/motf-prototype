@@ -120,7 +120,7 @@ index fa005de..0ebf575 100644
        },
      );
 diff --git a/app.js b/app.js
-index 0cc7af6..17e7b61 100644
+index 0cc7af6..d8728dc 100644
 --- a/app.js
 +++ b/app.js
 @@ -11,6 +11,8 @@ window.motfEscapeHtml = escapeHtml;
@@ -381,7 +381,35 @@ index 0cc7af6..17e7b61 100644
      }),
    });
    const data = await response.json();
-@@ -2173,27 +2304,36 @@ async function requestTossPayment() {
+@@ -2168,58 +2299,75 @@ async function requestTossPayment() {
+     return;
+   }
+   savePendingPayment(payment);
++  const showVirtualAccountIssued = (virtualAccount = {}, note = "") => {
++    const accountLabel = [
++      virtualAccount.bankName || virtualAccount.bank || virtualAccount.bankCode,
++      virtualAccount.accountNumber || virtualAccount.account_number,
++      virtualAccount.holderName || virtualAccount.accountHolder || virtualAccount.customerName,
++    ].filter(Boolean).join(" / ");
++    state.paymentResult = {
++      status: "virtual_account_issued",
++      type: payment.type,
++      eyebrow: "가상계좌 발급 완료",
++      title: "포트원 결제창 호출이 완료되었습니다",
++      text: note || "입금이 확인되면 예약·주문 요청이 접수됩니다. 서버 확인은 포트원 웹훅과 관리자 확인으로 이어집니다.",
++      icon: "landmark",
++      className: "",
++      orderId: payment.orderId,
++      itemName: payment.itemName,
++      amount: payment.amount,
++      paymentKey: accountLabel || portOnePaymentId(payment.orderId),
++      backRoute: paymentBackRoute(),
++    };
++    navigate("paymentResult");
++  };
++
+   try {
+     if (!PORTONE_STORE_ID || !PORTONE_CHANNEL_KEY) {
        throw new Error("PortOne Store ID 또는 Channel Key가 설정되지 않았습니다.");
      }
      await loadPortOneSdk();
@@ -414,14 +442,50 @@ index 0cc7af6..17e7b61 100644
      });
      if (response?.code) throw new Error(response.message || "PortOne payment window failed.");
 -    const result = await confirmPaymentOnServer(payment, new URLSearchParams({ paymentId: payment.orderId }));
-+    const result = await confirmPaymentOnServer(payment, new URLSearchParams({
-+      paymentId: portOnePaymentId(payment.orderId),
-+      orderId: payment.orderId,
-+    }));
-     if (result.status === "paid") {
-       await window.motfReloadTransactions?.();
-       setPaymentResult("success");
-@@ -2546,7 +2686,17 @@ document.addEventListener("click", (event) => {
+-    if (result.status === "paid") {
+-      await window.motfReloadTransactions?.();
+-      setPaymentResult("success");
+-      return;
++    try {
++      const result = await confirmPaymentOnServer(payment, new URLSearchParams({
++        paymentId: portOnePaymentId(payment.orderId),
++        orderId: payment.orderId,
++      }));
++      if (result.status === "paid") {
++        await window.motfReloadTransactions?.();
++        setPaymentResult("success");
++        return;
++      }
++      showVirtualAccountIssued(result.virtualAccount || response?.virtualAccount || response?.virtual_account);
++    } catch (confirmError) {
++      console.warn("PortOne server confirmation pending", confirmError);
++      showVirtualAccountIssued(response?.virtualAccount || response?.virtual_account, "포트원 결제창 호출은 완료되었습니다. 서버 결제 조회가 지연되어 관리자 확인이 필요합니다.");
+     }
+-    const account = result.virtualAccount || {};
+-    const accountLabel = [
+-      account.bankName || account.bank || account.bankCode,
+-      account.accountNumber || account.account_number,
+-      account.holderName || account.accountHolder || account.customerName,
+-    ].filter(Boolean).join(" / ");
+-    state.paymentResult = {
+-      status: "virtual_account_issued",
+-      type: payment.type,
+-      eyebrow: "가상계좌 발급 완료",
+-      title: "입금이 확인되면 예약·주문 요청이 접수됩니다",
+-      text: "아직 실제 결제 완료가 아닙니다. 발급된 가상계좌로 입금하면 포트원 웹훅을 통해 자동으로 예약·주문이 생성됩니다.",
+-      icon: "landmark",
+-      className: "",
+-      orderId: payment.orderId,
+-      itemName: payment.itemName,
+-      amount: payment.amount,
+-      paymentKey: accountLabel || payment.orderId,
+-      backRoute: paymentBackRoute(),
+-    };
+-    navigate("paymentResult");
+   } catch (error) {
+     state.paymentResult = {
+       status: "fail",
+@@ -2546,7 +2694,17 @@ document.addEventListener("click", (event) => {
  });
  
  document.addEventListener("input", (event) => {
@@ -440,7 +504,7 @@ index 0cc7af6..17e7b61 100644
    if (event.target.matches("#marketPeople")) renderStores();
    if (event.target.matches("#recommendPeople, #mealStyle")) renderCommunity();
    if (event.target.matches("#activityPeople, #activitySpace, #activityMood")) renderRecreation();
-@@ -2560,7 +2710,17 @@ document.addEventListener("input", (event) => {
+@@ -2560,7 +2718,17 @@ document.addEventListener("input", (event) => {
  });
  
  document.addEventListener("change", (event) => {
@@ -459,7 +523,7 @@ index 0cc7af6..17e7b61 100644
    if (event.target.matches("#marketPeople")) renderStores();
    if (event.target.matches("#mealStyle")) renderCommunity();
    if (event.target.matches("#activityPeople, #activitySpace, #activityMood")) renderRecreation();
-@@ -2694,6 +2854,8 @@ window.addEventListener("popstate", () => {
+@@ -2694,6 +2862,8 @@ window.addEventListener("popstate", () => {
  });
  
  (async function boot() {
