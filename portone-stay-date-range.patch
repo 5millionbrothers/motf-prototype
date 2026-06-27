@@ -1,5 +1,5 @@
 diff --git a/app.js b/app.js
-index 0cc7af6..f2d0c12 100644
+index 0cc7af6..9f5635b 100644
 --- a/app.js
 +++ b/app.js
 @@ -11,6 +11,8 @@ window.motfEscapeHtml = escapeHtml;
@@ -11,6 +11,15 @@ index 0cc7af6..f2d0c12 100644
  
  let NAVER_MAP_KEY_ID = window.MOTF_CONFIG?.NAVER_MAP_KEY_ID?.trim() || "";
  const NAVER_MAP_SCRIPT_ID = "motf-naver-map-sdk";
+@@ -526,7 +528,7 @@ const state = {
+ 
+ window.motfApplyCatalog = function applyCatalog(nextStays, nextStores) {
+   if (Array.isArray(nextStays) && nextStays.length) {
+-    stays = nextStays;
++    stays = nextStays.map((stay) => ({ ...stay, region: DEFAULT_STAY_REGION }));
+     state.selectedStay = stays[0];
+     state.selectedRoom = stays[0].rooms[0];
+   }
 @@ -545,6 +547,7 @@ window.motfApplyCatalog = function applyCatalog(nextStays, nextStores) {
  
  window.motfGetReservationDraft = function getReservationDraft() {
@@ -269,16 +278,17 @@ index 0cc7af6..f2d0c12 100644
    if (event.target.matches("#marketPeople")) renderStores();
    if (event.target.matches("#mealStyle")) renderCommunity();
    if (event.target.matches("#activityPeople, #activitySpace, #activityMood")) renderRecreation();
-@@ -2694,6 +2836,7 @@ window.addEventListener("popstate", () => {
+@@ -2694,6 +2836,8 @@ window.addEventListener("popstate", () => {
  });
  
  (async function boot() {
++  stays = stays.map((stay) => ({ ...stay, region: DEFAULT_STAY_REGION }));
 +  initializeStaySearchDefaults();
    await loadPaymentConfig();
    const handledRedirect = await handleTossRedirect();
    if (!handledRedirect) {
 diff --git a/index.html b/index.html
-index d0d7e0b..4ec11e4 100644
+index d0d7e0b..ac8a3c1 100644
 --- a/index.html
 +++ b/index.html
 @@ -88,8 +88,12 @@
@@ -296,7 +306,7 @@ index d0d7e0b..4ec11e4 100644
            </label>
            <label>
              지역
-@@ -103,7 +107,7 @@
+@@ -103,12 +107,12 @@
            </label>
            <label>
              인원
@@ -305,6 +315,13 @@ index d0d7e0b..4ec11e4 100644
            </label>
            <label class="range-label">
              1박 예산
+-            <span id="stayPriceLabel">800,000원 이하</span>
+-            <input type="range" id="stayPrice" min="400000" max="2000000" step="100000" value="800000" />
++            <span id="stayPriceLabel">2,000,000원 이하</span>
++            <input type="range" id="stayPrice" min="400000" max="2000000" step="100000" value="2000000" />
+           </label>
+           <button class="detail-filter-trigger" type="button" data-toggle-stay-filters>
+             <i data-lucide="sliders-horizontal"></i>세부필터
 @@ -186,7 +190,9 @@
              <label>대표자 이름<input required id="bookingName" placeholder="예: 김모두" /></label>
              <label>대표 연락처<input required id="bookingPhone" placeholder="010-0000-0000" /></label>

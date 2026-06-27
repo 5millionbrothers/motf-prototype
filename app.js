@@ -528,7 +528,7 @@ const state = {
 
 window.motfApplyCatalog = function applyCatalog(nextStays, nextStores) {
   if (Array.isArray(nextStays) && nextStays.length) {
-    stays = nextStays;
+    stays = nextStays.map((stay) => ({ ...stay, region: DEFAULT_STAY_REGION }));
     state.selectedStay = stays[0];
     state.selectedRoom = stays[0].rooms[0];
   }
@@ -2836,6 +2836,7 @@ window.addEventListener("popstate", () => {
 });
 
 (async function boot() {
+  stays = stays.map((stay) => ({ ...stay, region: DEFAULT_STAY_REGION }));
   initializeStaySearchDefaults();
   await loadPaymentConfig();
   const handledRedirect = await handleTossRedirect();
