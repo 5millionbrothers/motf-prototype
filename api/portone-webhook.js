@@ -1,4 +1,5 @@
 const { json } = require("./_utils");
+const https = require("https");
 
 const requiredEnv = ["PORTONE_API_SECRET", "SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"];
 
@@ -21,20 +22,70 @@ async function supabaseRequest(path, key, options = {}) {
   return data;
 }
 
-async function getPortOnePayment(paymentId) {
-  const response = await fetch(`https://api.portone.io/payments/${encodeURIComponent(paymentId)}`, {
-    headers: {
-      Authorization: `PortOne ${process.env.PORTONE_API_SECRET}`,
-      "Content-Type": "application/json",
-    },
+function portOneAuthHeader() {
+  return `PortOne ${String(process.env.PORTONE_API_SECRET || "").replace(/^PortOne\s+/i, "").trim()}`;
+}
+
+function getJsonWithHttps(url, headers) {
+  return new Promise((resolve, reject) => {
+    const req = https.request(url, {
+      method: "GET",
+      headers,
+      family: 4,
+      timeout: 8000,
+    }, (response) => {
+      let raw = "";
+      response.setEncoding("utf8");
+      response.on("data", (chunk) => { raw += chunk; });
+      response.on("end", () => {
+        let data = null;
+        try {
+          data = raw ? JSON.parse(raw) : null;
+        } catch {
+          const error = new Error("PortOne HTTPS response was not JSON.");
+          error.statusCode = response.statusCode;
+          reject(error);
+          return;
+        }
+        if (response.statusCode >= 200 && response.statusCode < 300) {
+          resolve(data);
+          return;
+        }
+        const error = new Error(data?.message || data?.type || `PortOne payment lookup failed with ${response.statusCode}.`);
+        error.statusCode = response.statusCode;
+        reject(error);
+      });
+    });
+    req.on("timeout", () => req.destroy(new Error("PortOne HTTPS lookup timed out.")));
+    req.on("error", reject);
+    req.end();
   });
-  const data = await response.json().catch(() => null);
-  if (!response.ok) {
-    const error = new Error(data?.message || data?.type || "PortOne payment lookup failed.");
-    error.statusCode = response.status;
-    throw error;
+}
+
+async function getPortOnePayment(paymentId) {
+  const url = `https://api.portone.io/payments/${encodeURIComponent(paymentId)}`;
+  const headers = {
+    Authorization: portOneAuthHeader(),
+    "Content-Type": "application/json",
+  };
+  try {
+    const response = await fetch(url, { headers });
+    const data = await response.json().catch(() => null);
+    if (!response.ok) {
+      const error = new Error(data?.message || data?.type || "PortOne payment lookup failed.");
+      error.statusCode = response.status;
+      throw error;
+    }
+    return data;
+  } catch (error) {
+    try {
+      return await getJsonWithHttps(url, headers);
+    } catch (httpsError) {
+      const finalError = new Error(`PortOne lookup failed. fetch=${error.message || error}; https=${httpsError.message || httpsError}`);
+      finalError.statusCode = httpsError.statusCode || error.statusCode;
+      throw finalError;
+    }
   }
-  return data;
 }
 
 function extractPaymentId(body) {
