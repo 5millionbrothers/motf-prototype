@@ -1537,20 +1537,6 @@ function normalizePhone(value) {
   return String(value || "").replace(/\D/g, "").slice(0, 20);
 }
 
-function formatVirtualAccount(account = {}) {
-  const bank = account.bankName || account.bank || account.bankCode || account.bank_code || "";
-  const number = account.accountNumber || account.account_number || account.number || "";
-  const holder = account.holderName || account.accountHolder || account.account_holder || account.customerName || "";
-  const due = account.dueDate || account.due_date || account.expiredAt || account.expiresAt || account.expiry || "";
-  return {
-    bank,
-    number,
-    holder,
-    due,
-    label: [bank, number, holder].filter(Boolean).join(" / "),
-  };
-}
-
 function setTossWidgetStatus(message, isError = false) {
   const status = qs("#tossWidgetStatus");
   if (!status) return;
@@ -1876,10 +1862,6 @@ function renderPaymentResult() {
   qs("#paymentResultText").textContent = result.text;
   const extraRows = [
     result.paymentKey ? `<div class="result-detail-row"><span>paymentKey</span><strong>${result.paymentKey}</strong></div>` : "",
-    result.virtualAccount?.bank ? `<div class="result-detail-row"><span>은행</span><strong>${result.virtualAccount.bank}</strong></div>` : "",
-    result.virtualAccount?.number ? `<div class="result-detail-row"><span>입금 계좌</span><strong>${result.virtualAccount.number}</strong></div>` : "",
-    result.virtualAccount?.holder ? `<div class="result-detail-row"><span>예금주</span><strong>${result.virtualAccount.holder}</strong></div>` : "",
-    result.virtualAccount?.due ? `<div class="result-detail-row"><span>입금 기한</span><strong>${result.virtualAccount.due}</strong></div>` : "",
     result.errorCode ? `<div class="result-detail-row"><span>오류 코드</span><strong>${result.errorCode}</strong></div>` : "",
   ].join("");
   qs("#paymentResultDetails").innerHTML = `
@@ -2180,7 +2162,6 @@ async function confirmPaymentOnServer(payment, params = new URLSearchParams()) {
     },
     body: JSON.stringify({
       paymentId: params.get("paymentId") || params.get("orderId") || payment.orderId,
-      portoneResponse: payment.portoneResponse || null,
     }),
   });
   const data = await response.json();
@@ -2217,21 +2198,18 @@ async function requestTossPayment() {
       },
     });
     if (response?.code) throw new Error(response.message || "PortOne payment window failed.");
-    payment.portoneResponse = {
-      ...response,
-      id: response.id || response.paymentId || payment.orderId,
-      paymentId: response.paymentId || response.id || payment.orderId,
-      status: response.status || response.paymentStatus || "VIRTUAL_ACCOUNT_ISSUED",
-      amount: response.amount || { total: payment.amount },
-    };
-    savePendingPayment(payment);
     const result = await confirmPaymentOnServer(payment, new URLSearchParams({ paymentId: payment.orderId }));
     if (result.status === "paid") {
       await window.motfReloadTransactions?.();
       setPaymentResult("success");
       return;
     }
-    const account = formatVirtualAccount(result.virtualAccount || {});
+    const account = result.virtualAccount || {};
+    const accountLabel = [
+      account.bankName || account.bank || account.bankCode,
+      account.accountNumber || account.account_number,
+      account.holderName || account.accountHolder || account.customerName,
+    ].filter(Boolean).join(" / ");
     state.paymentResult = {
       status: "virtual_account_issued",
       type: payment.type,
@@ -2243,11 +2221,9 @@ async function requestTossPayment() {
       orderId: payment.orderId,
       itemName: payment.itemName,
       amount: payment.amount,
-      virtualAccount: account,
-      paymentKey: account.label || payment.orderId,
+      paymentKey: accountLabel || payment.orderId,
       backRoute: paymentBackRoute(),
     };
-    await window.motfReloadTransactions?.();
     navigate("paymentResult");
   } catch (error) {
     state.paymentResult = {
@@ -2272,10 +2248,6 @@ async function handleTossRedirect() {
 }
 
 function reservationCard(item) {
-  const account = item.virtualAccount || {};
-  const accountInfo = account.accountNumber
-    ? `<p class="muted">입금계좌: ${[account.bank, account.accountNumber, account.holder].filter(Boolean).join(" / ")}${account.due ? ` · 기한 ${account.due}` : ""}</p>`
-    : "";
   return `
     <article class="listing-card">
       <div class="listing-body">
@@ -2285,7 +2257,6 @@ function reservationCard(item) {
           <span class="pill">${item.people}명</span>
         </div>
         <h3>${item.stayName}</h3>
-        ${accountInfo}
         <p>${item.roomName} · ${money(item.amount)}</p>
         ${item.refundAmount ? `<p class="muted">환불 예정 금액 ${money(item.refundAmount)}</p>` : ""}
         <div class="button-row">
@@ -2298,10 +2269,6 @@ function reservationCard(item) {
 }
 
 function orderCard(item) {
-  const account = item.virtualAccount || {};
-  const accountInfo = account.accountNumber
-    ? `<p class="muted">입금계좌: ${[account.bank, account.accountNumber, account.holder].filter(Boolean).join(" / ")}${account.due ? ` · 기한 ${account.due}` : ""}</p>`
-    : "";
   return `
     <article class="listing-card">
       <div class="listing-body">
@@ -2310,7 +2277,6 @@ function orderCard(item) {
           <span class="pill">${item.pickupTime}</span>
         </div>
         <h3>${item.storeName}</h3>
-        ${accountInfo}
         <p>${item.items.length}개 품목 · ${money(item.amount)}</p>
         ${item.refundAmount ? `<p class="muted">환불 예정 금액 ${money(item.refundAmount)}</p>` : ""}
         <div class="button-row">
