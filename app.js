@@ -1,4 +1,16 @@
 const money = (value) => `${Number(value).toLocaleString("ko-KR")}원`;
+const formatDateTime = (value) => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleString("ko-KR", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
 const escapeHtml = (value) => String(value ?? "").replace(/[&<>'"]/g, (character) => ({
   "&": "&amp;",
   "<": "&lt;",
@@ -1980,7 +1992,18 @@ function renderPaymentResult() {
   qs("#paymentResultEyebrow").textContent = result.eyebrow;
   qs("#paymentResultTitle").textContent = result.title;
   qs("#paymentResultText").textContent = result.text;
+  const virtualAccountRows = result.virtualAccount ? [
+    result.virtualAccount.bankName || result.virtualAccount.bank || result.virtualAccount.bankCode
+      ? `<div class="result-detail-row"><span>입금 은행</span><strong>${result.virtualAccount.bankName || result.virtualAccount.bank || result.virtualAccount.bankCode}</strong></div>` : "",
+    result.virtualAccount.accountNumber || result.virtualAccount.account_number
+      ? `<div class="result-detail-row"><span>입금 계좌</span><strong>${result.virtualAccount.accountNumber || result.virtualAccount.account_number}</strong></div>` : "",
+    result.virtualAccount.holderName || result.virtualAccount.accountHolder || result.virtualAccount.customerName
+      ? `<div class="result-detail-row"><span>예금주</span><strong>${result.virtualAccount.holderName || result.virtualAccount.accountHolder || result.virtualAccount.customerName}</strong></div>` : "",
+    result.virtualAccount.dueDate || result.virtualAccount.accountExpiry?.dueDate
+      ? `<div class="result-detail-row"><span>입금 기한</span><strong>${formatDateTime(result.virtualAccount.dueDate || result.virtualAccount.accountExpiry?.dueDate)}</strong></div>` : "",
+  ].join("") : "";
   const extraRows = [
+    virtualAccountRows,
     result.paymentKey ? `<div class="result-detail-row"><span>paymentKey</span><strong>${result.paymentKey}</strong></div>` : "",
     result.errorCode ? `<div class="result-detail-row"><span>오류 코드</span><strong>${result.errorCode}</strong></div>` : "",
   ].join("");
@@ -2318,6 +2341,7 @@ async function requestTossPayment() {
       orderId: payment.orderId,
       itemName: payment.itemName,
       amount: payment.amount,
+      virtualAccount,
       paymentKey: accountLabel || portOnePaymentId(payment.orderId),
       backRoute: paymentBackRoute(),
     };

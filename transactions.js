@@ -36,7 +36,7 @@
         .eq("customer_id", authData.session.user.id)
         .order("created_at", { ascending: false }),
       client.from("payment_intents")
-        .select("order_id, kind, amount, order_name, status, virtual_account_issued_at, created_at")
+        .select("order_id, kind, amount, order_name, status, virtual_account, virtual_account_issued_at, created_at")
         .eq("customer_id", authData.session.user.id)
         .eq("status", "virtual_account_issued")
         .order("created_at", { ascending: false }),
@@ -62,10 +62,16 @@
       items: item.market_order_items || [],
     }));
     (intentResult.data || []).forEach((item) => {
+      const account = item.virtual_account || {};
+      const accountLabel = [
+        account.bankName || account.bank || account.bankCode,
+        account.accountNumber || account.account_number,
+        account.holderName || account.accountHolder || account.customerName,
+      ].filter(Boolean).join(" / ");
       const pendingItem = {
         id: item.order_id,
         amount: item.amount,
-        status: "입금 대기",
+        status: accountLabel ? `입금 대기 · ${accountLabel}` : "입금 대기",
       };
       if (item.kind === "stay") {
         reservations.unshift({
