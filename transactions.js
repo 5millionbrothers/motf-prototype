@@ -22,6 +22,20 @@
     if (item.refund_status && item.refund_status !== "none") return refundText[item.refund_status] || statusText[item.status] || item.status;
     return statusText[item.status] || item.status;
   }
+  function localIssuedPayments() {
+    try {
+      return JSON.parse(window.localStorage.getItem("motf.localIssuedPayments") || "[]");
+    } catch {
+      return [];
+    }
+  }
+  function accountLabel(account = {}) {
+    return [
+      account.bankName || account.bank || account.bankCode,
+      account.accountNumber || account.account_number,
+      account.holderName || account.accountHolder || account.customerName,
+    ].filter(Boolean).join(" / ");
+  }
 
   async function loadMyTransactions() {
     const { data: authData } = await client.auth.getSession();
@@ -36,7 +50,7 @@
         .eq("customer_id", authData.session.user.id)
         .order("created_at", { ascending: false }),
       client.from("payment_intents")
-        .select("order_id, kind, amount, order_name, status, virtual_account_issued_at, created_at")
+        .select("order_id, kind, amount, order_name, status, virtual_account, virtual_account_issued_at, created_at")
         .eq("customer_id", authData.session.user.id)
         .eq("status", "virtual_account_issued")
         .order("created_at", { ascending: false }),
@@ -62,10 +76,12 @@
       items: item.market_order_items || [],
     }));
     (intentResult.data || []).forEach((item) => {
+      const account = item.virtual_account || {};
+      const label = accountLabel(account);
       const pendingItem = {
         id: item.order_id,
         amount: item.amount,
-        status: "입금 대기",
+        status: label ? `예약 대기 · ${label}` : "예약 대기",
       };
       if (item.kind === "stay") {
         reservations.unshift({
@@ -84,6 +100,31 @@
         });
       }
     });
+    localIssuedPayments()
+      .filter((item) => !reservations.some((reservation) => reservation.id === item.orderId) && !orders.some((order) => order.id === item.orderId))
+      .forEach((item) => {
+        const pendingItem = {
+          id: item.orderId,
+          amount: item.amount,
+          status: accountLabel(item.virtualAccount) ? `예약 대기 · ${accountLabel(item.virtualAccount)}` : "예약 대기",
+        };
+        if (item.type === "stay") {
+          reservations.unshift({
+            ...pendingItem,
+            stayName: "가상계좌 입금 대기",
+            roomName: item.itemName,
+            date: String(item.issuedAt || "").slice(0, 10),
+            people: "-",
+          });
+        } else {
+          orders.unshift({
+            ...pendingItem,
+            storeName: "가상계좌 입금 대기",
+            pickupTime: String(item.issuedAt || "").slice(11, 16),
+            items: [{ id: item.orderId }],
+          });
+        }
+      });
     window.motfApplyMyTransactions?.(reservations, orders);
   }
   window.motfReloadTransactions = loadMyTransactions;
@@ -112,8 +153,6 @@
           event_date: draft.event_date,
           guest_count: draft.guest_count,
           request_memo: draft.request_memo,
-          check_in_date: draft.check_in_date,
-          check_out_date: draft.check_out_date,
         });
         if (error) throw error;
         const intent = Array.isArray(data) ? data[0] : data;
