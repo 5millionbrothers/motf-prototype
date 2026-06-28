@@ -1405,11 +1405,9 @@ input[type="range"] {
 }
 
 .toss-widget-box {
-  min-height: 220px;
+  min-height: 0;
   align-content: start;
-  background:
-    linear-gradient(135deg, rgba(90, 107, 61, 0.1), transparent 42%),
-    var(--warm);
+  background: var(--paper);
 }
 
 .toss-widget-header {
@@ -1417,7 +1415,7 @@ input[type="range"] {
   align-items: center;
   gap: 9px;
   color: var(--teal-dark);
-  font-size: 18px;
+  font-size: 16px;
 }
 
 .key-row {
@@ -1445,17 +1443,14 @@ input[type="range"] {
 
 .toss-widget-area {
   overflow: hidden;
-  background: var(--paper);
+  background: #fff;
   border: 1px solid var(--line);
   border-radius: 8px;
 }
 
 .toss-widget-area:empty {
-  min-height: 54px;
-  background:
-    linear-gradient(90deg, var(--warm) 25%, var(--olive-soft) 37%, var(--warm) 63%);
-  background-size: 400% 100%;
-  animation: loading-stripe 1.4s ease infinite;
+  min-height: 0;
+  border: 0;
 }
 
 .toss-widget-status {
@@ -1463,6 +1458,50 @@ input[type="range"] {
   color: var(--muted);
   font-size: 13px;
   font-weight: 600;
+}
+
+.portone-method-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px;
+}
+
+.portone-method-card span,
+.portone-note-grid span {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.portone-method-card strong,
+.portone-note-grid strong {
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.portone-method-card i {
+  width: 22px;
+  height: 22px;
+  color: var(--teal);
+}
+
+.portone-note-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.portone-note-grid div {
+  min-width: 0;
+  padding: 13px;
+  border-right: 1px solid var(--line);
+}
+
+.portone-note-grid div:last-child {
+  border-right: 0;
 }
 
 @keyframes loading-stripe {
@@ -2576,8 +2615,18 @@ input[type="range"] {
   .product-grid,
   .room-grid,
   .board-grid,
+  .portone-note-grid,
   .form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .portone-note-grid div {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .portone-note-grid div:last-child {
+    border-bottom: 0;
   }
 
   .market-intro img {

@@ -45,19 +45,28 @@ async function getPaymentIntent(orderId) {
 }
 
 async function getPortOnePayment(paymentId) {
-  const response = await fetch(`https://api.portone.io/payments/${encodeURIComponent(paymentId)}`, {
-    headers: {
-      Authorization: `PortOne ${process.env.PORTONE_API_SECRET}`,
-      "Content-Type": "application/json",
-    },
-  });
-  const data = await response.json().catch(() => null);
-  if (!response.ok) {
-    const error = new Error(data?.message || data?.type || "PortOne payment lookup failed.");
-    error.statusCode = response.status;
-    throw error;
+  let lastError = null;
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, 600));
+    try {
+      const response = await fetch(`https://api.portone.io/payments/${encodeURIComponent(paymentId)}`, {
+        headers: {
+          Authorization: `PortOne ${process.env.PORTONE_API_SECRET}`,
+          "Content-Type": "application/json",
+        },
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        const error = new Error(data?.message || data?.type || "PortOne payment lookup failed.");
+        error.statusCode = response.status;
+        throw error;
+      }
+      return data;
+    } catch (error) {
+      lastError = error;
+    }
   }
-  return data;
+  throw lastError;
 }
 
 function paymentAmount(payment) {
@@ -70,6 +79,26 @@ function paymentStatus(payment) {
 
 function paymentKey(payment) {
   return payment?.transactionId || payment?.txId || payment?.id;
+}
+
+function virtualAccountInfo(payment) {
+  const source =
+    payment?.virtualAccount ||
+    payment?.virtual_account ||
+    payment?.method?.virtualAccount ||
+    payment?.method?.virtual_account ||
+    (payment?.method?.type === "VIRTUAL_ACCOUNT" ? payment.method : null) ||
+    payment?.paymentMethod?.virtualAccount ||
+    payment?.paymentMethod?.virtual_account ||
+    (payment?.paymentMethod?.type === "VIRTUAL_ACCOUNT" ? payment.paymentMethod : null) ||
+    {};
+  return {
+    bankName: source.bankName || source.bank || source.bankCode || "",
+    accountNumber: source.accountNumber || source.account_number || source.number || "",
+    holderName: source.holderName || source.accountHolder || source.customerName || source.depositorName || "",
+    dueDate: source.dueDate || source.expiry?.dueDate || source.accountExpiry?.dueDate || source.expiredAt || "",
+    raw: source,
+  };
 }
 
 function canonicalOrderId(value) {
@@ -108,21 +137,33 @@ async function applyPortOnePayment(userId, orderId, payment) {
     return { status: "paid", transactionId: result?.transaction_id, kind: result?.kind };
   }
 
-  if (status === "VIRTUAL_ACCOUNT_ISSUED" || status === "READY") {
-    const issued = await supabaseRequest(
-      "/rest/v1/rpc/mark_virtual_account_issued",
-      process.env.SUPABASE_SERVICE_ROLE_KEY,
-      {
-        method: "POST",
-        body: JSON.stringify({
-          target_customer_id: userId,
-          target_order_id: orderId,
-          portone_response: intentPayment,
-        }),
-      },
-    );
-    const result = Array.isArray(issued) ? issued[0] : issued;
-    return { status: "virtual_account_issued", orderId: result?.order_id, virtualAccount: result?.virtual_account };
+  if (["VIRTUAL_ACCOUNT_ISSUED", "READY", "PENDING"].includes(status)) {
+    const virtualAccount = virtualAccountInfo(payment);
+    try {
+      const issued = await supabaseRequest(
+        "/rest/v1/rpc/mark_virtual_account_issued",
+        process.env.SUPABASE_SERVICE_ROLE_KEY,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            target_customer_id: userId,
+            target_order_id: orderId,
+            portone_response: intentPayment,
+          }),
+        },
+      );
+      const result = Array.isArray(issued) ? issued[0] : issued;
+      return { status: "virtual_account_issued", orderId: result?.order_id, virtualAccount: result?.virtual_account || virtualAccount };
+    } catch (error) {
+      console.error("mark_virtual_account_issued", error);
+      return {
+        status: "virtual_account_issued",
+        orderId,
+        virtualAccount,
+        persistence: "failed",
+        warning: error.message || "DB에 입금대기 저장을 완료하지 못했습니다.",
+      };
+    }
   }
 
   return { status: "pending", portoneStatus: status };

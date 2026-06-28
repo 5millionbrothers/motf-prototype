@@ -2284,9 +2284,23 @@ async function renderTossWidgets(payment) {
   const paymentMethods = qs("#tossPaymentMethods");
   const agreement = qs("#tossAgreement");
   if (!paymentMethods || !agreement || !payment) return;
-  paymentMethods.innerHTML = `<div class="empty-state">KG이니시스 가상계좌만 사용할 수 있습니다.</div>`;
-  agreement.innerHTML = `<div class="summary-line"><span>입금 후 처리</span><strong>입금 완료 후 예약·주문 요청이 접수됩니다</strong></div>`;
-  setTossWidgetStatus("가상계좌 발급 버튼을 누르면 포트원 결제창이 열립니다.");
+  paymentMethods.innerHTML = `
+    <div class="portone-method-card">
+      <div>
+        <span>결제수단</span>
+        <strong>KG이니시스 가상계좌</strong>
+      </div>
+      <i data-lucide="landmark"></i>
+    </div>
+  `;
+  agreement.innerHTML = `
+    <div class="portone-note-grid">
+      <div><span>입금기한</span><strong>발급 후 24시간</strong></div>
+      <div><span>접수시점</span><strong>입금 완료 후 자동 접수</strong></div>
+      <div><span>확인방식</span><strong>포트원 조회 + 서버 검증</strong></div>
+    </div>
+  `;
+  setTossWidgetStatus("아래 버튼을 누르면 포트원 KG이니시스 결제창이 열립니다.");
 }
 
 async function confirmPaymentOnServer(payment, params = new URLSearchParams()) {
@@ -2389,10 +2403,14 @@ async function requestTossPayment() {
         setPaymentResult("success");
         return;
       }
-      showVirtualAccountIssued(result.virtualAccount || response?.virtualAccount || response?.virtual_account, "", true);
+      showVirtualAccountIssued(
+        result.virtualAccount || response?.virtualAccount || response?.virtual_account,
+        result.warning ? `가상계좌는 확인되었습니다. 다만 관리자 저장 확인이 필요합니다: ${result.warning}` : "",
+        true
+      );
     } catch (confirmError) {
       console.warn("PortOne server confirmation pending", confirmError);
-      showVirtualAccountIssued(response?.virtualAccount || response?.virtual_account, "포트원 결제창 호출은 완료되었습니다. 포트원 콘솔에서 결제번호를 조회하고, 서버 결제 조회 로그 확인이 필요합니다.", false);
+      showVirtualAccountIssued(response?.virtualAccount || response?.virtual_account, `포트원 결제창 호출은 완료되었습니다. 서버 확인 실패: ${confirmError.message || "원인 확인 필요"}`, false);
     }
   } catch (error) {
     state.paymentResult = {
