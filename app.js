@@ -2299,17 +2299,19 @@ async function requestTossPayment() {
     return;
   }
   savePendingPayment(payment);
-  const showVirtualAccountIssued = (virtualAccount = {}, note = "") => {
+  const showVirtualAccountIssued = (virtualAccount = {}, note = "", confirmed = false) => {
     const accountLabel = [
       virtualAccount.bankName || virtualAccount.bank || virtualAccount.bankCode,
       virtualAccount.accountNumber || virtualAccount.account_number,
       virtualAccount.holderName || virtualAccount.accountHolder || virtualAccount.customerName,
     ].filter(Boolean).join(" / ");
+    const hasAccountInfo = Boolean(accountLabel);
+    const isIssued = confirmed || hasAccountInfo;
     state.paymentResult = {
-      status: "virtual_account_issued",
+      status: isIssued ? "virtual_account_issued" : "pending",
       type: payment.type,
-      eyebrow: "가상계좌 발급 완료",
-      title: "포트원 결제창 호출이 완료되었습니다",
+      eyebrow: isIssued ? "가상계좌 발급 완료" : "결제창 호출 완료",
+      title: isIssued ? "가상계좌 발급이 확인되었습니다" : "포트원 결제창 호출이 완료되었습니다",
       text: note || "입금이 확인되면 예약·주문 요청이 접수됩니다. 서버 확인은 포트원 웹훅과 관리자 확인으로 이어집니다.",
       icon: "landmark",
       className: "",
@@ -2363,10 +2365,10 @@ async function requestTossPayment() {
         setPaymentResult("success");
         return;
       }
-      showVirtualAccountIssued(result.virtualAccount || response?.virtualAccount || response?.virtual_account);
+      showVirtualAccountIssued(result.virtualAccount || response?.virtualAccount || response?.virtual_account, "", true);
     } catch (confirmError) {
       console.warn("PortOne server confirmation pending", confirmError);
-      showVirtualAccountIssued(response?.virtualAccount || response?.virtual_account, "포트원 결제창 호출은 완료되었습니다. 서버 결제 조회가 지연되어 관리자 확인이 필요합니다.");
+      showVirtualAccountIssued(response?.virtualAccount || response?.virtual_account, "포트원 결제창 호출은 완료되었습니다. 포트원 콘솔에서 결제번호를 조회하고, 서버 결제 조회 로그 확인이 필요합니다.", false);
     }
   } catch (error) {
     state.paymentResult = {

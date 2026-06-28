@@ -8,6 +8,10 @@ module.exports = async function handler(req, res) {
   return json(res, 200, {
     ok: true,
     service: "motf-prototype",
-    paymentConfigured: false,
+    paymentConfigured: Boolean(
+      process.env.PORTONE_STORE_ID &&
+      process.env.PORTONE_CHANNEL_KEY &&
+      process.env.PORTONE_API_SECRET,
+    ),
   });
 };
