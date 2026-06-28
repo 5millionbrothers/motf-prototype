@@ -22,6 +22,20 @@
     if (item.refund_status && item.refund_status !== "none") return refundText[item.refund_status] || statusText[item.status] || item.status;
     return statusText[item.status] || item.status;
   }
+  function localIssuedPayments() {
+    try {
+      return JSON.parse(window.localStorage.getItem("motf.localIssuedPayments") || "[]");
+    } catch {
+      return [];
+    }
+  }
+  function accountLabel(account = {}) {
+    return [
+      account.bankName || account.bank || account.bankCode,
+      account.accountNumber || account.account_number,
+      account.holderName || account.accountHolder || account.customerName,
+    ].filter(Boolean).join(" / ");
+  }
 
   async function loadMyTransactions() {
     const { data: authData } = await client.auth.getSession();
@@ -63,15 +77,11 @@
     }));
     (intentResult.data || []).forEach((item) => {
       const account = item.virtual_account || {};
-      const accountLabel = [
-        account.bankName || account.bank || account.bankCode,
-        account.accountNumber || account.account_number,
-        account.holderName || account.accountHolder || account.customerName,
-      ].filter(Boolean).join(" / ");
+      const label = accountLabel(account);
       const pendingItem = {
         id: item.order_id,
         amount: item.amount,
-        status: accountLabel ? `입금 대기 · ${accountLabel}` : "입금 대기",
+        status: label ? `예약 대기 · ${label}` : "예약 대기",
       };
       if (item.kind === "stay") {
         reservations.unshift({
@@ -90,6 +100,31 @@
         });
       }
     });
+    localIssuedPayments()
+      .filter((item) => !reservations.some((reservation) => reservation.id === item.orderId) && !orders.some((order) => order.id === item.orderId))
+      .forEach((item) => {
+        const pendingItem = {
+          id: item.orderId,
+          amount: item.amount,
+          status: accountLabel(item.virtualAccount) ? `예약 대기 · ${accountLabel(item.virtualAccount)}` : "예약 대기",
+        };
+        if (item.type === "stay") {
+          reservations.unshift({
+            ...pendingItem,
+            stayName: "가상계좌 입금 대기",
+            roomName: item.itemName,
+            date: String(item.issuedAt || "").slice(0, 10),
+            people: "-",
+          });
+        } else {
+          orders.unshift({
+            ...pendingItem,
+            storeName: "가상계좌 입금 대기",
+            pickupTime: String(item.issuedAt || "").slice(11, 16),
+            items: [{ id: item.orderId }],
+          });
+        }
+      });
     window.motfApplyMyTransactions?.(reservations, orders);
   }
   window.motfReloadTransactions = loadMyTransactions;

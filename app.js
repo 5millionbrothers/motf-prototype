@@ -23,6 +23,7 @@ window.motfEscapeHtml = escapeHtml;
 let PORTONE_STORE_ID = window.MOTF_CONFIG?.PORTONE_STORE_ID?.trim() || "";
 let PORTONE_CHANNEL_KEY = window.MOTF_CONFIG?.PORTONE_CHANNEL_KEY?.trim() || "";
 const PORTONE_PENDING_PAYMENT_KEY = "motf.pendingPayment";
+const PORTONE_LOCAL_ISSUED_KEY = "motf.localIssuedPayments";
 const DEFAULT_STAY_REGION = "대성리";
 const DEFAULT_STAY_PEOPLE = 10;
 
@@ -1658,6 +1659,21 @@ function clearPendingPayment() {
   window.localStorage.removeItem(PORTONE_PENDING_PAYMENT_KEY);
 }
 
+function saveLocalIssuedPayment(payment, virtualAccount) {
+  if (!hasVirtualAccountInfo(virtualAccount)) return;
+  const current = JSON.parse(window.localStorage.getItem(PORTONE_LOCAL_ISSUED_KEY) || "[]");
+  const nextItem = {
+    orderId: payment.orderId,
+    type: payment.type,
+    itemName: payment.itemName,
+    amount: payment.amount,
+    virtualAccount,
+    issuedAt: new Date().toISOString(),
+  };
+  const next = [nextItem, ...current.filter((item) => item.orderId !== payment.orderId)].slice(0, 20);
+  window.localStorage.setItem(PORTONE_LOCAL_ISSUED_KEY, JSON.stringify(next));
+}
+
 function portOnePaymentId(orderId) {
   return String(orderId || "")
     .replace(/^MOTF-STAY-/, "MS-")
@@ -1667,6 +1683,29 @@ function portOnePaymentId(orderId) {
 
 function normalizePhone(value) {
   return String(value || "").replace(/\D/g, "").slice(0, 20);
+}
+
+function normalizeVirtualAccount(value = {}) {
+  const source =
+    value?.virtualAccount ||
+    value?.virtual_account ||
+    value?.method?.virtualAccount ||
+    value?.method?.virtual_account ||
+    (value?.method?.type === "VIRTUAL_ACCOUNT" ? value.method : null) ||
+    value?.paymentMethod?.virtualAccount ||
+    value?.paymentMethod?.virtual_account ||
+    (value?.paymentMethod?.type === "VIRTUAL_ACCOUNT" ? value.paymentMethod : null) ||
+    value;
+  return {
+    bankName: source?.bankName || source?.bank || source?.bankCode || "",
+    accountNumber: source?.accountNumber || source?.account_number || source?.number || "",
+    holderName: source?.holderName || source?.accountHolder || source?.customerName || source?.depositorName || "",
+    dueDate: source?.dueDate || source?.expiry?.dueDate || source?.accountExpiry?.dueDate || source?.expiredAt || "",
+  };
+}
+
+function hasVirtualAccountInfo(account = {}) {
+  return Boolean(account.bankName || account.accountNumber || account.holderName || account.dueDate);
 }
 
 function setTossWidgetStatus(message, isError = false) {
@@ -2295,9 +2334,9 @@ async function renderTossWidgets(payment) {
   `;
   agreement.innerHTML = `
     <div class="portone-note-grid">
-      <div><span>입금기한</span><strong>발급 후 24시간</strong></div>
-      <div><span>접수시점</span><strong>입금 완료 후 자동 접수</strong></div>
-      <div><span>확인방식</span><strong>포트원 조회 + 서버 검증</strong></div>
+      <div><span>1단계</span><strong>입금 완료</strong></div>
+      <div><span>2단계</span><strong>예약 요청</strong></div>
+      <div><span>3단계</span><strong>예약 확인 후 최종 확정</strong></div>
     </div>
   `;
   setTossWidgetStatus("아래 버튼을 누르면 포트원 KG이니시스 결제창이 열립니다.");
@@ -2337,13 +2376,15 @@ async function requestTossPayment() {
   }
   savePendingPayment(payment);
   const showVirtualAccountIssued = (virtualAccount = {}, note = "", confirmed = false) => {
+    const normalizedAccount = normalizeVirtualAccount(virtualAccount);
     const accountLabel = [
-      virtualAccount.bankName || virtualAccount.bank || virtualAccount.bankCode,
-      virtualAccount.accountNumber || virtualAccount.account_number,
-      virtualAccount.holderName || virtualAccount.accountHolder || virtualAccount.customerName,
+      normalizedAccount.bankName,
+      normalizedAccount.accountNumber,
+      normalizedAccount.holderName,
     ].filter(Boolean).join(" / ");
-    const hasAccountInfo = Boolean(accountLabel);
+    const hasAccountInfo = hasVirtualAccountInfo(normalizedAccount);
     const isIssued = confirmed || hasAccountInfo;
+    if (isIssued && hasAccountInfo) saveLocalIssuedPayment(payment, normalizedAccount);
     state.paymentResult = {
       status: isIssued ? "virtual_account_issued" : "pending",
       type: payment.type,
@@ -2355,7 +2396,7 @@ async function requestTossPayment() {
       orderId: payment.orderId,
       itemName: payment.itemName,
       amount: payment.amount,
-      virtualAccount,
+      virtualAccount: normalizedAccount,
       paymentKey: accountLabel || portOnePaymentId(payment.orderId),
       backRoute: paymentBackRoute(),
     };
@@ -2393,6 +2434,7 @@ async function requestTossPayment() {
       },
     });
     if (response?.code) throw new Error(response.message || "PortOne payment window failed.");
+    const responseAccount = normalizeVirtualAccount(response);
     try {
       const result = await confirmPaymentOnServer(payment, new URLSearchParams({
         paymentId: portOnePaymentId(payment.orderId),
@@ -2404,13 +2446,20 @@ async function requestTossPayment() {
         return;
       }
       showVirtualAccountIssued(
-        result.virtualAccount || response?.virtualAccount || response?.virtual_account,
+        result.virtualAccount || responseAccount,
         result.warning ? `가상계좌는 확인되었습니다. 다만 관리자 저장 확인이 필요합니다: ${result.warning}` : "",
         true
       );
     } catch (confirmError) {
       console.warn("PortOne server confirmation pending", confirmError);
-      showVirtualAccountIssued(response?.virtualAccount || response?.virtual_account, `포트원 결제창 호출은 완료되었습니다. 서버 확인 실패: ${confirmError.message || "원인 확인 필요"}`, false);
+      const hasBrowserAccount = hasVirtualAccountInfo(responseAccount);
+      showVirtualAccountIssued(
+        responseAccount,
+        hasBrowserAccount
+          ? "가상계좌는 발급되었습니다. 입금 완료 후 예약 요청 상태로 전환됩니다."
+          : `포트원 결제창 호출은 완료되었습니다. 서버 확인 실패: ${confirmError.message || "원인 확인 필요"}`,
+        hasBrowserAccount
+      );
     }
   } catch (error) {
     state.paymentResult = {
