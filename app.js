@@ -2350,18 +2350,26 @@ async function confirmPaymentOnServer(payment, params = new URLSearchParams()) {
   const { data: sessionData } = await window.motfSupabase.auth.getSession();
   const accessToken = sessionData.session?.access_token;
   if (!accessToken) throw new Error("Login expired. Please sign in again.");
-  const response = await fetch("/api/confirm-payment", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${accessToken}`,
-    },
-    body: JSON.stringify({
-      paymentId: params.get("paymentId") || portOnePaymentId(payment.orderId),
-      orderId: params.get("orderId") || payment.orderId,
-    }),
-  });
-  const data = await response.json();
+  let response;
+  try {
+    response = await fetch("/api/confirm-payment", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({
+        paymentId: params.get("paymentId") || portOnePaymentId(payment.orderId),
+        orderId: params.get("orderId") || payment.orderId,
+      }),
+    });
+  } catch (error) {
+    throw new Error(`우리 서버 결제 확인 API 호출 실패: ${error.message || "네트워크 오류"}`);
+  }
+  const data = await response.json().catch(() => ({
+    ok: false,
+    message: `우리 서버 결제 확인 API가 JSON을 반환하지 않았습니다. HTTP ${response.status}`,
+  }));
   if (!response.ok || !data.ok) {
     throw new Error(data.message || "Payment confirmation failed.");
   }

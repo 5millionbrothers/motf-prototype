@@ -8,6 +8,7 @@ module.exports = async function handler(req, res) {
   return json(res, 200, {
     ok: true,
     service: "motf-prototype",
+    portonePatch: "confirm-payment-https-fallback-2026-06-28-2",
     paymentConfigured: Boolean(
       process.env.PORTONE_STORE_ID &&
       process.env.PORTONE_CHANNEL_KEY &&
