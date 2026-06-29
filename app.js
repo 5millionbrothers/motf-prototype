@@ -2361,6 +2361,7 @@ async function confirmPaymentOnServer(payment, params = new URLSearchParams()) {
       body: JSON.stringify({
         paymentId: params.get("paymentId") || portOnePaymentId(payment.orderId),
         orderId: params.get("orderId") || payment.orderId,
+        amount: Number(params.get("amount") || payment.amount),
       }),
     });
   } catch (error) {
