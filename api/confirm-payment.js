@@ -142,22 +142,68 @@ function paymentKey(payment) {
   return payment?.transactionId || payment?.txId || payment?.id;
 }
 
+function pickVirtualAccountValue(source, keys) {
+  for (const key of keys) {
+    if (source && source[key] !== undefined && source[key] !== null && source[key] !== "") return source[key];
+  }
+  return "";
+}
+
+function findVirtualAccountSource(value, seen = new Set()) {
+  if (!value || typeof value !== "object" || seen.has(value)) return null;
+  seen.add(value);
+  const preferred =
+    value.virtualAccount ||
+    value.virtual_account ||
+    value.vbank ||
+    value.vBank ||
+    value.vbankIssued ||
+    value.virtualAccountIssued ||
+    value.bankAccount ||
+    value.account;
+  if (preferred && typeof preferred === "object") {
+    const found = findVirtualAccountSource(preferred, seen);
+    if (found) return found;
+  }
+  const accountNumber = pickVirtualAccountValue(value, [
+    "accountNumber", "account_number", "accountNo", "account_no", "account", "number",
+    "bankAccountNumber", "virtualAccountNumber", "vbankNum", "vbank_num", "vbankNumber",
+  ]);
+  const bankName = pickVirtualAccountValue(value, [
+    "bankName", "bank_name", "bank", "bankCode", "bank_code", "bankId", "bank_id",
+  ]);
+  const holderName = pickVirtualAccountValue(value, [
+    "holderName", "holder_name", "accountHolder", "account_holder", "customerName",
+    "depositorName", "depositor", "ownerName", "owner",
+  ]);
+  const dueDate = pickVirtualAccountValue(value, [
+    "dueDate", "due_date", "expiredAt", "expired_at", "expiresAt", "expires_at",
+    "expiryDate", "expiry_date",
+  ]) || value.expiry?.dueDate || value.expiry?.due_date || value.accountExpiry?.dueDate || value.accountExpiry?.due_date;
+  if (accountNumber || (bankName && holderName) || dueDate) return value;
+  for (const child of Object.values(value)) {
+    const found = findVirtualAccountSource(child, seen);
+    if (found) return found;
+  }
+  return null;
+}
+
 function virtualAccountInfo(payment) {
-  const source =
-    payment?.virtualAccount ||
-    payment?.virtual_account ||
-    payment?.method?.virtualAccount ||
-    payment?.method?.virtual_account ||
-    (payment?.method?.type === "VIRTUAL_ACCOUNT" ? payment.method : null) ||
-    payment?.paymentMethod?.virtualAccount ||
-    payment?.paymentMethod?.virtual_account ||
-    (payment?.paymentMethod?.type === "VIRTUAL_ACCOUNT" ? payment.paymentMethod : null) ||
-    {};
+  const source = findVirtualAccountSource(payment) || {};
   return {
-    bankName: source.bankName || source.bank || source.bankCode || "",
-    accountNumber: source.accountNumber || source.account_number || source.number || "",
-    holderName: source.holderName || source.accountHolder || source.customerName || source.depositorName || "",
-    dueDate: source.dueDate || source.expiry?.dueDate || source.accountExpiry?.dueDate || source.expiredAt || "",
+    bankName: pickVirtualAccountValue(source, ["bankName", "bank_name", "bank", "bankCode", "bank_code", "bankId", "bank_id"]),
+    accountNumber: pickVirtualAccountValue(source, [
+      "accountNumber", "account_number", "accountNo", "account_no", "account", "number",
+      "bankAccountNumber", "virtualAccountNumber", "vbankNum", "vbank_num", "vbankNumber",
+    ]),
+    holderName: pickVirtualAccountValue(source, [
+      "holderName", "holder_name", "accountHolder", "account_holder", "customerName",
+      "depositorName", "depositor", "ownerName", "owner",
+    ]),
+    dueDate: pickVirtualAccountValue(source, [
+      "dueDate", "due_date", "expiredAt", "expired_at", "expiresAt", "expires_at",
+      "expiryDate", "expiry_date",
+    ]) || source.expiry?.dueDate || source.expiry?.due_date || source.accountExpiry?.dueDate || source.accountExpiry?.due_date || "",
     raw: source,
   };
 }
@@ -302,7 +348,7 @@ module.exports = async function handler(req, res) {
     return json(res, error.statusCode || 500, {
       ok: false,
       code: "PAYMENT_CONFIRM_ERROR",
-      patch: "confirm-payment-portone-first-2026-06-29-1",
+      patch: "virtual-account-deep-parse-2026-06-29-1",
       message: error.message || "Payment confirmation failed.",
     });
   }

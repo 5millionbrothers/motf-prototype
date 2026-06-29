@@ -614,6 +614,7 @@ window.motfStartPreparedPayment = function startPreparedPayment(intent, draft) {
     stayName: isStay ? state.selectedStay.name : undefined,
     roomName: isStay ? state.selectedRoom.name : undefined,
     storeName: isStay ? undefined : state.selectedStore.name,
+    location: isStay ? state.selectedStay.distance : "공판장 수령 장소는 주문 정보 기준",
     date: isStay ? draft.event_date : undefined,
     checkOutDate: isStay ? draft.check_out_date : undefined,
     people: isStay ? draft.guest_count : undefined,
@@ -1685,22 +1686,69 @@ function normalizePhone(value) {
   return String(value || "").replace(/\D/g, "").slice(0, 20);
 }
 
+function pickVirtualAccountValue(source, keys) {
+  for (const key of keys) {
+    if (source && source[key] !== undefined && source[key] !== null && source[key] !== "") return source[key];
+  }
+  return "";
+}
+
+function findVirtualAccountSource(value, seen = new Set()) {
+  if (!value || typeof value !== "object" || seen.has(value)) return null;
+  seen.add(value);
+  const preferred =
+    value.virtualAccount ||
+    value.virtual_account ||
+    value.vbank ||
+    value.vBank ||
+    value.vbankIssued ||
+    value.virtualAccountIssued ||
+    value.bankAccount ||
+    value.account ||
+    value.raw;
+  if (preferred && typeof preferred === "object") {
+    const found = findVirtualAccountSource(preferred, seen);
+    if (found) return found;
+  }
+  const accountNumber = pickVirtualAccountValue(value, [
+    "accountNumber", "account_number", "accountNo", "account_no", "account", "number",
+    "bankAccountNumber", "virtualAccountNumber", "vbankNum", "vbank_num", "vbankNumber",
+  ]);
+  const bankName = pickVirtualAccountValue(value, [
+    "bankName", "bank_name", "bank", "bankCode", "bank_code", "bankId", "bank_id",
+  ]);
+  const holderName = pickVirtualAccountValue(value, [
+    "holderName", "holder_name", "accountHolder", "account_holder", "customerName",
+    "depositorName", "depositor", "ownerName", "owner",
+  ]);
+  const dueDate = pickVirtualAccountValue(value, [
+    "dueDate", "due_date", "expiredAt", "expired_at", "expiresAt", "expires_at",
+    "expiryDate", "expiry_date",
+  ]) || value.expiry?.dueDate || value.expiry?.due_date || value.accountExpiry?.dueDate || value.accountExpiry?.due_date;
+  if (accountNumber || (bankName && holderName) || dueDate) return value;
+  for (const child of Object.values(value)) {
+    const found = findVirtualAccountSource(child, seen);
+    if (found) return found;
+  }
+  return null;
+}
+
 function normalizeVirtualAccount(value = {}) {
-  const source =
-    value?.virtualAccount ||
-    value?.virtual_account ||
-    value?.method?.virtualAccount ||
-    value?.method?.virtual_account ||
-    (value?.method?.type === "VIRTUAL_ACCOUNT" ? value.method : null) ||
-    value?.paymentMethod?.virtualAccount ||
-    value?.paymentMethod?.virtual_account ||
-    (value?.paymentMethod?.type === "VIRTUAL_ACCOUNT" ? value.paymentMethod : null) ||
-    value;
+  const source = findVirtualAccountSource(value) || value;
   return {
-    bankName: source?.bankName || source?.bank || source?.bankCode || "",
-    accountNumber: source?.accountNumber || source?.account_number || source?.number || "",
-    holderName: source?.holderName || source?.accountHolder || source?.customerName || source?.depositorName || "",
-    dueDate: source?.dueDate || source?.expiry?.dueDate || source?.accountExpiry?.dueDate || source?.expiredAt || "",
+    bankName: pickVirtualAccountValue(source, ["bankName", "bank_name", "bank", "bankCode", "bank_code", "bankId", "bank_id"]),
+    accountNumber: pickVirtualAccountValue(source, [
+      "accountNumber", "account_number", "accountNo", "account_no", "account", "number",
+      "bankAccountNumber", "virtualAccountNumber", "vbankNum", "vbank_num", "vbankNumber",
+    ]),
+    holderName: pickVirtualAccountValue(source, [
+      "holderName", "holder_name", "accountHolder", "account_holder", "customerName",
+      "depositorName", "depositor", "ownerName", "owner",
+    ]),
+    dueDate: pickVirtualAccountValue(source, [
+      "dueDate", "due_date", "expiredAt", "expired_at", "expiresAt", "expires_at",
+      "expiryDate", "expiry_date",
+    ]) || source?.expiry?.dueDate || source?.expiry?.due_date || source?.accountExpiry?.dueDate || source?.accountExpiry?.due_date || "",
   };
 }
 
@@ -2041,9 +2089,34 @@ function renderPaymentResult() {
     result.virtualAccount.dueDate || result.virtualAccount.accountExpiry?.dueDate
       ? `<div class="result-detail-row"><span>입금 기한</span><strong>${formatDateTime(result.virtualAccount.dueDate || result.virtualAccount.accountExpiry?.dueDate)}</strong></div>` : "",
   ].join("") : "";
+  const stayRows = result.type === "stay" ? [
+    `<div class="result-detail-row highlight"><span>예약 상태</span><strong>${result.status === "virtual_account_issued" ? "예약 요청 완료 · 입금 확인 대기" : result.status === "success" ? "예약 요청 접수" : "확인 필요"}</strong></div>`,
+    result.date || result.checkOutDate
+      ? `<div class="result-detail-row"><span>예약 일정</span><strong>${[result.date, result.checkOutDate].filter(Boolean).join(" ~ ")}</strong></div>` : "",
+    result.stayName || result.roomName
+      ? `<div class="result-detail-row"><span>예약 장소</span><strong>${[result.stayName, result.roomName].filter(Boolean).join(" · ")}</strong></div>` : "",
+    result.location
+      ? `<div class="result-detail-row"><span>위치 안내</span><strong>${result.location}</strong></div>` : "",
+    result.people
+      ? `<div class="result-detail-row"><span>예약 인원</span><strong>${result.people}명</strong></div>` : "",
+  ].join("") : [
+    `<div class="result-detail-row highlight"><span>주문 상태</span><strong>${result.status === "virtual_account_issued" ? "주문 요청 완료 · 입금 확인 대기" : result.status === "success" ? "주문 요청 접수" : "확인 필요"}</strong></div>`,
+    result.pickupTime
+      ? `<div class="result-detail-row"><span>수령 시간</span><strong>${formatDateTime(result.pickupTime)}</strong></div>` : "",
+    result.storeName
+      ? `<div class="result-detail-row"><span>수령 장소</span><strong>${result.storeName}</strong></div>` : "",
+  ].join("");
+  const guideRows = result.status === "virtual_account_issued" ? `
+    <div class="result-next-steps">
+      <div><span>1</span><strong>가상계좌 입금</strong><p>아래 계좌로 입금하면 요청이 접수됩니다.</p></div>
+      <div><span>2</span><strong>사장님 확인</strong><p>일정과 객실 가능 여부를 확인합니다.</p></div>
+      <div><span>3</span><strong>최종 확정</strong><p>확정 여부는 마이페이지와 채팅에서 확인할 수 있습니다.</p></div>
+    </div>
+  ` : "";
   const extraRows = [
+    guideRows,
+    stayRows,
     virtualAccountRows,
-    result.paymentKey ? `<div class="result-detail-row"><span>paymentKey</span><strong>${result.paymentKey}</strong></div>` : "",
     result.errorCode ? `<div class="result-detail-row"><span>오류 코드</span><strong>${result.errorCode}</strong></div>` : "",
   ].join("");
   qs("#paymentResultDetails").innerHTML = `
@@ -2055,12 +2128,14 @@ function renderPaymentResult() {
   let primaryAction = "";
   if (result.status === "confirming") {
     primaryAction = `<button class="primary-btn" type="button" disabled><i data-lucide="loader-circle"></i>서버 확인 중</button>`;
+  } else if (result.status === "virtual_account_issued") {
+    primaryAction = `<button class="primary-btn" data-route="mypage"><i data-lucide="user-round"></i>예약 요청 확인</button>`;
   } else if (result.status !== "success") {
     primaryAction = `<button class="primary-btn" data-route="${result.backRoute}"><i data-lucide="credit-card"></i>다시 결제하기</button>`;
   }
   qs("#paymentResultActions").innerHTML = `
     ${primaryAction}
-    <button class="secondary-btn" data-route="mypage"><i data-lucide="user-round"></i>마이페이지 확인</button>
+    <button class="secondary-btn" data-route="chat"><i data-lucide="message-circle"></i>채팅 문의</button>
     <button class="ghost-btn" data-route="${paymentHomeRoute()}"><i data-lucide="home"></i>목록으로</button>
   `;
   refreshIcons();
@@ -2397,16 +2472,25 @@ async function requestTossPayment() {
     state.paymentResult = {
       status: isIssued ? "virtual_account_issued" : "pending",
       type: payment.type,
-      eyebrow: isIssued ? "가상계좌 발급 완료" : "결제창 호출 완료",
-      title: isIssued ? "가상계좌 발급이 확인되었습니다" : "포트원 결제창 호출이 완료되었습니다",
-      text: note || "입금이 확인되면 예약·주문 요청이 접수됩니다. 서버 확인은 포트원 웹훅과 관리자 확인으로 이어집니다.",
+      eyebrow: isIssued ? (payment.type === "stay" ? "예약 요청 완료" : "주문 요청 완료") : "결제창 호출 완료",
+      title: isIssued ? (payment.type === "stay" ? "예약 요청이 접수되었습니다" : "주문 요청이 접수되었습니다") : "포트원 결제창 호출이 완료되었습니다",
+      text: isIssued
+        ? "입금 확인 후 사장님이 일정과 가능 여부를 확인합니다. 진행 상황은 마이페이지와 채팅에서 볼 수 있습니다."
+        : "포트원 결제창 호출은 완료되었습니다. 입금 정보 확인이 지연되면 마이페이지에서 다시 확인해주세요.",
       icon: "landmark",
       className: "",
       orderId: payment.orderId,
       itemName: payment.itemName,
       amount: payment.amount,
+      stayName: payment.stayName,
+      roomName: payment.roomName,
+      storeName: payment.storeName,
+      location: payment.location,
+      date: payment.date,
+      checkOutDate: payment.checkOutDate,
+      people: payment.people,
+      pickupTime: payment.pickupTime,
       virtualAccount: normalizedAccount,
-      paymentKey: accountLabel || portOnePaymentId(payment.orderId),
       backRoute: paymentBackRoute(),
     };
     navigate("paymentResult");
