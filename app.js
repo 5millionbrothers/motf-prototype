@@ -1669,6 +1669,14 @@ function saveLocalIssuedPayment(payment, virtualAccount) {
     itemName: payment.itemName,
     amount: payment.amount,
     virtualAccount,
+    stayName: payment.stayName,
+    roomName: payment.roomName,
+    storeName: payment.storeName,
+    location: payment.location,
+    date: payment.date,
+    checkOutDate: payment.checkOutDate,
+    people: payment.people,
+    pickupTime: payment.pickupTime,
     issuedAt: new Date().toISOString(),
   };
   const next = [nextItem, ...current.filter((item) => item.orderId !== payment.orderId)].slice(0, 20);
@@ -1754,6 +1762,88 @@ function normalizeVirtualAccount(value = {}) {
 
 function hasVirtualAccountInfo(account = {}) {
   return Boolean(account.bankName || account.accountNumber || account.holderName || account.dueDate);
+}
+
+function bankLabel(value = "") {
+  const code = String(value || "").trim();
+  const upper = code.toUpperCase();
+  const labels = {
+    WOORI: "우리은행",
+    IBK: "IBK기업은행",
+    KB: "KB국민은행",
+    KOOKMIN: "KB국민은행",
+    SHINHAN: "신한은행",
+    HANA: "하나은행",
+    NH: "NH농협은행",
+    NONGHYUP: "NH농협은행",
+    KAKAOBANK: "카카오뱅크",
+    K_BANK: "케이뱅크",
+    TOSS_BANK: "토스뱅크",
+    SC: "SC제일은행",
+    CITI: "씨티은행",
+    DAEGU: "대구은행",
+    BUSAN: "부산은행",
+    GWANGJU: "광주은행",
+    JEONBUK: "전북은행",
+    KYONGNAM: "경남은행",
+    SAEMAUL: "새마을금고",
+    SHINHYUP: "신협",
+    SUHYUP: "수협은행",
+    POST: "우체국",
+  };
+  return labels[upper] || code.replace(/_/g, " ");
+}
+
+function readableAccount(account = {}) {
+  const bank = bankLabel(account.bankName || account.bank || account.bankCode);
+  const number = String(account.accountNumber || account.account_number || "").replace(/\s+/g, "");
+  const holder = account.holderName || account.accountHolder || account.customerName || "";
+  return [bank, number].filter(Boolean).join(" ") + (holder ? ` (예금주 ${holder})` : "");
+}
+
+function displayOrderNumber(orderId = "", type = "stay") {
+  const shortId = String(orderId || "").replace(/^MOTF-(STAY|MARKET)-/, "").slice(-8).toUpperCase();
+  return `${type === "stay" ? "예약" : "주문"}-${shortId || "확인중"}`;
+}
+
+function localIssuedPayments() {
+  try {
+    return JSON.parse(window.localStorage.getItem(PORTONE_LOCAL_ISSUED_KEY) || "[]");
+  } catch {
+    return [];
+  }
+}
+
+function hydrateLocalIssuedTransactions() {
+  localIssuedPayments().forEach((item) => {
+    if (item.type === "stay") {
+      if (state.reservations.some((reservation) => reservation.id === item.orderId)) return;
+      state.reservations.unshift({
+        id: item.orderId,
+        stayName: item.stayName || "예약 요청 숙소",
+        roomName: item.roomName || item.itemName,
+        date: item.date || String(item.issuedAt || "").slice(0, 10),
+        checkOutDate: item.checkOutDate || "",
+        people: item.people || "-",
+        amount: item.amount,
+        status: "입금 전",
+        virtualAccount: item.virtualAccount,
+        isPendingVirtualAccount: true,
+      });
+      return;
+    }
+    if (state.orders.some((order) => order.id === item.orderId)) return;
+    state.orders.unshift({
+      id: item.orderId,
+      storeName: item.storeName || "공판장 주문 요청",
+      pickupTime: item.pickupTime || String(item.issuedAt || "").slice(11, 16),
+      amount: item.amount,
+      status: "입금 전",
+      virtualAccount: item.virtualAccount,
+      isPendingVirtualAccount: true,
+      items: [{ id: item.orderId }],
+    });
+  });
 }
 
 function setTossWidgetStatus(message, isError = false) {
@@ -2079,16 +2169,15 @@ function renderPaymentResult() {
   qs("#paymentResultEyebrow").textContent = result.eyebrow;
   qs("#paymentResultTitle").textContent = result.title;
   qs("#paymentResultText").textContent = result.text;
-  const virtualAccountRows = result.virtualAccount ? [
-    result.virtualAccount.bankName || result.virtualAccount.bank || result.virtualAccount.bankCode
-      ? `<div class="result-detail-row"><span>입금 은행</span><strong>${result.virtualAccount.bankName || result.virtualAccount.bank || result.virtualAccount.bankCode}</strong></div>` : "",
-    result.virtualAccount.accountNumber || result.virtualAccount.account_number
-      ? `<div class="result-detail-row"><span>입금 계좌</span><strong>${result.virtualAccount.accountNumber || result.virtualAccount.account_number}</strong></div>` : "",
-    result.virtualAccount.holderName || result.virtualAccount.accountHolder || result.virtualAccount.customerName
-      ? `<div class="result-detail-row"><span>예금주</span><strong>${result.virtualAccount.holderName || result.virtualAccount.accountHolder || result.virtualAccount.customerName}</strong></div>` : "",
-    result.virtualAccount.dueDate || result.virtualAccount.accountExpiry?.dueDate
-      ? `<div class="result-detail-row"><span>입금 기한</span><strong>${formatDateTime(result.virtualAccount.dueDate || result.virtualAccount.accountExpiry?.dueDate)}</strong></div>` : "",
-  ].join("") : "";
+  const accountText = result.virtualAccount ? readableAccount(result.virtualAccount) : "";
+  const dueDate = result.virtualAccount?.dueDate || result.virtualAccount?.accountExpiry?.dueDate;
+  const virtualAccountRows = accountText ? `
+    <div class="result-account-box">
+      <span>입금 계좌</span>
+      <strong>${accountText}</strong>
+      ${dueDate ? `<p>입금 기한 ${formatDateTime(dueDate)}</p>` : ""}
+    </div>
+  ` : "";
   const stayRows = result.type === "stay" ? [
     `<div class="result-detail-row highlight"><span>예약 상태</span><strong>${result.status === "virtual_account_issued" ? "예약 요청 완료 · 입금 확인 대기" : result.status === "success" ? "예약 요청 접수" : "확인 필요"}</strong></div>`,
     result.date || result.checkOutDate
@@ -2115,12 +2204,12 @@ function renderPaymentResult() {
   ` : "";
   const extraRows = [
     guideRows,
-    stayRows,
     virtualAccountRows,
+    stayRows,
     result.errorCode ? `<div class="result-detail-row"><span>오류 코드</span><strong>${result.errorCode}</strong></div>` : "",
   ].join("");
   qs("#paymentResultDetails").innerHTML = `
-    <div class="result-detail-row"><span>주문번호</span><strong>${result.orderId}</strong></div>
+    <div class="result-detail-row"><span>${result.type === "stay" ? "예약번호" : "주문번호"}</span><strong>${displayOrderNumber(result.orderId, result.type)}</strong></div>
     <div class="result-detail-row"><span>상품명</span><strong>${result.itemName}</strong></div>
     <div class="result-detail-row"><span>금액</span><strong>${money(result.amount)}</strong></div>
     ${extraRows}
@@ -2379,6 +2468,7 @@ window.motfFindBusinessByName = (name) => [...stays, ...stores].find((item) => i
 window.motfNavigate = navigate;
 
 function renderMypage() {
+  hydrateLocalIssuedTransactions();
   const reservationList = qs("#reservationList");
   const orderList = qs("#orderList");
   if (!reservationList || !orderList) {
@@ -2538,9 +2628,11 @@ async function requestTossPayment() {
         setPaymentResult("success");
         return;
       }
+      const issuedAccount = normalizeVirtualAccount(result.virtualAccount || responseAccount);
+      if (hasVirtualAccountInfo(issuedAccount)) saveLocalIssuedPayment(payment, issuedAccount);
       showVirtualAccountIssued(
-        result.virtualAccount || responseAccount,
-        result.warning ? `가상계좌는 확인되었습니다. 다만 관리자 저장 확인이 필요합니다: ${result.warning}` : "",
+        issuedAccount,
+        "",
         true
       );
     } catch (confirmError) {
@@ -2577,16 +2669,20 @@ async function handleTossRedirect() {
 }
 
 function reservationCard(item) {
+  const account = item.virtualAccount ? readableAccount(item.virtualAccount) : "";
+  const schedule = [item.date, item.checkOutDate].filter(Boolean).join(" ~ ") || item.date || "";
   return `
-    <article class="listing-card">
+    <article class="listing-card ${item.isPendingVirtualAccount ? "pending-payment-card" : ""}">
       <div class="listing-body">
         <div class="listing-meta">
-          <span class="pill success">${item.status}</span>
-          <span class="pill">${item.date}</span>
+          <span class="pill ${item.isPendingVirtualAccount ? "warning" : "success"}">${item.status}</span>
+          <span class="pill">${schedule}</span>
           <span class="pill">${item.people}명</span>
         </div>
         <h3>${item.stayName}</h3>
         <p>${item.roomName} · ${money(item.amount)}</p>
+        ${account ? `<div class="pending-account"><span>입금 계좌</span><strong>${account}</strong></div>` : ""}
+        ${item.isPendingVirtualAccount ? `<p class="muted">입금이 확인되면 예약 요청 완료 상태로 넘어가고, 사장님 확인 후 최종 확정됩니다.</p>` : ""}
         ${item.refundAmount ? `<p class="muted">환불 예정 금액 ${money(item.refundAmount)}</p>` : ""}
         <div class="button-row">
           <button class="secondary-btn" data-budget-file="${item.id}"><i data-lucide="file-spreadsheet"></i>예결산 엑셀 생성</button>
@@ -2598,15 +2694,18 @@ function reservationCard(item) {
 }
 
 function orderCard(item) {
+  const account = item.virtualAccount ? readableAccount(item.virtualAccount) : "";
   return `
-    <article class="listing-card">
+    <article class="listing-card ${item.isPendingVirtualAccount ? "pending-payment-card" : ""}">
       <div class="listing-body">
         <div class="listing-meta">
-          <span class="pill success">${item.status}</span>
+          <span class="pill ${item.isPendingVirtualAccount ? "warning" : "success"}">${item.status}</span>
           <span class="pill">${item.pickupTime}</span>
         </div>
         <h3>${item.storeName}</h3>
         <p>${item.items.length}개 품목 · ${money(item.amount)}</p>
+        ${account ? `<div class="pending-account"><span>입금 계좌</span><strong>${account}</strong></div>` : ""}
+        ${item.isPendingVirtualAccount ? `<p class="muted">입금이 확인되면 주문 요청 완료 상태로 넘어갑니다.</p>` : ""}
         ${item.refundAmount ? `<p class="muted">환불 예정 금액 ${money(item.refundAmount)}</p>` : ""}
         <div class="button-row">
           <button class="secondary-btn" data-budget-file="${item.id}"><i data-lucide="file-spreadsheet"></i>예결산 엑셀 생성</button>

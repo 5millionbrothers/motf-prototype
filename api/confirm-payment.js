@@ -348,7 +348,7 @@ module.exports = async function handler(req, res) {
     return json(res, error.statusCode || 500, {
       ok: false,
       code: "PAYMENT_CONFIRM_ERROR",
-      patch: "virtual-account-deep-parse-2026-06-29-1",
+      patch: "readable-account-mypage-2026-06-29-1",
       message: error.message || "Payment confirmation failed.",
     });
   }

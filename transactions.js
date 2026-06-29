@@ -29,12 +29,40 @@
       return [];
     }
   }
+  function bankLabel(value = "") {
+    const code = String(value || "").trim();
+    const upper = code.toUpperCase();
+    const labels = {
+      WOORI: "우리은행",
+      IBK: "IBK기업은행",
+      KB: "KB국민은행",
+      KOOKMIN: "KB국민은행",
+      SHINHAN: "신한은행",
+      HANA: "하나은행",
+      NH: "NH농협은행",
+      NONGHYUP: "NH농협은행",
+      KAKAOBANK: "카카오뱅크",
+      K_BANK: "케이뱅크",
+      TOSS_BANK: "토스뱅크",
+      SC: "SC제일은행",
+      CITI: "씨티은행",
+      DAEGU: "대구은행",
+      BUSAN: "부산은행",
+      GWANGJU: "광주은행",
+      JEONBUK: "전북은행",
+      KYONGNAM: "경남은행",
+      SAEMAUL: "새마을금고",
+      SHINHYUP: "신협",
+      SUHYUP: "수협은행",
+      POST: "우체국",
+    };
+    return labels[upper] || code.replace(/_/g, " ");
+  }
   function accountLabel(account = {}) {
-    return [
-      account.bankName || account.bank || account.bankCode,
-      account.accountNumber || account.account_number,
-      account.holderName || account.accountHolder || account.customerName,
-    ].filter(Boolean).join(" / ");
+    const bank = bankLabel(account.bankName || account.bank || account.bankCode);
+    const number = String(account.accountNumber || account.account_number || "").replace(/\s+/g, "");
+    const holder = account.holderName || account.accountHolder || account.customerName || "";
+    return [bank, number].filter(Boolean).join(" ") + (holder ? ` (예금주 ${holder})` : "");
   }
 
   async function loadMyTransactions() {
@@ -81,7 +109,9 @@
       const pendingItem = {
         id: item.order_id,
         amount: item.amount,
-        status: label ? `예약 대기 · ${label}` : "예약 대기",
+        status: "입금 전",
+        virtualAccount: account,
+        isPendingVirtualAccount: true,
       };
       if (item.kind === "stay") {
         reservations.unshift({
@@ -106,21 +136,24 @@
         const pendingItem = {
           id: item.orderId,
           amount: item.amount,
-          status: accountLabel(item.virtualAccount) ? `예약 대기 · ${accountLabel(item.virtualAccount)}` : "예약 대기",
+          status: "입금 전",
+          virtualAccount: item.virtualAccount,
+          isPendingVirtualAccount: true,
         };
         if (item.type === "stay") {
           reservations.unshift({
             ...pendingItem,
-            stayName: "가상계좌 입금 대기",
-            roomName: item.itemName,
-            date: String(item.issuedAt || "").slice(0, 10),
-            people: "-",
+            stayName: item.stayName || "예약 요청 숙소",
+            roomName: item.roomName || item.itemName,
+            date: item.date || String(item.issuedAt || "").slice(0, 10),
+            checkOutDate: item.checkOutDate || "",
+            people: item.people || "-",
           });
         } else {
           orders.unshift({
             ...pendingItem,
-            storeName: "가상계좌 입금 대기",
-            pickupTime: String(item.issuedAt || "").slice(11, 16),
+            storeName: item.storeName || "공판장 주문 요청",
+            pickupTime: item.pickupTime || String(item.issuedAt || "").slice(11, 16),
             items: [{ id: item.orderId }],
           });
         }

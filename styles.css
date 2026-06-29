@@ -2442,6 +2442,46 @@ input[type="range"] {
   text-align: right;
 }
 
+.result-account-box,
+.pending-account {
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  background: rgba(90, 107, 61, 0.1);
+  border: 1px solid rgba(90, 107, 61, 0.24);
+  border-radius: 8px;
+}
+
+.result-account-box span,
+.pending-account span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.result-account-box strong {
+  color: var(--teal-dark);
+  font-size: 20px;
+  line-height: 1.35;
+  word-break: keep-all;
+}
+
+.result-account-box p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.pending-account {
+  margin: 10px 0;
+}
+
+.pending-account strong {
+  color: var(--teal-dark);
+  font-size: 15px;
+  line-height: 1.45;
+}
+
 .result-next-steps {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
