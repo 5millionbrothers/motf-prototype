@@ -8,19 +8,30 @@ const requiredEnv = [
   "SUPABASE_SERVICE_ROLE_KEY",
 ];
 
+async function safeFetch(label, url, options = {}) {
+  try {
+    return await fetch(url, options);
+  } catch (error) {
+    const wrapped = new Error(`${label} fetch failed: ${error.message || error}`);
+    wrapped.code = `${label}_FETCH_FAILED`;
+    throw wrapped;
+  }
+}
+
 async function supabaseRequest(path, key, options = {}) {
-  const response = await fetch(`${process.env.SUPABASE_URL}${path}`, {
-    ...options,
+  const { label = "SUPABASE", ...requestOptions } = options;
+  const response = await safeFetch(label, `${process.env.SUPABASE_URL}${path}`, {
+    ...requestOptions,
     headers: {
       apikey: key,
       Authorization: `Bearer ${key}`,
       "Content-Type": "application/json",
-      ...(options.headers || {}),
+      ...(requestOptions.headers || {}),
     },
   });
   const data = await response.json().catch(() => null);
   if (!response.ok) {
-    const error = new Error(data?.message || data?.error_description || "Supabase request failed.");
+    const error = new Error(`${label} error: ${data?.message || data?.error_description || "Supabase request failed."}`);
     error.statusCode = response.status;
     throw error;
   }
@@ -29,7 +40,7 @@ async function supabaseRequest(path, key, options = {}) {
 
 async function authenticatedUser(authorization) {
   if (!authorization?.startsWith("Bearer ")) return null;
-  const response = await fetch(`${process.env.SUPABASE_URL}/auth/v1/user`, {
+  const response = await safeFetch("SUPABASE_AUTH", `${process.env.SUPABASE_URL}/auth/v1/user`, {
     headers: {
       apikey: process.env.SUPABASE_PUBLISHABLE_KEY,
       Authorization: authorization,
@@ -41,7 +52,7 @@ async function authenticatedUser(authorization) {
 
 async function getPaymentIntent(orderId) {
   const query = `/rest/v1/payment_intents?select=order_id,customer_id,amount,status,transaction_id,kind,expires_at&order_id=eq.${encodeURIComponent(orderId)}&limit=1`;
-  const intents = await supabaseRequest(query, process.env.SUPABASE_SERVICE_ROLE_KEY);
+  const intents = await supabaseRequest(query, process.env.SUPABASE_SERVICE_ROLE_KEY, { label: "PAYMENT_INTENT" });
   return intents?.[0] || null;
 }
 
@@ -95,10 +106,10 @@ async function getPortOnePayment(paymentId) {
   for (let attempt = 0; attempt < 4; attempt += 1) {
     if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, 600));
     try {
-      const response = await fetch(url, { headers });
+      const response = await safeFetch("PORTONE_LOOKUP", url, { headers });
       const data = await response.json().catch(() => null);
       if (!response.ok) {
-        const error = new Error(data?.message || data?.type || "PortOne payment lookup failed.");
+        const error = new Error(`PORTONE_LOOKUP error: ${data?.message || data?.type || "PortOne payment lookup failed."}`);
         error.statusCode = response.status;
         throw error;
       }
@@ -107,7 +118,7 @@ async function getPortOnePayment(paymentId) {
       try {
         return await getJsonWithHttps(url, headers);
       } catch (httpsError) {
-        lastError = new Error(`PortOne lookup failed. fetch=${error.message || error}; https=${httpsError.message || httpsError}`);
+        lastError = new Error(`PORTONE_LOOKUP failed. fetch=${error.message || error}; https=${httpsError.message || httpsError}`);
         lastError.statusCode = httpsError.statusCode || error.statusCode;
       }
     }
@@ -167,11 +178,12 @@ async function applyPortOnePayment(userId, orderId, payment) {
   const status = paymentStatus(payment);
   if (status === "PAID") {
     const finalized = await supabaseRequest(
-      "/rest/v1/rpc/finalize_payment_intent",
-      process.env.SUPABASE_SERVICE_ROLE_KEY,
-      {
-        method: "POST",
-        body: JSON.stringify({
+        "/rest/v1/rpc/finalize_payment_intent",
+        process.env.SUPABASE_SERVICE_ROLE_KEY,
+        {
+          label: "FINALIZE_PAYMENT",
+          method: "POST",
+          body: JSON.stringify({
           target_customer_id: userId,
           target_order_id: orderId,
           target_payment_key: paymentKey(payment),
@@ -190,6 +202,7 @@ async function applyPortOnePayment(userId, orderId, payment) {
         "/rest/v1/rpc/mark_virtual_account_issued",
         process.env.SUPABASE_SERVICE_ROLE_KEY,
         {
+          label: "MARK_VIRTUAL_ACCOUNT",
           method: "POST",
           body: JSON.stringify({
             target_customer_id: userId,
@@ -261,6 +274,7 @@ module.exports = async function handler(req, res) {
     return json(res, error.statusCode || 500, {
       ok: false,
       code: "PAYMENT_CONFIRM_ERROR",
+      patch: "confirm-payment-diagnostic-2026-06-29-1",
       message: error.message || "Payment confirmation failed.",
     });
   }
