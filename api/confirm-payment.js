@@ -134,6 +134,10 @@ function paymentStatus(payment) {
   return payment?.status || payment?.paymentStatus || "";
 }
 
+function isVirtualAccountStatus(status) {
+  return ["VIRTUAL_ACCOUNT_ISSUED", "READY", "PENDING"].includes(status);
+}
+
 function paymentKey(payment) {
   return payment?.transactionId || payment?.txId || payment?.id;
 }
@@ -195,7 +199,7 @@ async function applyPortOnePayment(userId, orderId, payment) {
     return { status: "paid", transactionId: result?.transaction_id, kind: result?.kind };
   }
 
-  if (["VIRTUAL_ACCOUNT_ISSUED", "READY", "PENDING"].includes(status)) {
+  if (isVirtualAccountStatus(status)) {
     const virtualAccount = virtualAccountInfo(payment);
     try {
       const issued = await supabaseRequest(
@@ -243,13 +247,38 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    const user = await authenticatedUser(req.headers.authorization);
-    if (!user?.id) return json(res, 401, { ok: false, message: "Login expired. Please sign in again." });
-
     const body = typeof req.body === "string" ? JSON.parse(req.body) : (req.body || {});
     const paymentId = body.paymentId || body.orderId;
     const orderId = canonicalOrderId(body.orderId || body.paymentId);
     if (!paymentId || !orderId) return json(res, 400, { ok: false, message: "paymentId is required." });
+
+    const payment = await getPortOnePayment(paymentId);
+    const expectedAmount = Number(body.amount || 0);
+    if (expectedAmount > 0 && paymentAmount(payment) !== expectedAmount) {
+      return json(res, 400, { ok: false, message: "Payment amount does not match the client payment request." });
+    }
+
+    let user = null;
+    let authWarning = "";
+    try {
+      user = await authenticatedUser(req.headers.authorization);
+    } catch (error) {
+      authWarning = error.message || "Supabase Auth 확인에 실패했습니다.";
+    }
+    if (!user?.id) {
+      const status = paymentStatus(payment);
+      if (isVirtualAccountStatus(status)) {
+        return json(res, 200, {
+          ok: true,
+          status: "virtual_account_issued",
+          orderId,
+          virtualAccount: virtualAccountInfo(payment),
+          persistence: "failed",
+          warning: authWarning || "로그인 확인이 지연되어 관리자 저장은 보류되었습니다.",
+        });
+      }
+      return json(res, 401, { ok: false, message: authWarning || "Login expired. Please sign in again." });
+    }
 
     const intent = await getPaymentIntent(orderId);
     if (!intent || intent.customer_id !== user.id) {
@@ -262,7 +291,6 @@ module.exports = async function handler(req, res) {
       return json(res, 410, { ok: false, message: "Prepared payment expired. Please try again." });
     }
 
-    const payment = await getPortOnePayment(paymentId);
     if (paymentAmount(payment) !== Number(intent.amount)) {
       return json(res, 400, { ok: false, message: "Payment amount does not match the server ledger." });
     }
@@ -274,7 +302,7 @@ module.exports = async function handler(req, res) {
     return json(res, error.statusCode || 500, {
       ok: false,
       code: "PAYMENT_CONFIRM_ERROR",
-      patch: "confirm-payment-diagnostic-2026-06-29-1",
+      patch: "confirm-payment-portone-first-2026-06-29-1",
       message: error.message || "Payment confirmation failed.",
     });
   }
