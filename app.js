@@ -2398,32 +2398,46 @@ async function confirmPaymentOnServer(payment, params = new URLSearchParams(), p
   const { data: sessionData } = await window.motfSupabase.auth.getSession();
   const accessToken = sessionData.session?.access_token;
   if (!accessToken) throw new Error("Login expired. Please sign in again.");
-  let response;
-  try {
-    response = await fetch("/api/confirm-payment", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify({
-        paymentId: params.get("paymentId") || portOnePaymentId(payment.orderId),
-        orderId: params.get("orderId") || payment.orderId,
-        amount: Number(params.get("amount") || payment.amount),
-        ...(portoneResponse ? { portoneResponse, clientPaymentWindowCompleted: true } : {}),
-      }),
-    });
-  } catch (error) {
-    throw new Error(`우리 서버 결제 확인 API 호출 실패: ${error.message || "네트워크 오류"}`);
+  const payload = {
+    paymentId: params.get("paymentId") || portOnePaymentId(payment.orderId),
+    orderId: params.get("orderId") || payment.orderId,
+    amount: Number(params.get("amount") || payment.amount),
+    ...(portoneResponse ? { portoneResponse, clientPaymentWindowCompleted: true } : {}),
+  };
+  const retryDelays = [0, 600, 1200, 2200, 3600];
+  let lastError = null;
+
+  for (let attempt = 0; attempt < retryDelays.length; attempt += 1) {
+    if (retryDelays[attempt]) {
+      await new Promise((resolve) => window.setTimeout(resolve, retryDelays[attempt]));
+    }
+    let response;
+    try {
+      response = await fetch("/api/confirm-payment", {
+        method: "POST",
+        cache: "no-store",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify(payload),
+      });
+    } catch (error) {
+      lastError = new Error(`우리 서버 결제 확인 API 호출 실패: ${error.message || "네트워크 오류"}`);
+      continue;
+    }
+
+    const data = await response.json().catch(() => ({
+      ok: false,
+      message: `우리 서버 결제 확인 API가 JSON을 반환하지 않았습니다. HTTP ${response.status}`,
+    }));
+    if (response.ok && data.ok) return data;
+
+    lastError = new Error(data.message || `Payment confirmation failed. HTTP ${response.status}`);
+    if (![408, 429, 500, 502, 503, 504].includes(response.status)) break;
   }
-  const data = await response.json().catch(() => ({
-    ok: false,
-    message: `우리 서버 결제 확인 API가 JSON을 반환하지 않았습니다. HTTP ${response.status}`,
-  }));
-  if (!response.ok || !data.ok) {
-    throw new Error(data.message || "Payment confirmation failed.");
-  }
-  return data;
+
+  throw lastError || new Error("Payment confirmation failed.");
 }
 
 async function requestPortOneVirtualAccount() {
