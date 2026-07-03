@@ -1,4 +1,5 @@
 const { json } = require("./_utils");
+const https = require("https");
 
 const requiredEnv = [
   "PORTONE_API_SECRET",
@@ -45,19 +46,84 @@ async function getPaymentIntent(orderId) {
 }
 
 async function getPortOnePayment(paymentId) {
-  const response = await fetch(`https://api.portone.io/payments/${encodeURIComponent(paymentId)}`, {
-    headers: {
-      Authorization: `PortOne ${process.env.PORTONE_API_SECRET}`,
-      "Content-Type": "application/json",
-    },
-  });
-  const data = await response.json().catch(() => null);
-  if (!response.ok) {
-    const error = new Error(data?.message || data?.type || "PortOne payment lookup failed.");
-    error.statusCode = response.status;
-    throw error;
+  const path = `/payments/${encodeURIComponent(paymentId)}`;
+  try {
+    return await getPortOnePaymentWithFetch(path);
+  } catch (fetchError) {
+    try {
+      return await getPortOnePaymentWithHttps(path);
+    } catch (httpsError) {
+      const error = new Error(`PortOne payment lookup failed: ${httpsError.message || fetchError.message || "network error"}`);
+      error.statusCode = httpsError.statusCode || fetchError.statusCode || 502;
+      throw error;
+    }
   }
-  return data;
+}
+
+async function getPortOnePaymentWithFetch(path) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+  try {
+    const response = await fetch(`https://api.portone.io${path}`, {
+      signal: controller.signal,
+      headers: {
+        Authorization: `PortOne ${String(process.env.PORTONE_API_SECRET || "").trim()}`,
+        "Content-Type": "application/json",
+      },
+    });
+    const data = await response.json().catch(() => null);
+    if (!response.ok) {
+      const error = new Error(data?.message || data?.type || "PortOne payment lookup failed.");
+      error.statusCode = response.status;
+      throw error;
+    }
+    return data;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function getPortOnePaymentWithHttps(path) {
+  return new Promise((resolve, reject) => {
+    const request = https.request({
+      hostname: "api.portone.io",
+      path,
+      method: "GET",
+      family: 4,
+      timeout: 15000,
+      headers: {
+        Authorization: `PortOne ${String(process.env.PORTONE_API_SECRET || "").trim()}`,
+        "Content-Type": "application/json",
+      },
+    }, (response) => {
+      let body = "";
+      response.setEncoding("utf8");
+      response.on("data", (chunk) => {
+        body += chunk;
+      });
+      response.on("end", () => {
+        let data = null;
+        try {
+          data = body ? JSON.parse(body) : null;
+        } catch (error) {
+          reject(new Error("PortOne returned invalid JSON."));
+          return;
+        }
+        if (response.statusCode < 200 || response.statusCode >= 300) {
+          const error = new Error(data?.message || data?.type || "PortOne payment lookup failed.");
+          error.statusCode = response.statusCode;
+          reject(error);
+          return;
+        }
+        resolve(data);
+      });
+    });
+    request.on("timeout", () => {
+      request.destroy(new Error("PortOne payment lookup timed out."));
+    });
+    request.on("error", reject);
+    request.end();
+  });
 }
 
 function paymentAmount(payment) {
@@ -77,17 +143,7 @@ function paymentKey(payment) {
 }
 
 function portOnePaymentId(orderId) {
-  return String(orderId || "")
-    .replace(/^MOTF-STAY-/, "MS-")
-    .replace(/^MOTF-MARKET-/, "MM-")
-    .slice(0, 40);
-}
-
-function ledgerOrderIdFromPaymentId(paymentId) {
-  const value = String(paymentId || "");
-  if (/^MS-[0-9a-f]{32}$/i.test(value)) return `MOTF-STAY-${value.slice(3)}`;
-  if (/^MM-[0-9a-f]{32}$/i.test(value)) return `MOTF-MARKET-${value.slice(3)}`;
-  return value;
+  return String(orderId || "").trim();
 }
 
 function pickVirtualAccountValue(source, keys) {
@@ -294,9 +350,12 @@ module.exports = async function handler(req, res) {
     if (!user?.id) return json(res, 401, { ok: false, message: "Login expired. Please sign in again." });
 
     const body = typeof req.body === "string" ? JSON.parse(req.body) : (req.body || {});
-    const ledgerOrderId = body.orderId || ledgerOrderIdFromPaymentId(body.paymentId);
-    const providerPaymentId = body.paymentId || portOnePaymentId(ledgerOrderId);
+    const ledgerOrderId = String(body.orderId || body.paymentId || "").trim();
+    const providerPaymentId = String(body.paymentId || ledgerOrderId || "").trim();
     if (!ledgerOrderId) return json(res, 400, { ok: false, message: "orderId is required." });
+    if (providerPaymentId && providerPaymentId !== portOnePaymentId(ledgerOrderId)) {
+      return json(res, 400, { ok: false, message: "Payment id does not match the prepared order id." });
+    }
 
     const intent = await getPaymentIntent(ledgerOrderId);
     if (!intent || intent.customer_id !== user.id) {

@@ -1771,10 +1771,7 @@ function saveLocalIssuedPayment(payment, virtualAccount) {
 }
 
 function portOnePaymentId(orderId) {
-  return String(orderId || "")
-    .replace(/^MOTF-STAY-/, "MS-")
-    .replace(/^MOTF-MARKET-/, "MM-")
-    .slice(0, 40);
+  return String(orderId || "").trim();
 }
 
 function normalizePhone(value) {
@@ -1938,7 +1935,7 @@ function hydrateLocalIssuedTransactions() {
   });
 }
 
-function setTossWidgetStatus(message, isError = false) {
+function setPaymentWidgetStatus(message, isError = false) {
   const status = qs("#tossWidgetStatus");
   if (!status) return;
   status.textContent = message;
@@ -1989,214 +1986,8 @@ function renderPayment() {
     <div class="summary-line"><span>주문번호</span><strong>${payment.orderId}</strong></div>
     <div class="summary-line total"><span>총 결제 금액</span><strong>${money(payment.amount)}</strong></div>
   `;
-  renderTossWidgets(payment);
+  renderPortOnePaymentPanel(payment);
   refreshIcons();
-}
-
-async function renderTossWidgets(payment) {
-  const paymentMethods = qs("#tossPaymentMethods");
-  const agreement = qs("#tossAgreement");
-  if (!paymentMethods || !agreement) return;
-
-  if (tossWidgets && tossWidgetOrderId === payment.orderId) return;
-
-  paymentMethods.innerHTML = "";
-  agreement.innerHTML = "";
-  setTossWidgetStatus("토스 결제위젯을 불러오는 중입니다.");
-
-  try {
-    if (!TOSS_CLIENT_KEY) {
-      throw new Error("토스페이먼츠 Client Key가 설정되지 않았습니다.");
-    }
-    await loadTossSdk();
-    const { data: sessionData } = await window.motfSupabase.auth.getSession();
-    const userId = sessionData.session?.user?.id;
-    if (!userId) throw new Error("로그인 후 결제할 수 있습니다.");
-    const tossPayments = window.TossPayments(TOSS_CLIENT_KEY);
-    tossWidgets = tossPayments.widgets({ customerKey: `motf_${userId.replaceAll("-", "")}` });
-    tossWidgetOrderId = payment.orderId;
-    await tossWidgets.setAmount({
-      currency: "KRW",
-      value: payment.amount,
-    });
-    await Promise.all([
-      tossWidgets.renderPaymentMethods({
-        selector: "#tossPaymentMethods",
-        variantKey: "DEFAULT",
-      }),
-      tossWidgets.renderAgreement({
-        selector: "#tossAgreement",
-        variantKey: "AGREEMENT",
-      }),
-    ]);
-    setTossWidgetStatus("결제수단과 약관을 확인한 뒤 결제를 진행할 수 있습니다.");
-  } catch (error) {
-    tossWidgets = null;
-    tossWidgetOrderId = null;
-    setTossWidgetStatus(error.message || "토스 결제위젯을 불러오지 못했습니다.", true);
-  }
-}
-
-async function requestTossPayment() {
-  const payment = state.pendingPayment;
-  if (!payment) {
-    toast("결제할 내역이 없습니다.");
-    return;
-  }
-
-  savePendingPayment(payment);
-
-  try {
-    await loadTossSdk();
-    if (!tossWidgets || tossWidgetOrderId !== payment.orderId) {
-      await renderTossWidgets(payment);
-    }
-    if (!tossWidgets) {
-      throw new Error("토스 결제위젯이 아직 준비되지 않았습니다.");
-    }
-    const baseUrl = getBaseUrl();
-    const mobilePhone = normalizePhone(payment.customerPhone);
-    await tossWidgets.requestPayment({
-      orderId: payment.orderId,
-      orderName: payment.itemName,
-      successUrl: `${baseUrl}?tossResult=success`,
-      failUrl: `${baseUrl}?tossResult=fail`,
-      customerName: payment.customerName,
-      ...(mobilePhone ? { customerMobilePhone: mobilePhone } : {}),
-    });
-  } catch (error) {
-    state.paymentResult = {
-      status: "fail",
-      type: payment.type,
-      eyebrow: "결제창 실행 실패",
-      title: "토스 결제창을 열지 못했습니다",
-      text: error.message || "브라우저나 네트워크 상태를 확인한 뒤 다시 시도해주세요.",
-      icon: "x",
-      className: "fail",
-      orderId: payment.orderId,
-      itemName: payment.itemName,
-      amount: payment.amount,
-      backRoute: paymentBackRoute(),
-    };
-    navigate("paymentResult");
-  }
-}
-
-async function confirmPaymentOnServer(payment, params) {
-  for (let i = 0; i < 20 && !window.motfSupabase; i += 1) {
-    await new Promise((resolve) => window.setTimeout(resolve, 100));
-  }
-  if (!window.motfSupabase) throw new Error("로그인 설정을 불러오지 못했습니다.");
-  const { data: sessionData } = await window.motfSupabase.auth.getSession();
-  const accessToken = sessionData.session?.access_token;
-  if (!accessToken) throw new Error("로그인이 만료되었습니다. 다시 로그인해주세요.");
-  const payload = {
-    paymentKey: params.get("paymentKey"),
-    orderId: params.get("orderId") || payment.orderId,
-    amount: Number(params.get("amount") || payment.amount),
-  };
-  const response = await fetch("/api/confirm-payment", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${accessToken}`,
-    },
-    body: JSON.stringify(payload),
-  });
-  const data = await response.json();
-  if (!response.ok || !data.ok) {
-    throw new Error(data.message || "서버 결제 승인에 실패했습니다.");
-  }
-  return data;
-}
-
-async function handleTossRedirect() {
-  const params = new URLSearchParams(window.location.search);
-  const tossResult = params.get("tossResult");
-  if (!tossResult) return false;
-
-  const storedPayment = getStoredPendingPayment();
-  if (!storedPayment) {
-    state.paymentResult = {
-      status: "fail",
-      type: "stay",
-      eyebrow: "결제 정보 확인 필요",
-      title: "결제 요청 정보를 찾지 못했습니다",
-      text: "결제창에서 돌아왔지만 브라우저에 저장된 주문 정보가 없습니다. 다시 결제를 시도해주세요.",
-      icon: "x",
-      className: "fail",
-      orderId: params.get("orderId") || "-",
-      itemName: "확인 필요",
-      amount: Number(params.get("amount") || 0),
-      backRoute: "stays",
-    };
-    navigate("paymentResult", { replace: true });
-    replaceBrowserRoute("paymentResult");
-    return true;
-  }
-
-  state.pendingPayment = storedPayment;
-  routeParents.paymentResult = storedPayment.type === "stay" ? "stays" : "market";
-
-  if (tossResult === "success") {
-    state.paymentResult = {
-      status: "confirming",
-      type: storedPayment.type,
-      eyebrow: "토스 결제창 인증 완료",
-      title: "서버에서 결제를 확인하는 중입니다",
-      text: "토스에 결제 금액과 주문번호가 맞는지 확인하고, 맞으면 Supabase 장부에 저장합니다.",
-      icon: "shield-check",
-      className: "",
-      orderId: params.get("orderId") || storedPayment.orderId,
-      itemName: storedPayment.itemName,
-      amount: Number(params.get("amount") || storedPayment.amount),
-      paymentKey: params.get("paymentKey") || "토스에서 발급",
-      backRoute: paymentBackRoute(),
-    };
-    navigate("paymentResult", { replace: true });
-    replaceBrowserRoute("paymentResult");
-    try {
-      await confirmPaymentOnServer(storedPayment, params);
-      await window.motfReloadTransactions?.();
-      setPaymentResult("success");
-    } catch (error) {
-      state.paymentResult = {
-        status: "fail",
-        type: storedPayment.type,
-        eyebrow: "서버 승인 실패",
-        title: "결제 확인을 완료하지 못했습니다",
-        text: error.message || "Vercel 환경변수나 Supabase 설정을 확인해주세요.",
-        icon: "x",
-        className: "fail",
-        orderId: params.get("orderId") || storedPayment.orderId,
-        itemName: storedPayment.itemName,
-        amount: Number(params.get("amount") || storedPayment.amount),
-        paymentKey: params.get("paymentKey") || "토스에서 발급",
-        backRoute: paymentBackRoute(),
-      };
-      navigate("paymentResult", { replace: true });
-    }
-    return true;
-  } else {
-    state.paymentResult = {
-      status: "fail",
-      type: storedPayment.type,
-      eyebrow: "토스 결제 실패",
-      title: "결제가 완료되지 않았습니다",
-      text: params.get("message") || "결제창에서 실패 또는 취소가 발생했습니다.",
-      icon: "x",
-      className: "fail",
-      orderId: params.get("orderId") || storedPayment.orderId,
-      itemName: storedPayment.itemName,
-      amount: storedPayment.amount,
-      errorCode: params.get("code") || "",
-      backRoute: paymentBackRoute(),
-    };
-  }
-
-  navigate("paymentResult", { replace: true });
-  replaceBrowserRoute("paymentResult");
-  return true;
 }
 
 function setPaymentResult(status) {
@@ -2208,8 +1999,8 @@ function setPaymentResult(status) {
 
   const resultText = {
     success: {
-      eyebrow: "토스페이먼츠 승인 완료",
-      title: payment.type === "stay" ? "결제 완료, 숙소 예약 요청이 접수되었습니다" : "결제 완료, 공판장 주문 요청이 접수되었습니다",
+      eyebrow: "포트원 입금 확인 완료",
+      title: payment.type === "stay" ? "입금 확인 완료, 숙소 예약 요청이 접수되었습니다" : "입금 확인 완료, 공판장 주문 요청이 접수되었습니다",
       text: payment.type === "stay"
         ? "사장님이 예약 가능 여부를 확인한 뒤 확정합니다. 거절 시 결제 취소·환불 처리가 필요합니다."
         : "사장님이 주문 가능 여부를 확인한 뒤 확정합니다. 거절 시 결제 취소·환불 처리가 필요합니다.",
@@ -2219,14 +2010,14 @@ function setPaymentResult(status) {
     fail: {
       eyebrow: "결제 실패",
       title: "결제가 완료되지 않았습니다",
-      text: "카드 한도, 인증 실패, 네트워크 문제처럼 결제가 실패한 상황을 보여주는 화면입니다.",
+      text: "가상계좌 발급 또는 입금 확인 과정에서 문제가 발생했습니다. 잠시 후 다시 시도해주세요.",
       icon: "x",
       className: "fail",
     },
     cancel: {
       eyebrow: "결제 취소",
       title: "결제를 취소했습니다",
-      text: "이용자가 토스 결제창을 닫거나 뒤로 가기를 눌렀을 때 보여주는 화면입니다.",
+      text: "이용자가 결제창을 닫거나 뒤로 가기를 눌렀을 때 보여주는 화면입니다.",
       icon: "rotate-ccw",
       className: "cancel",
     },
@@ -2576,7 +2367,7 @@ function renderMypage() {
   refreshIcons();
 }
 
-async function renderTossWidgets(payment) {
+async function renderPortOnePaymentPanel(payment) {
   const paymentMethods = qs("#tossPaymentMethods");
   const agreement = qs("#tossAgreement");
   if (!paymentMethods || !agreement || !payment) return;
@@ -2596,7 +2387,7 @@ async function renderTossWidgets(payment) {
       <div><span>3단계</span><strong>예약 확인 후 최종 확정</strong></div>
     </div>
   `;
-  setTossWidgetStatus("아래 버튼을 누르면 포트원 KG이니시스 결제창이 열립니다.");
+  setPaymentWidgetStatus("아래 버튼을 누르면 포트원 KG이니시스 결제창이 열립니다.");
 }
 
 async function confirmPaymentOnServer(payment, params = new URLSearchParams(), portoneResponse = null) {
@@ -2635,7 +2426,7 @@ async function confirmPaymentOnServer(payment, params = new URLSearchParams(), p
   return data;
 }
 
-async function requestTossPayment() {
+async function requestPortOneVirtualAccount() {
   const payment = state.pendingPayment;
   if (!payment) {
     toast("결제할 내역이 없습니다.");
@@ -2758,7 +2549,7 @@ async function requestTossPayment() {
   }
 }
 
-async function handleTossRedirect() {
+async function handleLegacyPaymentRedirect() {
   return false;
 }
 
@@ -3059,7 +2850,7 @@ document.addEventListener("click", (event) => {
 
   const tossPaymentButton = event.target.closest("[data-toss-payment]");
   if (tossPaymentButton) {
-    requestTossPayment();
+    requestPortOneVirtualAccount();
     return;
   }
 
@@ -3249,7 +3040,7 @@ window.addEventListener("popstate", () => {
   stays = stays.map((stay) => ({ ...stay, region: DEFAULT_STAY_REGION }));
   initializeStaySearchDefaults();
   await loadPaymentConfig();
-  const handledRedirect = await handleTossRedirect();
+  const handledRedirect = await handleLegacyPaymentRedirect();
   if (!handledRedirect) {
     navigate(routeFromLocation(), { record: false, replace: true });
   }
