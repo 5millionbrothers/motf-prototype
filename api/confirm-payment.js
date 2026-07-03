@@ -1,5 +1,4 @@
 const { json } = require("./_utils");
-const https = require("https");
 
 const requiredEnv = [
   "PORTONE_API_SECRET",
@@ -8,30 +7,19 @@ const requiredEnv = [
   "SUPABASE_SERVICE_ROLE_KEY",
 ];
 
-async function safeFetch(label, url, options = {}) {
-  try {
-    return await fetch(url, options);
-  } catch (error) {
-    const wrapped = new Error(`${label} fetch failed: ${error.message || error}`);
-    wrapped.code = `${label}_FETCH_FAILED`;
-    throw wrapped;
-  }
-}
-
 async function supabaseRequest(path, key, options = {}) {
-  const { label = "SUPABASE", ...requestOptions } = options;
-  const response = await safeFetch(label, `${process.env.SUPABASE_URL}${path}`, {
-    ...requestOptions,
+  const response = await fetch(`${process.env.SUPABASE_URL}${path}`, {
+    ...options,
     headers: {
       apikey: key,
       Authorization: `Bearer ${key}`,
       "Content-Type": "application/json",
-      ...(requestOptions.headers || {}),
+      ...(options.headers || {}),
     },
   });
   const data = await response.json().catch(() => null);
   if (!response.ok) {
-    const error = new Error(`${label} error: ${data?.message || data?.error_description || "Supabase request failed."}`);
+    const error = new Error(data?.message || data?.error_description || "Supabase request failed.");
     error.statusCode = response.status;
     throw error;
   }
@@ -40,7 +28,7 @@ async function supabaseRequest(path, key, options = {}) {
 
 async function authenticatedUser(authorization) {
   if (!authorization?.startsWith("Bearer ")) return null;
-  const response = await safeFetch("SUPABASE_AUTH", `${process.env.SUPABASE_URL}/auth/v1/user`, {
+  const response = await fetch(`${process.env.SUPABASE_URL}/auth/v1/user`, {
     headers: {
       apikey: process.env.SUPABASE_PUBLISHABLE_KEY,
       Authorization: authorization,
@@ -51,79 +39,25 @@ async function authenticatedUser(authorization) {
 }
 
 async function getPaymentIntent(orderId) {
-  const query = `/rest/v1/payment_intents?select=order_id,customer_id,amount,status,transaction_id,kind,expires_at&order_id=eq.${encodeURIComponent(orderId)}&limit=1`;
-  const intents = await supabaseRequest(query, process.env.SUPABASE_SERVICE_ROLE_KEY, { label: "PAYMENT_INTENT" });
+  const query = `/rest/v1/payment_intents?select=order_id,customer_id,amount,status,transaction_id,kind,expires_at,virtual_account,virtual_account_issued_at,order_name&order_id=eq.${encodeURIComponent(orderId)}&limit=1`;
+  const intents = await supabaseRequest(query, process.env.SUPABASE_SERVICE_ROLE_KEY);
   return intents?.[0] || null;
 }
 
-function portOneAuthHeader() {
-  return `PortOne ${String(process.env.PORTONE_API_SECRET || "").replace(/^PortOne\s+/i, "").trim()}`;
-}
-
-function getJsonWithHttps(url, headers) {
-  return new Promise((resolve, reject) => {
-    const req = https.request(url, {
-      method: "GET",
-      headers,
-      family: 4,
-      timeout: 8000,
-    }, (response) => {
-      let raw = "";
-      response.setEncoding("utf8");
-      response.on("data", (chunk) => { raw += chunk; });
-      response.on("end", () => {
-        let data = null;
-        try {
-          data = raw ? JSON.parse(raw) : null;
-        } catch {
-          const error = new Error("PortOne HTTPS response was not JSON.");
-          error.statusCode = response.statusCode;
-          reject(error);
-          return;
-        }
-        if (response.statusCode >= 200 && response.statusCode < 300) {
-          resolve(data);
-          return;
-        }
-        const error = new Error(data?.message || data?.type || `PortOne payment lookup failed with ${response.statusCode}.`);
-        error.statusCode = response.statusCode;
-        reject(error);
-      });
-    });
-    req.on("timeout", () => req.destroy(new Error("PortOne HTTPS lookup timed out.")));
-    req.on("error", reject);
-    req.end();
-  });
-}
-
 async function getPortOnePayment(paymentId) {
-  const url = `https://api.portone.io/payments/${encodeURIComponent(paymentId)}`;
-  const headers = {
-    Authorization: portOneAuthHeader(),
-    "Content-Type": "application/json",
-  };
-  let lastError = null;
-  for (let attempt = 0; attempt < 4; attempt += 1) {
-    if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, 600));
-    try {
-      const response = await safeFetch("PORTONE_LOOKUP", url, { headers });
-      const data = await response.json().catch(() => null);
-      if (!response.ok) {
-        const error = new Error(`PORTONE_LOOKUP error: ${data?.message || data?.type || "PortOne payment lookup failed."}`);
-        error.statusCode = response.status;
-        throw error;
-      }
-      return data;
-    } catch (error) {
-      try {
-        return await getJsonWithHttps(url, headers);
-      } catch (httpsError) {
-        lastError = new Error(`PORTONE_LOOKUP failed. fetch=${error.message || error}; https=${httpsError.message || httpsError}`);
-        lastError.statusCode = httpsError.statusCode || error.statusCode;
-      }
-    }
+  const response = await fetch(`https://api.portone.io/payments/${encodeURIComponent(paymentId)}`, {
+    headers: {
+      Authorization: `PortOne ${process.env.PORTONE_API_SECRET}`,
+      "Content-Type": "application/json",
+    },
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
+    const error = new Error(data?.message || data?.type || "PortOne payment lookup failed.");
+    error.statusCode = response.status;
+    throw error;
   }
-  throw lastError;
+  return data;
 }
 
 function paymentAmount(payment) {
@@ -134,110 +68,89 @@ function paymentStatus(payment) {
   return payment?.status || payment?.paymentStatus || "";
 }
 
-function isVirtualAccountStatus(status) {
-  return ["VIRTUAL_ACCOUNT_ISSUED", "READY", "PENDING"].includes(status);
-}
-
 function paymentKey(payment) {
-  return payment?.transactionId || payment?.txId || payment?.id;
+  return payment?.transactionId || payment?.txId || payment?.portonePaymentId || payment?.motfProviderPaymentId || payment?.id;
 }
 
-function pickVirtualAccountValue(source, keys) {
-  for (const key of keys) {
-    if (source && source[key] !== undefined && source[key] !== null && source[key] !== "") return source[key];
-  }
-  return "";
+function portOnePaymentId(orderId) {
+  return String(orderId || "")
+    .replace(/^MOTF-STAY-/, "MS-")
+    .replace(/^MOTF-MARKET-/, "MM-")
+    .slice(0, 40);
 }
 
-function findVirtualAccountSource(value, seen = new Set()) {
-  if (!value || typeof value !== "object" || seen.has(value)) return null;
-  seen.add(value);
-  const preferred =
-    value.virtualAccount ||
-    value.virtual_account ||
-    value.vbank ||
-    value.vBank ||
-    value.vbankIssued ||
-    value.virtualAccountIssued ||
-    value.bankAccount ||
-    value.account;
-  if (preferred && typeof preferred === "object") {
-    const found = findVirtualAccountSource(preferred, seen);
-    if (found) return found;
-  }
-  const accountNumber = pickVirtualAccountValue(value, [
-    "accountNumber", "account_number", "accountNo", "account_no", "account", "number",
-    "bankAccountNumber", "virtualAccountNumber", "vbankNum", "vbank_num", "vbankNumber",
-  ]);
-  const bankName = pickVirtualAccountValue(value, [
-    "bankName", "bank_name", "bank", "bankCode", "bank_code", "bankId", "bank_id",
-  ]);
-  const holderName = pickVirtualAccountValue(value, [
-    "holderName", "holder_name", "accountHolder", "account_holder", "customerName",
-    "depositorName", "depositor", "ownerName", "owner",
-  ]);
-  const dueDate = pickVirtualAccountValue(value, [
-    "dueDate", "due_date", "expiredAt", "expired_at", "expiresAt", "expires_at",
-    "expiryDate", "expiry_date",
-  ]) || value.expiry?.dueDate || value.expiry?.due_date || value.accountExpiry?.dueDate || value.accountExpiry?.due_date;
-  if (accountNumber || (bankName && holderName) || dueDate) return value;
-  for (const child of Object.values(value)) {
-    const found = findVirtualAccountSource(child, seen);
-    if (found) return found;
-  }
-  return null;
+function ledgerOrderIdFromPaymentId(paymentId) {
+  const value = String(paymentId || "");
+  if (/^MS-[0-9a-f]{32}$/i.test(value)) return `MOTF-STAY-${value.slice(3)}`;
+  if (/^MM-[0-9a-f]{32}$/i.test(value)) return `MOTF-MARKET-${value.slice(3)}`;
+  return value;
 }
 
-function virtualAccountInfo(payment) {
-  const source = findVirtualAccountSource(payment) || {};
+function pickVirtualAccount(payment) {
+  const method = payment?.paymentMethod || payment?.payment_method || {};
+  const detail = payment?.paymentMethodDetail || payment?.payment_method_detail || {};
+  const account = payment?.virtualAccount
+    || payment?.virtual_account
+    || payment?.virtualAccountIssued
+    || payment?.virtual_account_issued
+    || (method.type === "VIRTUAL_ACCOUNT" ? method : null)
+    || (detail.type === "VIRTUAL_ACCOUNT" ? detail : null)
+    || {};
+
+  const bank = account.bankName || account.bank || account.bankCode || account.bank_code || "";
+  const accountNumber = account.accountNumber || account.account_number || account.number || "";
+  const holderName = account.holderName || account.accountHolder || account.account_holder || account.customerName || "";
+  const dueDate = account.dueDate || account.due_date || account.expiredAt || account.expiresAt || account.expiry || "";
+
   return {
-    bankName: pickVirtualAccountValue(source, ["bankName", "bank_name", "bank", "bankCode", "bank_code", "bankId", "bank_id"]),
-    accountNumber: pickVirtualAccountValue(source, [
-      "accountNumber", "account_number", "accountNo", "account_no", "account", "number",
-      "bankAccountNumber", "virtualAccountNumber", "vbankNum", "vbank_num", "vbankNumber",
-    ]),
-    holderName: pickVirtualAccountValue(source, [
-      "holderName", "holder_name", "accountHolder", "account_holder", "customerName",
-      "depositorName", "depositor", "ownerName", "owner",
-    ]),
-    dueDate: pickVirtualAccountValue(source, [
-      "dueDate", "due_date", "expiredAt", "expired_at", "expiresAt", "expires_at",
-      "expiryDate", "expiry_date",
-    ]) || source.expiry?.dueDate || source.expiry?.due_date || source.accountExpiry?.dueDate || source.accountExpiry?.due_date || "",
-    raw: source,
+    bank,
+    bankName: account.bankName || bank,
+    bankCode: account.bankCode || account.bank_code || "",
+    accountNumber,
+    holderName,
+    dueDate,
+    raw: account,
   };
 }
 
-function canonicalOrderId(value) {
-  return String(value || "")
-    .replace(/^MS-/, "MOTF-STAY-")
-    .replace(/^MM-/, "MOTF-MARKET-");
-}
-
-function normalizePaymentForIntent(payment, orderId) {
+function safePaymentFromClient(ledgerOrderId, providerPaymentId, payment) {
+  if (!payment || typeof payment !== "object") return null;
+  const id = payment.id || payment.paymentId || payment.orderId;
+  const allowedIds = new Set([ledgerOrderId, providerPaymentId].filter(Boolean));
+  if (id && !allowedIds.has(id)) return null;
   return {
     ...payment,
-    id: orderId,
-    paymentId: orderId,
-    orderId,
+    id: id || providerPaymentId || ledgerOrderId,
   };
 }
 
-async function applyPortOnePayment(userId, orderId, payment) {
-  const intentPayment = normalizePaymentForIntent(payment, orderId);
+function paymentForLedger(payment, ledgerOrderId, providerPaymentId) {
+  return {
+    ...payment,
+    originalPaymentId: payment?.id || payment?.paymentId || payment?.orderId || "",
+    portonePaymentId: providerPaymentId,
+    motfProviderPaymentId: providerPaymentId,
+    id: ledgerOrderId,
+    paymentId: ledgerOrderId,
+    orderId: ledgerOrderId,
+  };
+}
+
+async function applyPortOnePayment(userId, orderId, payment, providerPaymentId) {
   const status = paymentStatus(payment);
+  const virtualAccount = pickVirtualAccount(payment);
+  const hasVirtualAccount = Boolean(virtualAccount.bankName || virtualAccount.accountNumber || virtualAccount.holderName || virtualAccount.dueDate);
   if (status === "PAID") {
     const finalized = await supabaseRequest(
-        "/rest/v1/rpc/finalize_payment_intent",
-        process.env.SUPABASE_SERVICE_ROLE_KEY,
-        {
-          label: "FINALIZE_PAYMENT",
-          method: "POST",
-          body: JSON.stringify({
+      "/rest/v1/rpc/finalize_payment_intent",
+      process.env.SUPABASE_SERVICE_ROLE_KEY,
+      {
+        method: "POST",
+        body: JSON.stringify({
           target_customer_id: userId,
           target_order_id: orderId,
-          target_payment_key: paymentKey(payment),
-          portone_response: intentPayment,
+          target_payment_key: paymentKey(payment) || providerPaymentId,
+          portone_response: payment,
         }),
       },
     );
@@ -245,37 +158,31 @@ async function applyPortOnePayment(userId, orderId, payment) {
     return { status: "paid", transactionId: result?.transaction_id, kind: result?.kind };
   }
 
-  if (isVirtualAccountStatus(status)) {
-    const virtualAccount = virtualAccountInfo(payment);
-    try {
-      const issued = await supabaseRequest(
-        "/rest/v1/rpc/mark_virtual_account_issued",
-        process.env.SUPABASE_SERVICE_ROLE_KEY,
-        {
-          label: "MARK_VIRTUAL_ACCOUNT",
-          method: "POST",
-          body: JSON.stringify({
-            target_customer_id: userId,
-            target_order_id: orderId,
-            portone_response: intentPayment,
-          }),
-        },
-      );
-      const result = Array.isArray(issued) ? issued[0] : issued;
-      return { status: "virtual_account_issued", orderId: result?.order_id, virtualAccount: result?.virtual_account || virtualAccount };
-    } catch (error) {
-      console.error("mark_virtual_account_issued", error);
-      return {
-        status: "virtual_account_issued",
-        orderId,
-        virtualAccount,
-        persistence: "failed",
-        warning: error.message || "DB에 입금대기 저장을 완료하지 못했습니다.",
-      };
-    }
+  if (status === "VIRTUAL_ACCOUNT_ISSUED" || status === "READY" || hasVirtualAccount) {
+    const issued = await supabaseRequest(
+      "/rest/v1/rpc/mark_virtual_account_issued",
+      process.env.SUPABASE_SERVICE_ROLE_KEY,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          target_customer_id: userId,
+          target_order_id: orderId,
+          portone_response: payment,
+        }),
+      },
+    );
+    const result = Array.isArray(issued) ? issued[0] : issued;
+    const storedAccount = result?.virtual_account && Object.keys(result.virtual_account).length
+      ? result.virtual_account
+      : null;
+    return {
+      status: "virtual_account_issued",
+      orderId: result?.order_id,
+      virtualAccount: pickVirtualAccount({ ...payment, virtualAccount: storedAccount || payment?.virtualAccount || virtualAccount }),
+    };
   }
 
-  return { status: "pending", portoneStatus: status };
+  return { status: "pending", portoneStatus: status, virtualAccount: pickVirtualAccount(payment) };
 }
 
 module.exports = async function handler(req, res) {
@@ -293,62 +200,59 @@ module.exports = async function handler(req, res) {
   }
 
   try {
+    const user = await authenticatedUser(req.headers.authorization);
+    if (!user?.id) return json(res, 401, { ok: false, message: "Login expired. Please sign in again." });
+
     const body = typeof req.body === "string" ? JSON.parse(req.body) : (req.body || {});
-    const paymentId = body.paymentId || body.orderId;
-    const orderId = canonicalOrderId(body.orderId || body.paymentId);
-    if (!paymentId || !orderId) return json(res, 400, { ok: false, message: "paymentId is required." });
+    const ledgerOrderId = body.orderId || ledgerOrderIdFromPaymentId(body.paymentId);
+    const providerPaymentId = body.paymentId || portOnePaymentId(ledgerOrderId);
+    if (!ledgerOrderId) return json(res, 400, { ok: false, message: "orderId is required." });
 
-    const payment = await getPortOnePayment(paymentId);
-    const expectedAmount = Number(body.amount || 0);
-    if (expectedAmount > 0 && paymentAmount(payment) !== expectedAmount) {
-      return json(res, 400, { ok: false, message: "Payment amount does not match the client payment request." });
-    }
-
-    let user = null;
-    let authWarning = "";
-    try {
-      user = await authenticatedUser(req.headers.authorization);
-    } catch (error) {
-      authWarning = error.message || "Supabase Auth 확인에 실패했습니다.";
-    }
-    if (!user?.id) {
-      const status = paymentStatus(payment);
-      if (isVirtualAccountStatus(status)) {
-        return json(res, 200, {
-          ok: true,
-          status: "virtual_account_issued",
-          orderId,
-          virtualAccount: virtualAccountInfo(payment),
-          persistence: "failed",
-          warning: authWarning || "로그인 확인이 지연되어 관리자 저장은 보류되었습니다.",
-        });
-      }
-      return json(res, 401, { ok: false, message: authWarning || "Login expired. Please sign in again." });
-    }
-
-    const intent = await getPaymentIntent(orderId);
+    const intent = await getPaymentIntent(ledgerOrderId);
     if (!intent || intent.customer_id !== user.id) {
       return json(res, 404, { ok: false, message: "Prepared payment was not found." });
     }
     if (intent.status === "confirmed") {
       return json(res, 200, { ok: true, status: "paid", transactionId: intent.transaction_id, kind: intent.kind, alreadyConfirmed: true });
     }
+    if (intent.status === "virtual_account_issued" && intent.virtual_account && Object.keys(intent.virtual_account).length) {
+      return json(res, 200, {
+        ok: true,
+        status: "virtual_account_issued",
+        orderId: intent.order_id,
+        orderName: intent.order_name,
+        virtualAccount: pickVirtualAccount({ virtualAccount: intent.virtual_account }),
+        alreadyIssued: true,
+      });
+    }
     if (new Date(intent.expires_at).getTime() < Date.now()) {
       return json(res, 410, { ok: false, message: "Prepared payment expired. Please try again." });
     }
 
-    if (paymentAmount(payment) !== Number(intent.amount)) {
+    let payment;
+    let lookupWarning = "";
+    try {
+      payment = await getPortOnePayment(providerPaymentId);
+    } catch (error) {
+      const fallback = safePaymentFromClient(ledgerOrderId, providerPaymentId, body.portoneResponse);
+      if (!fallback) throw error;
+      payment = fallback;
+      lookupWarning = error.message || "PortOne lookup failed; stored client response.";
+    }
+    const ledgerPayment = paymentForLedger(payment, ledgerOrderId, providerPaymentId);
+
+    const checkedAmount = paymentAmount(ledgerPayment);
+    if (checkedAmount > 0 && checkedAmount !== Number(intent.amount)) {
       return json(res, 400, { ok: false, message: "Payment amount does not match the server ledger." });
     }
 
-    const applied = await applyPortOnePayment(user.id, orderId, payment);
-    return json(res, 200, { ok: true, ...applied });
+    const applied = await applyPortOnePayment(user.id, ledgerOrderId, ledgerPayment, providerPaymentId);
+    return json(res, 200, { ok: true, ...applied, lookupWarning });
   } catch (error) {
     console.error("confirm-payment", error);
     return json(res, error.statusCode || 500, {
       ok: false,
       code: "PAYMENT_CONFIRM_ERROR",
-      patch: "readable-account-mypage-2026-06-29-1",
       message: error.message || "Payment confirmation failed.",
     });
   }

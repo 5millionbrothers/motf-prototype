@@ -1,5 +1,4 @@
 const { json } = require("./_utils");
-const https = require("https");
 
 const requiredEnv = ["PORTONE_API_SECRET", "SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"];
 
@@ -22,70 +21,20 @@ async function supabaseRequest(path, key, options = {}) {
   return data;
 }
 
-function portOneAuthHeader() {
-  return `PortOne ${String(process.env.PORTONE_API_SECRET || "").replace(/^PortOne\s+/i, "").trim()}`;
-}
-
-function getJsonWithHttps(url, headers) {
-  return new Promise((resolve, reject) => {
-    const req = https.request(url, {
-      method: "GET",
-      headers,
-      family: 4,
-      timeout: 8000,
-    }, (response) => {
-      let raw = "";
-      response.setEncoding("utf8");
-      response.on("data", (chunk) => { raw += chunk; });
-      response.on("end", () => {
-        let data = null;
-        try {
-          data = raw ? JSON.parse(raw) : null;
-        } catch {
-          const error = new Error("PortOne HTTPS response was not JSON.");
-          error.statusCode = response.statusCode;
-          reject(error);
-          return;
-        }
-        if (response.statusCode >= 200 && response.statusCode < 300) {
-          resolve(data);
-          return;
-        }
-        const error = new Error(data?.message || data?.type || `PortOne payment lookup failed with ${response.statusCode}.`);
-        error.statusCode = response.statusCode;
-        reject(error);
-      });
-    });
-    req.on("timeout", () => req.destroy(new Error("PortOne HTTPS lookup timed out.")));
-    req.on("error", reject);
-    req.end();
-  });
-}
-
 async function getPortOnePayment(paymentId) {
-  const url = `https://api.portone.io/payments/${encodeURIComponent(paymentId)}`;
-  const headers = {
-    Authorization: portOneAuthHeader(),
-    "Content-Type": "application/json",
-  };
-  try {
-    const response = await fetch(url, { headers });
-    const data = await response.json().catch(() => null);
-    if (!response.ok) {
-      const error = new Error(data?.message || data?.type || "PortOne payment lookup failed.");
-      error.statusCode = response.status;
-      throw error;
-    }
-    return data;
-  } catch (error) {
-    try {
-      return await getJsonWithHttps(url, headers);
-    } catch (httpsError) {
-      const finalError = new Error(`PortOne lookup failed. fetch=${error.message || error}; https=${httpsError.message || httpsError}`);
-      finalError.statusCode = httpsError.statusCode || error.statusCode;
-      throw finalError;
-    }
+  const response = await fetch(`https://api.portone.io/payments/${encodeURIComponent(paymentId)}`, {
+    headers: {
+      Authorization: `PortOne ${process.env.PORTONE_API_SECRET}`,
+      "Content-Type": "application/json",
+    },
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
+    const error = new Error(data?.message || data?.type || "PortOne payment lookup failed.");
+    error.statusCode = response.status;
+    throw error;
   }
+  return data;
 }
 
 function extractPaymentId(body) {
@@ -97,21 +46,25 @@ function paymentStatus(payment) {
 }
 
 function paymentKey(payment) {
-  return payment?.transactionId || payment?.txId || payment?.id;
+  return payment?.transactionId || payment?.txId || payment?.portonePaymentId || payment?.motfProviderPaymentId || payment?.id;
 }
 
-function canonicalOrderId(value) {
-  return String(value || "")
-    .replace(/^MS-/, "MOTF-STAY-")
-    .replace(/^MM-/, "MOTF-MARKET-");
+function ledgerOrderIdFromPaymentId(paymentId) {
+  const value = String(paymentId || "");
+  if (/^MS-[0-9a-f]{32}$/i.test(value)) return `MOTF-STAY-${value.slice(3)}`;
+  if (/^MM-[0-9a-f]{32}$/i.test(value)) return `MOTF-MARKET-${value.slice(3)}`;
+  return value;
 }
 
-function normalizePaymentForIntent(payment, orderId) {
+function paymentForLedger(payment, ledgerOrderId, providerPaymentId) {
   return {
     ...payment,
-    id: orderId,
-    paymentId: orderId,
-    orderId,
+    originalPaymentId: payment?.id || payment?.paymentId || payment?.orderId || "",
+    portonePaymentId: providerPaymentId,
+    motfProviderPaymentId: providerPaymentId,
+    id: ledgerOrderId,
+    paymentId: ledgerOrderId,
+    orderId: ledgerOrderId,
   };
 }
 
@@ -129,14 +82,14 @@ module.exports = async function handler(req, res) {
     const body = typeof req.body === "string" ? JSON.parse(req.body) : (req.body || {});
     const paymentId = extractPaymentId(body);
     if (!paymentId) return json(res, 400, { ok: false, message: "paymentId is required." });
-    const orderId = canonicalOrderId(paymentId);
 
-    const payment = await getPortOnePayment(paymentId);
+    const ledgerOrderId = ledgerOrderIdFromPaymentId(paymentId);
+    const payment = paymentForLedger(await getPortOnePayment(paymentId), ledgerOrderId, paymentId);
     if (paymentStatus(payment) !== "PAID") {
       return json(res, 200, { ok: true, ignored: true, status: paymentStatus(payment) });
     }
 
-    const query = `/rest/v1/payment_intents?select=order_id,customer_id,status&order_id=eq.${encodeURIComponent(orderId)}&limit=1`;
+    const query = `/rest/v1/payment_intents?select=order_id,customer_id,status&order_id=eq.${encodeURIComponent(ledgerOrderId)}&limit=1`;
     const intents = await supabaseRequest(query, process.env.SUPABASE_SERVICE_ROLE_KEY);
     const intent = intents?.[0];
     if (!intent) return json(res, 404, { ok: false, message: "Payment intent was not found." });
@@ -151,9 +104,9 @@ module.exports = async function handler(req, res) {
         method: "POST",
         body: JSON.stringify({
           target_customer_id: intent.customer_id,
-          target_order_id: orderId,
+          target_order_id: ledgerOrderId,
           target_payment_key: paymentKey(payment),
-          portone_response: normalizePaymentForIntent(payment, orderId),
+          portone_response: payment,
         }),
       },
     );
