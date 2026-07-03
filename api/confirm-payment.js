@@ -86,21 +86,73 @@ function ledgerOrderIdFromPaymentId(paymentId) {
   return value;
 }
 
-function pickVirtualAccount(payment) {
-  const method = payment?.paymentMethod || payment?.payment_method || {};
-  const detail = payment?.paymentMethodDetail || payment?.payment_method_detail || {};
-  const account = payment?.virtualAccount
-    || payment?.virtual_account
-    || payment?.virtualAccountIssued
-    || payment?.virtual_account_issued
-    || (method.type === "VIRTUAL_ACCOUNT" ? method : null)
-    || (detail.type === "VIRTUAL_ACCOUNT" ? detail : null)
-    || {};
+function pickVirtualAccountValue(source, keys) {
+  for (const key of keys) {
+    if (source && source[key] !== undefined && source[key] !== null && source[key] !== "") return source[key];
+  }
+  return "";
+}
 
-  const bank = account.bankName || account.bank || account.bankCode || account.bank_code || "";
-  const accountNumber = account.accountNumber || account.account_number || account.number || "";
-  const holderName = account.holderName || account.accountHolder || account.account_holder || account.customerName || "";
-  const dueDate = account.dueDate || account.due_date || account.expiredAt || account.expiresAt || account.expiry || "";
+function findVirtualAccountSource(value, seen = new Set()) {
+  if (!value || typeof value !== "object" || seen.has(value)) return null;
+  seen.add(value);
+  const preferred =
+    value.virtualAccount ||
+    value.virtual_account ||
+    value.vbank ||
+    value.vBank ||
+    value.vbankIssued ||
+    value.virtualAccountIssued ||
+    value.virtual_account_issued ||
+    value.bankAccount ||
+    value.account ||
+    value.paymentMethodDetail ||
+    value.payment_method_detail ||
+    value.paymentMethod ||
+    value.payment_method;
+  if (preferred && typeof preferred === "object") {
+    const found = findVirtualAccountSource(preferred, seen);
+    if (found) return found;
+  }
+  const accountNumber = pickVirtualAccountValue(value, [
+    "accountNumber", "account_number", "accountNo", "account_no", "account", "number",
+    "bankAccountNumber", "virtualAccountNumber", "vbankNum", "vbank_num", "vbankNumber",
+  ]);
+  const bankName = pickVirtualAccountValue(value, [
+    "bankName", "bank_name", "bank", "bankCode", "bank_code", "bankId", "bank_id",
+  ]);
+  const holderName = pickVirtualAccountValue(value, [
+    "holderName", "holder_name", "accountHolder", "account_holder", "customerName",
+    "depositorName", "depositor", "ownerName", "owner",
+  ]);
+  const dueDate = pickVirtualAccountValue(value, [
+    "dueDate", "due_date", "expiredAt", "expired_at", "expiresAt", "expires_at",
+    "expiryDate", "expiry_date",
+  ]) || value.expiry?.dueDate || value.expiry?.due_date || value.accountExpiry?.dueDate || value.accountExpiry?.due_date;
+  if (accountNumber || (bankName && holderName) || dueDate) return value;
+  for (const child of Object.values(value)) {
+    const found = findVirtualAccountSource(child, seen);
+    if (found) return found;
+  }
+  return null;
+}
+
+function pickVirtualAccount(payment) {
+  const account = findVirtualAccountSource(payment) || {};
+
+  const bank = pickVirtualAccountValue(account, ["bankName", "bank_name", "bank", "bankCode", "bank_code", "bankId", "bank_id"]);
+  const accountNumber = pickVirtualAccountValue(account, [
+    "accountNumber", "account_number", "accountNo", "account_no", "account", "number",
+    "bankAccountNumber", "virtualAccountNumber", "vbankNum", "vbank_num", "vbankNumber",
+  ]);
+  const holderName = pickVirtualAccountValue(account, [
+    "holderName", "holder_name", "accountHolder", "account_holder", "customerName",
+    "depositorName", "depositor", "ownerName", "owner",
+  ]);
+  const dueDate = pickVirtualAccountValue(account, [
+    "dueDate", "due_date", "expiredAt", "expired_at", "expiresAt", "expires_at",
+    "expiryDate", "expiry_date",
+  ]) || account.expiry?.dueDate || account.expiry?.due_date || account.accountExpiry?.dueDate || account.accountExpiry?.due_date || "";
 
   return {
     bank,
@@ -111,6 +163,28 @@ function pickVirtualAccount(payment) {
     dueDate,
     raw: account,
   };
+}
+
+function hasVirtualAccountInfo(account = {}) {
+  return Boolean(account.bankName || account.accountNumber || account.holderName || account.dueDate);
+}
+
+function mergePaymentLookupWithClient(lookupPayment, clientPayment) {
+  if (!clientPayment || typeof clientPayment !== "object") return lookupPayment;
+  if (!lookupPayment || typeof lookupPayment !== "object") return clientPayment;
+  const lookupAccount = pickVirtualAccount(lookupPayment);
+  const clientAccount = pickVirtualAccount(clientPayment);
+  const merged = {
+    ...clientPayment,
+    ...lookupPayment,
+  };
+  if (!hasVirtualAccountInfo(lookupAccount) && hasVirtualAccountInfo(clientAccount)) {
+    merged.virtualAccount = clientAccount;
+  }
+  if (!paymentStatus(merged) && paymentStatus(clientPayment)) {
+    merged.status = paymentStatus(clientPayment);
+  }
+  return merged;
 }
 
 function safePaymentFromClient(ledgerOrderId, providerPaymentId, payment) {
@@ -139,7 +213,7 @@ function paymentForLedger(payment, ledgerOrderId, providerPaymentId) {
 async function applyPortOnePayment(userId, orderId, payment, providerPaymentId) {
   const status = paymentStatus(payment);
   const virtualAccount = pickVirtualAccount(payment);
-  const hasVirtualAccount = Boolean(virtualAccount.bankName || virtualAccount.accountNumber || virtualAccount.holderName || virtualAccount.dueDate);
+  const hasVirtualAccount = hasVirtualAccountInfo(virtualAccount);
   if (status === "PAID") {
     const finalized = await supabaseRequest(
       "/rest/v1/rpc/finalize_payment_intent",
@@ -232,7 +306,7 @@ module.exports = async function handler(req, res) {
     let payment;
     let lookupWarning = "";
     try {
-      payment = await getPortOnePayment(providerPaymentId);
+      payment = mergePaymentLookupWithClient(await getPortOnePayment(providerPaymentId), body.portoneResponse);
     } catch (error) {
       const fallback = safePaymentFromClient(ledgerOrderId, providerPaymentId, body.portoneResponse);
       if (!fallback) throw error;
