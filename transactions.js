@@ -186,6 +186,8 @@
           event_date: draft.event_date,
           guest_count: draft.guest_count,
           request_memo: draft.request_memo,
+          check_in_date: draft.event_date,
+          check_out_date: draft.check_out_date,
         });
         if (error) throw error;
         const intent = Array.isArray(data) ? data[0] : data;

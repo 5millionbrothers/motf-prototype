@@ -537,6 +537,11 @@ const state = {
   activePostId: "share-soju",
   pendingPayment: null,
   paymentResult: null,
+  stayAvailability: {
+    key: "",
+    loadingKey: "",
+    unavailableOfferingIds: new Set(),
+  },
 };
 
 window.motfApplyCatalog = function applyCatalog(nextStays, nextStores) {
@@ -1008,18 +1013,20 @@ function stayMatchesDetailFilters(stay, filters) {
 
 function getStayMatches() {
   normalizeStaySearchDates();
+  ensureStayAvailability();
   const region = qs("#stayRegion").value;
   const people = Number(qs("#stayPeople").value || 0);
   const maxPrice = Number(qs("#stayPrice").value || 0);
   const detailFilters = getStayDetailFilters();
   return stays.filter((stay) => {
     const regionOk = region === "전체" || stay.region === region;
-    return regionOk && stay.maxPeople >= people && stay.price <= maxPrice && stayMatchesDetailFilters(stay, detailFilters);
+    return regionOk && stay.maxPeople >= people && stayDisplayPrice(stay) <= maxPrice && stayMatchesDetailFilters(stay, detailFilters) && stayHasAvailableRoom(stay);
   });
 }
 
 function renderStays() {
   normalizeStaySearchDates();
+  ensureStayAvailability();
   const price = Number(qs("#stayPrice").value);
   qs("#stayPriceLabel").textContent = `${money(price)} 이하`;
   const detailFilters = getStayDetailFilters();
@@ -1040,6 +1047,7 @@ function renderStays() {
 }
 
 function stayCard(stay) {
+  const availableCount = availableRoomsForStay(stay).length;
   return `
     <article class="listing-card stay-listing-card">
       <img src="${stay.image}" alt="${stay.name} 사진" />
@@ -1055,7 +1063,8 @@ function stayCard(stay) {
           <p class="muted">${stay.distance}</p>
         </div>
         <div class="listing-actions">
-          <span class="price">${money(stay.price)}부터</span>
+          <span class="price">${money(stayDisplayPrice(stay))}부터</span>
+          <span class="muted">${availableCount}/${stay.rooms.length} 객실 가능</span>
           <button class="primary-btn" data-stay-id="${stay.id}"><i data-lucide="search"></i>상세 보기</button>
           <button class="ghost-btn" data-open-chat="${stay.name}"><i data-lucide="message-circle"></i>문의</button>
         </div>
@@ -1122,6 +1131,7 @@ function renderStayGallery(images, alt) {
 }
 
 function roomOptionCard(room, index, stay) {
+  const unavailable = isRoomUnavailable(room);
   return `
     <article class="room-option-card">
       <img src="${room.image}" alt="${room.name} 사진" />
@@ -1144,13 +1154,14 @@ function roomOptionCard(room, index, stay) {
             .join("")}
         </div>
         <div class="detail-meta">${room.features.map((feature) => `<span class="pill">${feature}</span>`).join("")}</div>
-        <button class="primary-btn" data-room-index="${index}"><i data-lucide="door-open"></i>객실 자세히 보기</button>
+        <button class="primary-btn" ${unavailable ? "disabled" : `data-room-index="${index}"`}><i data-lucide="${unavailable ? "ban" : "door-open"}"></i>${unavailable ? "품절" : "객실 자세히 보기"}</button>
       </div>
     </article>
   `;
 }
 
 function renderStayDetail() {
+  ensureStayAvailability();
   const stay = state.selectedStay;
   const gallery = stayGalleryImages(stay);
   qs("#stayDetailContent").innerHTML = `
@@ -1209,8 +1220,10 @@ function renderStayDetail() {
 }
 
 function renderRoomDetail() {
+  ensureStayAvailability();
   const stay = state.selectedStay;
   const room = state.selectedRoom;
+  const unavailable = isRoomUnavailable(room);
   const gallery = roomGalleryImages(stay, room);
   const maxPeople = roomCapacityMax(room);
   qs("#roomDetailContent").innerHTML = `
@@ -1224,7 +1237,7 @@ function renderRoomDetail() {
         <span>객실 금액</span>
         <strong>${money(room.price)}</strong>
         <p>최대 ${maxPeople || stay.maxPeople}명까지 선택 가능</p>
-        <button class="primary-btn" data-route="booking"><i data-lucide="calendar-check"></i>예약 정보 입력하기</button>
+        <button class="primary-btn" ${unavailable ? "disabled" : `data-route="booking"`}><i data-lucide="${unavailable ? "ban" : "calendar-check"}"></i>${unavailable ? "선택 날짜 품절" : "예약 정보 입력하기"}</button>
       </aside>
     </section>
 
@@ -1276,8 +1289,10 @@ function bookingAmount() {
 }
 
 function renderBooking() {
+  ensureStayAvailability();
   const stay = state.selectedStay;
   const room = state.selectedRoom;
+  const unavailable = isRoomUnavailable(room);
   const values = staySearchValues();
   qs("#bookingPeople").value = Math.min(stay.maxPeople, values.people);
   syncStaySearchPanel(qs("#bookingForm"));
@@ -1290,8 +1305,15 @@ function renderBooking() {
       <div class="summary-line"><span>예약 인원</span><strong>${qs("#bookingPeople").value}명</strong></div>
       <div class="summary-line"><span>사장님 등록 객실 금액</span><strong>${money(amount.roomFee)}</strong></div>
       <div class="summary-line"><span>시설 이용 요청</span><strong>결제 후 사장님 확인</strong></div>
+      ${unavailable ? `<div class="summary-line"><span>예약 가능 여부</span><strong>선택 날짜 품절</strong></div>` : ""}
       <div class="summary-line total"><span>총 결제 금액</span><strong>${money(amount.total)}</strong></div>
     `;
+    const submitButton = qs('#bookingForm [type="submit"]');
+    if (submitButton) {
+      submitButton.disabled = unavailable;
+      submitButton.innerHTML = unavailable ? '<i data-lucide="ban"></i>선택 날짜 품절' : '<i data-lucide="credit-card"></i>결제하기';
+      refreshIcons();
+    }
   };
   update();
   ["#bookingPeople", "#bookingFacility"].forEach((selector) => {
@@ -1599,6 +1621,65 @@ function staySearchValues() {
   };
 }
 
+function stayAvailabilityKey(values = staySearchValues()) {
+  return `${values.checkIn}|${values.checkOut}`;
+}
+
+function isRoomUnavailable(room) {
+  return state.stayAvailability.unavailableOfferingIds.has(String(room?.id || ""));
+}
+
+function availableRoomsForStay(stay) {
+  return (stay.rooms || []).filter((room) => !isRoomUnavailable(room));
+}
+
+function stayHasAvailableRoom(stay) {
+  return availableRoomsForStay(stay).length > 0;
+}
+
+function stayDisplayPrice(stay) {
+  const prices = availableRoomsForStay(stay).map((room) => Number(room.price || 0)).filter((price) => price > 0);
+  return prices.length ? Math.min(...prices) : Number(stay.price || 0);
+}
+
+function rerenderStayAvailabilityViews() {
+  const route = currentRoute();
+  if (route === "stays") renderStays();
+  if (route === "stayDetail") renderStayDetail();
+  if (route === "roomDetail") renderRoomDetail();
+  if (route === "booking") renderBooking();
+}
+
+async function refreshStayAvailability() {
+  const client = window.motfSupabase;
+  if (!client) return;
+  const values = staySearchValues();
+  if (!values.checkIn || !values.checkOut || values.checkIn >= values.checkOut) return;
+  const key = stayAvailabilityKey(values);
+  if (state.stayAvailability.key === key || state.stayAvailability.loadingKey === key) return;
+
+  state.stayAvailability.loadingKey = key;
+  const { data, error } = await client.rpc("list_unavailable_stay_offerings", {
+    target_check_in: values.checkIn,
+    target_check_out: values.checkOut,
+  });
+  if (state.stayAvailability.loadingKey !== key) return;
+  state.stayAvailability.loadingKey = "";
+
+  if (error) {
+    console.warn("Could not load stay availability.", error);
+    return;
+  }
+
+  state.stayAvailability.key = key;
+  state.stayAvailability.unavailableOfferingIds = new Set((data || []).map((item) => String(item.offering_id)));
+  rerenderStayAvailabilityViews();
+}
+
+function ensureStayAvailability() {
+  refreshStayAvailability();
+}
+
 function stayDateRangeLabel() {
   const values = staySearchValues();
   return `숙박일 ${values.checkIn} ~ ${values.checkOut}`;
@@ -1621,6 +1702,12 @@ function applyStaySearchField(field, value) {
   if (field === "region") qs("#stayRegion").value = value;
   if (field === "people") qs("#stayPeople").value = Math.max(DEFAULT_STAY_PEOPLE, Number(value || DEFAULT_STAY_PEOPLE));
   normalizeStaySearchDates();
+  if (field === "checkIn" || field === "checkOut") {
+    state.stayAvailability.key = "";
+    state.stayAvailability.loadingKey = "";
+    state.stayAvailability.unavailableOfferingIds = new Set();
+    ensureStayAvailability();
+  }
 }
 
 function renderStaySearchPanel(title = "예약 조건") {
@@ -2784,7 +2871,12 @@ document.addEventListener("click", (event) => {
 
   const roomButton = event.target.closest("[data-room-index]");
   if (roomButton) {
-    state.selectedRoom = state.selectedStay.rooms[Number(roomButton.dataset.roomIndex)];
+    const room = state.selectedStay.rooms[Number(roomButton.dataset.roomIndex)];
+    if (isRoomUnavailable(room)) {
+      toast("선택한 날짜에는 이미 품절된 객실입니다.");
+      return;
+    }
+    state.selectedRoom = room;
     navigate("roomDetail");
     return;
   }
