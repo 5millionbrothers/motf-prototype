@@ -68,6 +68,10 @@ function paymentStatus(payment) {
   return payment?.status || payment?.paymentStatus || "";
 }
 
+function isVirtualAccountIssuedStatus(status) {
+  return ["VIRTUAL_ACCOUNT_ISSUED", "READY", "PAY_PENDING", "PENDING"].includes(String(status || "").toUpperCase());
+}
+
 function paymentKey(payment) {
   return payment?.transactionId || payment?.txId || payment?.portonePaymentId || payment?.motfProviderPaymentId || payment?.id;
 }
@@ -189,21 +193,33 @@ function mergePaymentLookupWithClient(lookupPayment, clientPayment) {
 
 function safePaymentFromClient(ledgerOrderId, providerPaymentId, payment) {
   if (!payment || typeof payment !== "object") return null;
-  const id = payment.id || payment.paymentId || payment.orderId;
   const allowedIds = new Set([ledgerOrderId, providerPaymentId].filter(Boolean));
-  if (id && !allowedIds.has(id)) return null;
+  const candidateIds = [
+    payment.paymentId,
+    payment.orderId,
+    payment.merchantUid,
+    payment.merchant_uid,
+    payment.id,
+  ].filter(Boolean).map(String);
+  const hasMatchingId = candidateIds.some((id) => allowedIds.has(id));
+  const virtualAccount = pickVirtualAccount(payment);
+  const hasVirtualAccount = hasVirtualAccountInfo(virtualAccount);
+  if (candidateIds.length && !hasMatchingId && !hasVirtualAccount) return null;
   return {
     ...payment,
-    id: id || providerPaymentId || ledgerOrderId,
+    virtualAccount: hasVirtualAccount ? virtualAccount : payment.virtualAccount,
+    id: hasMatchingId ? candidateIds.find((id) => allowedIds.has(id)) : (providerPaymentId || ledgerOrderId),
   };
 }
 
 function paymentForLedger(payment, ledgerOrderId, providerPaymentId) {
+  const virtualAccount = pickVirtualAccount(payment);
   return {
     ...payment,
     originalPaymentId: payment?.id || payment?.paymentId || payment?.orderId || "",
     portonePaymentId: providerPaymentId,
     motfProviderPaymentId: providerPaymentId,
+    virtualAccount: hasVirtualAccountInfo(virtualAccount) ? virtualAccount : payment?.virtualAccount,
     id: ledgerOrderId,
     paymentId: ledgerOrderId,
     orderId: ledgerOrderId,
@@ -232,7 +248,7 @@ async function applyPortOnePayment(userId, orderId, payment, providerPaymentId) 
     return { status: "paid", transactionId: result?.transaction_id, kind: result?.kind };
   }
 
-  if (status === "VIRTUAL_ACCOUNT_ISSUED" || status === "READY" || hasVirtualAccount) {
+  if (isVirtualAccountIssuedStatus(status) || hasVirtualAccount) {
     const issued = await supabaseRequest(
       "/rest/v1/rpc/mark_virtual_account_issued",
       process.env.SUPABASE_SERVICE_ROLE_KEY,

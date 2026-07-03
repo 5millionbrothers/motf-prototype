@@ -1798,8 +1798,13 @@ function findVirtualAccountSource(value, seen = new Set()) {
     value.vBank ||
     value.vbankIssued ||
     value.virtualAccountIssued ||
+    value.virtual_account_issued ||
     value.bankAccount ||
     value.account ||
+    value.paymentMethodDetail ||
+    value.payment_method_detail ||
+    value.paymentMethod ||
+    value.payment_method ||
     value.raw;
   if (preferred && typeof preferred === "object") {
     const found = findVirtualAccountSource(preferred, seen);
@@ -2647,14 +2652,15 @@ async function requestTossPayment() {
     const hasAccountInfo = hasVirtualAccountInfo(normalizedAccount);
     const isIssued = confirmed || hasAccountInfo;
     if (isIssued && hasAccountInfo) saveLocalIssuedPayment(payment, normalizedAccount);
+    const resultText = isIssued
+      ? (note || "입금 확인 후 사장님이 일정과 가능 여부를 확인합니다. 진행 상황은 마이페이지와 채팅에서 볼 수 있습니다.")
+      : (note || "포트원 결제창 호출은 완료되었습니다. 입금 정보 확인이 지연되면 마이페이지에서 다시 확인해주세요.");
     state.paymentResult = {
       status: isIssued ? "virtual_account_issued" : "pending",
       type: payment.type,
       eyebrow: isIssued ? (payment.type === "stay" ? "예약 요청 완료" : "주문 요청 완료") : "결제창 호출 완료",
       title: isIssued ? (payment.type === "stay" ? "예약 요청이 접수되었습니다" : "주문 요청이 접수되었습니다") : "포트원 결제창 호출이 완료되었습니다",
-      text: isIssued
-        ? "입금 확인 후 사장님이 일정과 가능 여부를 확인합니다. 진행 상황은 마이페이지와 채팅에서 볼 수 있습니다."
-        : "포트원 결제창 호출은 완료되었습니다. 입금 정보 확인이 지연되면 마이페이지에서 다시 확인해주세요.",
+      text: resultText,
       icon: "landmark",
       className: "",
       orderId: payment.orderId,
