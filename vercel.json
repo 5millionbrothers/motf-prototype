@@ -1,5 +1,16 @@
 {
   "cleanUrls": true,
+  "functions": {
+    "api/confirm-payment.js": {
+      "maxDuration": 30
+    },
+    "api/portone-webhook.js": {
+      "maxDuration": 30
+    },
+    "api/portone-diagnostics.js": {
+      "maxDuration": 30
+    }
+  },
   "headers": [
     {
       "source": "/(.*)",

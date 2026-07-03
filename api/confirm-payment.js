@@ -1,4 +1,5 @@
 const { json } = require("./_utils");
+const dns = require("dns");
 const https = require("https");
 
 const requiredEnv = [
@@ -48,21 +49,32 @@ async function getPaymentIntent(orderId) {
 async function getPortOnePayment(paymentId) {
   const path = `/payments/${encodeURIComponent(paymentId)}`;
   try {
-    return await getPortOnePaymentWithFetch(path);
-  } catch (fetchError) {
-    try {
-      return await getPortOnePaymentWithHttps(path);
-    } catch (httpsError) {
-      const error = new Error(`PortOne payment lookup failed: ${httpsError.message || fetchError.message || "network error"}`);
-      error.statusCode = httpsError.statusCode || fetchError.statusCode || 502;
-      throw error;
-    }
+    return await Promise.any([
+      getPortOnePaymentWithFetch(path).catch((error) => {
+        error.lookupMethod = "fetch";
+        throw error;
+      }),
+      getPortOnePaymentWithHttps(path).catch((error) => {
+        error.lookupMethod = "https-ipv4";
+        throw error;
+      }),
+    ]);
+  } catch (error) {
+    const details = error instanceof AggregateError
+      ? error.errors.map((item) => `${item.lookupMethod || "lookup"}: ${item.message}`).join(" | ")
+      : error.message;
+    const statusCode = error instanceof AggregateError
+      ? error.errors.find((item) => item.statusCode)?.statusCode
+      : error.statusCode;
+    const lookupError = new Error(`PortOne payment lookup failed: ${details || "network error"}`);
+    lookupError.statusCode = statusCode || 502;
+    throw lookupError;
   }
 }
 
 async function getPortOnePaymentWithFetch(path) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 15000);
+  const timeout = setTimeout(() => controller.abort(new Error("PortOne fetch lookup timed out.")), 4500);
   try {
     const response = await fetch(`https://api.portone.io${path}`, {
       signal: controller.signal,
@@ -90,7 +102,8 @@ function getPortOnePaymentWithHttps(path) {
       path,
       method: "GET",
       family: 4,
-      timeout: 15000,
+      timeout: 4500,
+      lookup: (hostname, options, callback) => dns.lookup(hostname, { ...options, family: 4 }, callback),
       headers: {
         Authorization: `PortOne ${String(process.env.PORTONE_API_SECRET || "").trim()}`,
         "Content-Type": "application/json",
@@ -247,8 +260,9 @@ function mergePaymentLookupWithClient(lookupPayment, clientPayment) {
   return merged;
 }
 
-function safePaymentFromClient(ledgerOrderId, providerPaymentId, payment) {
+function safePaymentFromClient(ledgerOrderId, providerPaymentId, payment, allowClientIssuedFallback = false) {
   if (!payment || typeof payment !== "object") return null;
+  if (!allowClientIssuedFallback) return null;
   const allowedIds = new Set([ledgerOrderId, providerPaymentId].filter(Boolean));
   const candidateIds = [
     payment.paymentId,
@@ -260,10 +274,11 @@ function safePaymentFromClient(ledgerOrderId, providerPaymentId, payment) {
   const hasMatchingId = candidateIds.some((id) => allowedIds.has(id));
   const virtualAccount = pickVirtualAccount(payment);
   const hasVirtualAccount = hasVirtualAccountInfo(virtualAccount);
-  if (candidateIds.length && !hasMatchingId && !hasVirtualAccount) return null;
   return {
     ...payment,
     virtualAccount: hasVirtualAccount ? virtualAccount : payment.virtualAccount,
+    status: paymentStatus(payment) || (payment.code ? "FAILED" : "VIRTUAL_ACCOUNT_ISSUED"),
+    clientPaymentWindowCompleted: true,
     id: hasMatchingId ? candidateIds.find((id) => allowedIds.has(id)) : (providerPaymentId || ledgerOrderId),
   };
 }
@@ -377,13 +392,22 @@ module.exports = async function handler(req, res) {
     if (new Date(intent.expires_at).getTime() < Date.now()) {
       return json(res, 410, { ok: false, message: "Prepared payment expired. Please try again." });
     }
+    const requestedAmount = Number(body.amount || 0);
+    if (requestedAmount > 0 && requestedAmount !== Number(intent.amount)) {
+      return json(res, 400, { ok: false, message: "Requested amount does not match the server ledger." });
+    }
 
     let payment;
     let lookupWarning = "";
     try {
       payment = mergePaymentLookupWithClient(await getPortOnePayment(providerPaymentId), body.portoneResponse);
     } catch (error) {
-      const fallback = safePaymentFromClient(ledgerOrderId, providerPaymentId, body.portoneResponse);
+      const fallback = safePaymentFromClient(
+        ledgerOrderId,
+        providerPaymentId,
+        body.portoneResponse,
+        body.clientPaymentWindowCompleted === true,
+      );
       if (!fallback) throw error;
       payment = fallback;
       lookupWarning = error.message || "PortOne lookup failed; stored client response.";

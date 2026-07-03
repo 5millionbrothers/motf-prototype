@@ -2410,7 +2410,7 @@ async function confirmPaymentOnServer(payment, params = new URLSearchParams(), p
         paymentId: params.get("paymentId") || portOnePaymentId(payment.orderId),
         orderId: params.get("orderId") || payment.orderId,
         amount: Number(params.get("amount") || payment.amount),
-        ...(portoneResponse ? { portoneResponse } : {}),
+        ...(portoneResponse ? { portoneResponse, clientPaymentWindowCompleted: true } : {}),
       }),
     });
   } catch (error) {
@@ -2502,6 +2502,13 @@ async function requestPortOneVirtualAccount() {
       },
     });
     if (response?.code) throw new Error(response.message || "PortOne payment window failed.");
+    try {
+      window.localStorage.setItem("motf.lastPortOneResponse", JSON.stringify({
+        orderId: payment.orderId,
+        savedAt: new Date().toISOString(),
+        response,
+      }));
+    } catch {}
     const responseAccount = normalizeVirtualAccount(response);
     try {
       const result = await confirmPaymentOnServer(payment, new URLSearchParams({

@@ -1,4 +1,5 @@
 const { json } = require("./_utils");
+const dns = require("dns");
 const https = require("https");
 
 const requiredEnv = ["PORTONE_API_SECRET", "SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"];
@@ -25,21 +26,32 @@ async function supabaseRequest(path, key, options = {}) {
 async function getPortOnePayment(paymentId) {
   const path = `/payments/${encodeURIComponent(paymentId)}`;
   try {
-    return await getPortOnePaymentWithFetch(path);
-  } catch (fetchError) {
-    try {
-      return await getPortOnePaymentWithHttps(path);
-    } catch (httpsError) {
-      const error = new Error(`PortOne payment lookup failed: ${httpsError.message || fetchError.message || "network error"}`);
-      error.statusCode = httpsError.statusCode || fetchError.statusCode || 502;
-      throw error;
-    }
+    return await Promise.any([
+      getPortOnePaymentWithFetch(path).catch((error) => {
+        error.lookupMethod = "fetch";
+        throw error;
+      }),
+      getPortOnePaymentWithHttps(path).catch((error) => {
+        error.lookupMethod = "https-ipv4";
+        throw error;
+      }),
+    ]);
+  } catch (error) {
+    const details = error instanceof AggregateError
+      ? error.errors.map((item) => `${item.lookupMethod || "lookup"}: ${item.message}`).join(" | ")
+      : error.message;
+    const statusCode = error instanceof AggregateError
+      ? error.errors.find((item) => item.statusCode)?.statusCode
+      : error.statusCode;
+    const lookupError = new Error(`PortOne payment lookup failed: ${details || "network error"}`);
+    lookupError.statusCode = statusCode || 502;
+    throw lookupError;
   }
 }
 
 async function getPortOnePaymentWithFetch(path) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 15000);
+  const timeout = setTimeout(() => controller.abort(new Error("PortOne fetch lookup timed out.")), 4500);
   try {
     const response = await fetch(`https://api.portone.io${path}`, {
       signal: controller.signal,
@@ -67,7 +79,8 @@ function getPortOnePaymentWithHttps(path) {
       path,
       method: "GET",
       family: 4,
-      timeout: 15000,
+      timeout: 4500,
+      lookup: (hostname, options, callback) => dns.lookup(hostname, { ...options, family: 4 }, callback),
       headers: {
         Authorization: `PortOne ${String(process.env.PORTONE_API_SECRET || "").trim()}`,
         "Content-Type": "application/json",
