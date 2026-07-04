@@ -159,6 +159,39 @@
     return error?.message ? `로그인에 실패했습니다: ${error.message}` : "로그인에 실패했습니다. 잠시 후 다시 시도해주세요.";
   }
 
+  function oauthRedirectUrl() {
+    return `${window.location.origin}${window.location.pathname}`;
+  }
+
+  async function signInWithKakao(button) {
+    if (!client?.auth?.signInWithOAuth) {
+      setMessage("카카오 로그인을 시작할 수 없습니다. 잠시 후 다시 시도해주세요.", "error");
+      return;
+    }
+    const originalHtml = button?.innerHTML;
+    if (button) {
+      button.disabled = true;
+      button.innerHTML = '<span class="auth-kakao-symbol">K</span>카카오로 이동 중...';
+    }
+    setMessage("카카오 로그인 화면으로 이동합니다.");
+
+    const { error } = await client.auth.signInWithOAuth({
+      provider: "kakao",
+      options: {
+        redirectTo: oauthRedirectUrl(),
+        queryParams: {
+          prompt: "select_account",
+        },
+      },
+    });
+
+    if (button) {
+      button.disabled = false;
+      button.innerHTML = originalHtml;
+    }
+    if (error) setMessage(`카카오 로그인에 실패했습니다: ${error.message}`, "error");
+  }
+
   function switchTab(tab) {
     const isLogin = tab === "login";
     loginForm.hidden = !isLogin;
@@ -397,7 +430,7 @@
     }
 
     if (event.target.closest("[data-kakao-login]")) {
-      setMessage("카카오 로그인은 현재 연동 준비 중입니다.");
+      await signInWithKakao(event.target.closest("[data-kakao-login]"));
       return;
     }
 
