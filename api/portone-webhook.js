@@ -251,6 +251,70 @@ function inferWebhookStatus(body = {}) {
   return "VIRTUAL_ACCOUNT_ISSUED";
 }
 
+function cancellationSignal(payment = {}, body = {}) {
+  const raw = [
+    payment.status,
+    payment.paymentStatus,
+    payment.cancellationStatus,
+    body.status,
+    body.paymentStatus,
+    body.type,
+    body.eventType,
+    body.event_type,
+    body.data?.status,
+    body.data?.paymentStatus,
+    body.data?.type,
+  ].filter(Boolean).join(" ").toUpperCase();
+  const cancellations = Array.isArray(payment.cancellations) ? payment.cancellations : [];
+  const cancellationText = cancellations.map((item) => `${item?.status || ""} ${item?.type || ""}`).join(" ").toUpperCase();
+  const combined = `${raw} ${cancellationText}`;
+  if (!combined.includes("CANCEL") && !combined.includes("REFUND")) return "";
+  if (combined.includes("FAIL")) return "failed";
+  if (combined.includes("REQUEST") || combined.includes("PENDING") || combined.includes("PROCESS")) return "processing";
+  return "refunded";
+}
+
+function refundPaymentStatus(refundStatus) {
+  if (refundStatus === "refunded") return "refunded";
+  if (refundStatus === "processing") return "refund_processing";
+  if (refundStatus === "failed") return "refund_failed";
+  return "refund_required";
+}
+
+async function markRefundResult(intent, payment, refundStatus) {
+  if (!intent?.transaction_id || !intent?.kind) return;
+  const now = new Date().toISOString();
+  const refundAmount = Number(intent.refund_amount || intent.amount || 0);
+  const refundReason = intent.refund_reason || "PortOne refund update";
+  const payload = {
+    refund_status: refundStatus,
+    refund_amount: refundAmount,
+    refund_reason: refundReason,
+    refund_response: payment,
+    refund_requested_at: now,
+  };
+  if (refundStatus === "refunded") payload.refunded_at = now;
+
+  await supabaseRequest(
+    `/rest/v1/payment_intents?order_id=eq.${encodeURIComponent(intent.order_id)}`,
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    { method: "PATCH", body: JSON.stringify(payload) },
+  );
+
+  const table = intent.kind === "market" ? "market_orders" : "reservations";
+  await supabaseRequest(
+    `/rest/v1/${table}?id=eq.${encodeURIComponent(intent.transaction_id)}`,
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    {
+      method: "PATCH",
+      body: JSON.stringify({
+        ...payload,
+        payment_status: refundPaymentStatus(refundStatus),
+      }),
+    },
+  );
+}
+
 function paymentKey(payment) {
   return payment?.transactionId || payment?.txId || payment?.portonePaymentId || payment?.motfProviderPaymentId || payment?.id;
 }
@@ -377,7 +441,7 @@ module.exports = async function handler(req, res) {
     const orderFilter = candidateOrderIds
       .map((id) => `order_id.eq.${encodeURIComponent(id)}`)
       .join(",");
-    const query = `/rest/v1/payment_intents?select=order_id,customer_id,status,virtual_account&or=(${orderFilter})&limit=1`;
+    const query = `/rest/v1/payment_intents?select=order_id,customer_id,status,virtual_account,kind,transaction_id,amount,refund_amount,refund_reason&or=(${orderFilter})&limit=1`;
     const intents = await supabaseRequest(query, process.env.SUPABASE_SERVICE_ROLE_KEY);
     const intent = intents?.[0];
     if (!intent) {
@@ -404,6 +468,11 @@ module.exports = async function handler(req, res) {
     }
     const payment = paymentForLedger(rawPayment, ledgerOrderId, providerPaymentId);
     const status = paymentStatus(payment);
+    const refundStatus = cancellationSignal(payment, body);
+    if (refundStatus) {
+      await markRefundResult(intent, payment, refundStatus);
+      return json(res, 200, { ok: true, accepted: true, status: refundStatus, kind: intent.kind, lookupWarning });
+    }
     if (intent.status === "confirmed") {
       return json(res, 200, { ok: true, accepted: true, alreadyConfirmed: true });
     }
