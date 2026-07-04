@@ -4,8 +4,24 @@ const https = require("https");
 
 const requiredEnv = ["PORTONE_API_SECRET", "SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"];
 
+const KNOWN_SUPABASE_URL = "https://izbwcqnvwsdijoognoag.supabase.co";
+const DEAD_SUPABASE_HOSTS = new Set([
+  "avvfqgtkeziughphppcj.supabase.co",
+]);
+
+function supabaseBaseUrl() {
+  const configured = String(process.env.SUPABASE_URL || "").trim();
+  try {
+    const url = new URL(configured || KNOWN_SUPABASE_URL);
+    if (DEAD_SUPABASE_HOSTS.has(url.hostname)) return KNOWN_SUPABASE_URL;
+    return url.origin;
+  } catch {
+    return KNOWN_SUPABASE_URL;
+  }
+}
+
 async function supabaseRequest(path, key, options = {}) {
-  const result = await requestJson(`${process.env.SUPABASE_URL}${path}`, {
+  const result = await requestJson(`${supabaseBaseUrl()}${path}`, {
     ...options,
     headers: {
       apikey: key,

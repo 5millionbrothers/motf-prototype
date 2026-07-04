@@ -3,12 +3,32 @@ const dns = require("dns");
 const https = require("https");
 
 const PORTONE_HOST = "api.portone.io";
+const KNOWN_SUPABASE_URL = "https://izbwcqnvwsdijoognoag.supabase.co";
+const DEAD_SUPABASE_HOSTS = new Set([
+  "avvfqgtkeziughphppcj.supabase.co",
+]);
 
 function redactedEnv() {
   const secret = String(process.env.PORTONE_API_SECRET || "").trim();
+  const supabaseUrl = String(process.env.SUPABASE_URL || "").trim();
+  let configuredSupabaseHost = "";
+  let effectiveSupabaseHost = "";
+  try {
+    configuredSupabaseHost = new URL(supabaseUrl).hostname;
+  } catch {}
+  try {
+    const effectiveUrl = configuredSupabaseHost && !DEAD_SUPABASE_HOSTS.has(configuredSupabaseHost)
+      ? supabaseUrl
+      : KNOWN_SUPABASE_URL;
+    effectiveSupabaseHost = new URL(effectiveUrl).hostname;
+  } catch {}
   return {
     portoneApiSecretConfigured: Boolean(secret),
     portoneApiSecretLength: secret ? secret.length : 0,
+    supabaseUrlConfigured: Boolean(supabaseUrl),
+    configuredSupabaseHost,
+    effectiveSupabaseHost,
+    supabaseUrlCorrected: Boolean(configuredSupabaseHost && configuredSupabaseHost !== effectiveSupabaseHost),
     nodeVersion: process.version,
   };
 }
@@ -22,6 +42,26 @@ function dnsLookup() {
       }
       resolve({
         ok: true,
+        addresses: (addresses || []).map((item) => item.address),
+      });
+    });
+  });
+}
+
+function hostLookup(hostname) {
+  return new Promise((resolve) => {
+    if (!hostname) {
+      resolve({ ok: false, message: "hostname is empty" });
+      return;
+    }
+    dns.lookup(hostname, { all: true, family: 4 }, (error, addresses) => {
+      if (error) {
+        resolve({ ok: false, host: hostname, message: error.message });
+        return;
+      }
+      resolve({
+        ok: true,
+        host: hostname,
         addresses: (addresses || []).map((item) => item.address),
       });
     });
@@ -107,8 +147,11 @@ module.exports = async function handler(req, res) {
   const url = new URL(req.url || "/api/portone-diagnostics", "https://motf.co.kr");
   const paymentId = String(url.searchParams.get("paymentId") || "MOTF-DIAGNOSTIC-NONEXISTENT").trim();
   const path = `/payments/${encodeURIComponent(paymentId)}`;
-  const [dnsResult, fetchResult, httpsResult] = await Promise.all([
+  const env = redactedEnv();
+  const [dnsResult, supabaseConfiguredDns, supabaseEffectiveDns, fetchResult, httpsResult] = await Promise.all([
     dnsLookup(),
+    hostLookup(env.configuredSupabaseHost),
+    hostLookup(env.effectiveSupabaseHost),
     fetchProbe(path),
     httpsProbe(path),
   ]);
@@ -121,8 +164,12 @@ module.exports = async function handler(req, res) {
   return json(res, 200, {
     ok: true,
     paymentId,
-    env: redactedEnv(),
+    env,
     dns: dnsResult,
+    supabaseDns: {
+      configured: supabaseConfiguredDns,
+      effective: supabaseEffectiveDns,
+    },
     fetch: fetchResult,
     httpsIpv4: httpsResult,
     reachedPortOne,

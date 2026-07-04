@@ -9,8 +9,24 @@ const requiredEnv = [
   "SUPABASE_SERVICE_ROLE_KEY",
 ];
 
+const KNOWN_SUPABASE_URL = "https://izbwcqnvwsdijoognoag.supabase.co";
+const DEAD_SUPABASE_HOSTS = new Set([
+  "avvfqgtkeziughphppcj.supabase.co",
+]);
+
+function supabaseBaseUrl() {
+  const configured = String(process.env.SUPABASE_URL || "").trim();
+  try {
+    const url = new URL(configured || KNOWN_SUPABASE_URL);
+    if (DEAD_SUPABASE_HOSTS.has(url.hostname)) return KNOWN_SUPABASE_URL;
+    return url.origin;
+  } catch {
+    return KNOWN_SUPABASE_URL;
+  }
+}
+
 async function supabaseRequest(path, key, options = {}) {
-  const result = await requestJson(`${process.env.SUPABASE_URL}${path}`, {
+  const result = await requestJson(`${supabaseBaseUrl()}${path}`, {
     ...options,
     headers: {
       apikey: key,
@@ -30,7 +46,7 @@ async function supabaseRequest(path, key, options = {}) {
 
 async function authenticatedUser(authorization) {
   if (!authorization?.startsWith("Bearer ")) return null;
-  const result = await requestJson(`${process.env.SUPABASE_URL}/auth/v1/user`, {
+  const result = await requestJson(`${supabaseBaseUrl()}/auth/v1/user`, {
     headers: {
       apikey: process.env.SUPABASE_PUBLISHABLE_KEY,
       Authorization: authorization,
