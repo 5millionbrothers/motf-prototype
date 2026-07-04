@@ -2261,13 +2261,24 @@ function renderPaymentResult() {
   qs("#paymentResultEyebrow").textContent = result.eyebrow;
   qs("#paymentResultTitle").textContent = result.title;
   qs("#paymentResultText").textContent = result.text;
+  const account = result.virtualAccount || {};
+  const bankName = bankLabel(account.bankName || account.bank || account.bankCode);
+  const accountNumber = String(account.accountNumber || account.account_number || "").replace(/\s+/g, "");
+  const holderName = account.holderName || account.accountHolder || account.customerName || "";
   const accountText = result.virtualAccount ? readableAccount(result.virtualAccount) : "";
   const dueDate = result.virtualAccount?.dueDate || result.virtualAccount?.accountExpiry?.dueDate;
   const virtualAccountRows = accountText ? `
     <div class="result-account-box">
-      <span>입금 계좌</span>
-      <strong>${accountText}</strong>
-      ${dueDate ? `<p>입금 기한 ${formatDateTime(dueDate)}</p>` : ""}
+      <div class="result-account-head">
+        <span>입금 계좌</span>
+        ${dueDate ? `<em>${formatDateTime(dueDate)}까지</em>` : ""}
+      </div>
+      <div class="result-account-bank">${escapeHtml(bankName || "은행 확인중")}</div>
+      <div class="result-account-number">
+        <strong>${escapeHtml(accountNumber || accountText)}</strong>
+        ${accountNumber ? `<button type="button" data-copy-account="${escapeHtml(accountNumber)}">복사</button>` : ""}
+      </div>
+      ${holderName ? `<p>예금주 ${escapeHtml(holderName)}</p>` : ""}
     </div>
   ` : "";
   const stayRows = result.type === "stay" ? [
@@ -2289,14 +2300,14 @@ function renderPaymentResult() {
   ].join("");
   const guideRows = result.status === "virtual_account_issued" ? `
     <div class="result-next-steps">
-      <div><span>1</span><strong>가상계좌 입금</strong><p>아래 계좌로 입금하면 요청이 접수됩니다.</p></div>
-      <div><span>2</span><strong>사장님 확인</strong><p>일정과 객실 가능 여부를 확인합니다.</p></div>
-      <div><span>3</span><strong>최종 확정</strong><p>확정 여부는 마이페이지와 채팅에서 확인할 수 있습니다.</p></div>
+      <div><span>1</span><strong>입금</strong></div>
+      <div><span>2</span><strong>사장님 확인</strong></div>
+      <div><span>3</span><strong>확정 안내</strong></div>
     </div>
   ` : "";
   const extraRows = [
-    guideRows,
     virtualAccountRows,
+    guideRows,
     stayRows,
     result.errorCode ? `<div class="result-detail-row"><span>오류 코드</span><strong>${result.errorCode}</strong></div>` : "",
   ].join("");
@@ -2652,7 +2663,7 @@ async function requestTossPayment() {
     const hasAccountInfo = hasVirtualAccountInfo(normalizedAccount);
     const isIssued = confirmed || hasAccountInfo;
     if (isIssued && hasAccountInfo) saveLocalIssuedPayment(payment, normalizedAccount);
-    const issuedText = "입금 확인 후 사장님이 일정과 가능 여부를 확인합니다. 진행 상황은 마이페이지와 채팅에서 볼 수 있습니다.";
+    const issuedText = "아래 계좌로 입금하면 사장님 확인 후 확정됩니다.";
     const pendingText = "포트원 결제창 호출은 완료되었습니다. 입금 정보 확인이 지연되면 마이페이지에서 다시 확인해주세요.";
     state.paymentResult = {
       status: isIssued ? "virtual_account_issued" : "pending",
@@ -3082,6 +3093,21 @@ document.addEventListener("click", (event) => {
   const tagButton = event.target.closest(".tag-chip");
   if (tagButton) {
     tagButton.classList.toggle("active");
+    return;
+  }
+
+  const copyAccountButton = event.target.closest("[data-copy-account]");
+  if (copyAccountButton) {
+    const accountNumber = copyAccountButton.dataset.copyAccount;
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(accountNumber).then(() => {
+        toast("계좌번호를 복사했습니다.");
+      }).catch(() => {
+        toast(accountNumber);
+      });
+    } else {
+      toast(accountNumber);
+    }
     return;
   }
 
