@@ -9,6 +9,9 @@
     },
     "api/portone-diagnostics.js": {
       "maxDuration": 30
+    },
+    "api/notifications-dispatch.js": {
+      "maxDuration": 30
     }
   },
   "headers": [
