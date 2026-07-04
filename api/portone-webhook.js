@@ -5,7 +5,7 @@ const https = require("https");
 const requiredEnv = ["PORTONE_API_SECRET", "SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"];
 
 async function supabaseRequest(path, key, options = {}) {
-  const response = await fetch(`${process.env.SUPABASE_URL}${path}`, {
+  const result = await requestJson(`${process.env.SUPABASE_URL}${path}`, {
     ...options,
     headers: {
       apikey: key,
@@ -14,13 +14,71 @@ async function supabaseRequest(path, key, options = {}) {
       ...(options.headers || {}),
     },
   });
-  const data = await response.json().catch(() => null);
-  if (!response.ok) {
+  if (!result.ok) {
+    const data = result.data;
     const error = new Error(data?.message || data?.error_description || "Supabase request failed.");
-    error.statusCode = response.status;
+    error.statusCode = result.status;
     throw error;
   }
-  return data;
+  return result.data;
+}
+
+async function requestJson(url, options = {}, timeoutMs = 7000) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(new Error("fetch timed out")), timeoutMs);
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    const data = await response.json().catch(() => null);
+    return { ok: response.ok, status: response.status, data };
+  } catch (error) {
+    return requestJsonWithHttps(url, options, timeoutMs);
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function requestJsonWithHttps(urlString, options = {}, timeoutMs = 7000) {
+  return new Promise((resolve, reject) => {
+    const url = new URL(urlString);
+    const body = options.body || "";
+    const headers = {
+      ...(options.headers || {}),
+      ...(body ? { "Content-Length": Buffer.byteLength(body) } : {}),
+    };
+    const request = https.request({
+      hostname: url.hostname,
+      path: `${url.pathname}${url.search}`,
+      method: options.method || "GET",
+      timeout: timeoutMs,
+      headers,
+    }, (response) => {
+      let responseBody = "";
+      response.setEncoding("utf8");
+      response.on("data", (chunk) => {
+        responseBody += chunk;
+      });
+      response.on("end", () => {
+        let data = null;
+        try {
+          data = responseBody ? JSON.parse(responseBody) : null;
+        } catch {}
+        resolve({
+          ok: response.statusCode >= 200 && response.statusCode < 300,
+          status: response.statusCode || 0,
+          data,
+        });
+      });
+    });
+    request.on("timeout", () => {
+      request.destroy(new Error("https timed out"));
+    });
+    request.on("error", reject);
+    if (body) request.write(body);
+    request.end();
+  });
 }
 
 async function getPortOnePayment(paymentId) {
