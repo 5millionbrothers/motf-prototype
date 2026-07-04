@@ -2635,34 +2635,6 @@ async function confirmPaymentOnServer(payment, params = new URLSearchParams(), p
   return data;
 }
 
-async function markVirtualAccountIssuedFromClient(payment, portoneResponse = null) {
-  if (!window.motfSupabase) throw new Error("Login config was not loaded.");
-  const { data: sessionData } = await window.motfSupabase.auth.getSession();
-  const userId = sessionData.session?.user?.id;
-  if (!userId) throw new Error("Login expired. Please sign in again.");
-  const normalizedAccount = normalizeVirtualAccount(portoneResponse || {});
-  if (!hasVirtualAccountInfo(normalizedAccount)) {
-    throw new Error("Browser payment response did not include virtual account info.");
-  }
-  const responseForDb = {
-    ...(portoneResponse && typeof portoneResponse === "object" ? portoneResponse : {}),
-    id: payment.orderId,
-    paymentId: payment.orderId,
-    orderId: payment.orderId,
-    status: portoneResponse?.status || "VIRTUAL_ACCOUNT_ISSUED",
-    amount: { total: Number(payment.amount || 0) },
-    totalAmount: Number(payment.amount || 0),
-    virtualAccount: normalizedAccount,
-  };
-  const { data, error } = await window.motfSupabase.rpc("mark_virtual_account_issued", {
-    target_customer_id: userId,
-    target_order_id: payment.orderId,
-    portone_response: responseForDb,
-  });
-  if (error) throw error;
-  return Array.isArray(data) ? data[0] : data;
-}
-
 async function requestTossPayment() {
   const payment = state.pendingPayment;
   if (!payment) {
@@ -2786,20 +2758,6 @@ async function requestTossPayment() {
     } catch (confirmError) {
       console.warn("PortOne server confirmation pending", confirmError);
       const hasBrowserAccount = hasVirtualAccountInfo(responseAccount);
-      try {
-        const issued = await markVirtualAccountIssuedFromClient(payment, response);
-        await window.motfReloadTransactions?.();
-        const issuedAccount = normalizeVirtualAccount(issued?.virtual_account || responseAccount);
-        if (hasVirtualAccountInfo(issuedAccount)) saveLocalIssuedPayment(payment, issuedAccount);
-        showVirtualAccountIssued(
-          issuedAccount,
-          "가상계좌 결제 요청이 입금 대기로 저장되었습니다. 입금 정보가 바로 보이지 않으면 마이페이지에서 다시 확인해주세요.",
-          true
-        );
-        return;
-      } catch (fallbackError) {
-        console.warn("Could not store virtual-account pending payment from client.", fallbackError);
-      }
       if (hasBrowserAccount) {
         showVirtualAccountIssued(
           responseAccount,
