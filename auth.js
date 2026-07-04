@@ -402,6 +402,20 @@
     return true;
   }
 
+  async function unlinkOAuthIdentitiesForWithdrawal() {
+    try {
+      const { data, error } = await client.auth.getUserIdentities();
+      if (error) return;
+      const identities = Array.isArray(data?.identities) ? data.identities : [];
+      for (const identity of identities) {
+        if (!identity?.provider || identity.provider === "email") continue;
+        await client.auth.unlinkIdentity(identity);
+      }
+    } catch {
+      // Auth 이메일 익명화가 핵심 처리입니다. 소셜 identity 해제 실패는 탈퇴 완료를 막지 않습니다.
+    }
+  }
+
   async function finishLogin() {
     await refreshAuthUi();
     if (await blockInactiveUserSession()) return;
@@ -612,19 +626,30 @@
       accountWithdrawalButton.disabled = true;
       accountWithdrawalButton.textContent = "탈퇴 요청 중...";
 
-      const { error } = await client.rpc("request_account_withdrawal", {
-        request_reason: reasonInput.trim(),
+      const { data: sessionData } = await client.auth.getSession();
+      const activeAccessToken = sessionData?.session?.access_token;
+      const response = await fetch("/api/account-withdrawal", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(activeAccessToken ? { Authorization: `Bearer ${activeAccessToken}` } : {}),
+        },
+        body: JSON.stringify({
+          reason: reasonInput.trim(),
+        }),
       });
+      const result = await response.json().catch(() => null);
 
       accountWithdrawalButton.disabled = false;
       accountWithdrawalButton.innerHTML = originalHtml;
       if (typeof window.refreshIcons === "function") window.refreshIcons();
 
-      if (error) {
-        showToast(error.message || "회원 탈퇴 요청을 처리하지 못했습니다.");
+      if (!response.ok || !result?.ok) {
+        showToast(result?.message || "회원 탈퇴 요청을 처리하지 못했습니다.");
         return;
       }
 
+      await unlinkOAuthIdentitiesForWithdrawal();
       await client.auth.signOut();
       session = null;
       profile = null;
