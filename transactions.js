@@ -29,6 +29,15 @@
       return [];
     }
   }
+  function isFutureDate(value) {
+    if (!value) return true;
+    const time = new Date(value).getTime();
+    return Number.isNaN(time) || time > Date.now();
+  }
+  function pendingAccountExpiresAt(item = {}) {
+    const account = item.virtual_account || item.virtualAccount || {};
+    return item.expires_at || account.dueDate || account.due_date || account.expiredAt || account.expired_at || account.expiresAt || account.expires_at || account.expiry?.dueDate || account.expiry?.due_date || account.accountExpiry?.dueDate || account.accountExpiry?.due_date || "";
+  }
   function bankLabel(value = "") {
     const code = String(value || "").trim();
     const upper = code.toUpperCase();
@@ -78,7 +87,7 @@
         .eq("customer_id", authData.session.user.id)
         .order("created_at", { ascending: false }),
       client.from("payment_intents")
-        .select("order_id, kind, amount, order_name, status, virtual_account, virtual_account_issued_at, created_at")
+        .select("order_id, kind, amount, order_name, status, virtual_account, virtual_account_issued_at, created_at, expires_at")
         .eq("customer_id", authData.session.user.id)
         .eq("status", "virtual_account_issued")
         .order("created_at", { ascending: false }),
@@ -103,7 +112,7 @@
       refundAmount: item.refund_amount,
       items: item.market_order_items || [],
     }));
-    (intentResult.data || []).forEach((item) => {
+    (intentResult.data || []).filter((item) => isFutureDate(pendingAccountExpiresAt(item))).forEach((item) => {
       const account = item.virtual_account || {};
       const label = accountLabel(account);
       const pendingItem = {
@@ -132,6 +141,7 @@
     });
     localIssuedPayments()
       .filter((item) => !reservations.some((reservation) => reservation.id === item.orderId) && !orders.some((order) => order.id === item.orderId))
+      .filter((item) => isFutureDate(pendingAccountExpiresAt(item)))
       .forEach((item) => {
         const pendingItem = {
           id: item.orderId,
