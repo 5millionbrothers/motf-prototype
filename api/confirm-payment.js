@@ -91,7 +91,19 @@ function paymentStatus(payment) {
 }
 
 function isVirtualAccountIssuedStatus(status) {
-  return ["VIRTUAL_ACCOUNT_ISSUED", "READY", "PAY_PENDING", "PENDING"].includes(String(status || "").toUpperCase());
+  return [
+    "VIRTUAL_ACCOUNT_ISSUED",
+    "VIRTUAL_ACCOUNT_READY",
+    "READY",
+    "PAY_PENDING",
+    "PAYMENT_PENDING",
+    "PENDING",
+    "WAITING_FOR_DEPOSIT",
+    "WAITING_DEPOSIT",
+    "DEPOSIT_READY",
+    "VBANK_ISSUED",
+    "ISSUED",
+  ].includes(String(status || "").toUpperCase());
 }
 
 function paymentKey(payment) {
@@ -251,7 +263,7 @@ function paymentForLedger(payment, ledgerOrderId, providerPaymentId) {
   };
 }
 
-async function applyPortOnePayment(userId, orderId, payment, providerPaymentId) {
+async function applyPortOnePayment(userId, orderId, payment, providerPaymentId, forceVirtualAccountIssued = false) {
   const status = paymentStatus(payment);
   const virtualAccount = pickVirtualAccount(payment);
   const hasVirtualAccount = hasVirtualAccountInfo(virtualAccount);
@@ -273,7 +285,7 @@ async function applyPortOnePayment(userId, orderId, payment, providerPaymentId) 
     return { status: "paid", transactionId: result?.transaction_id, kind: result?.kind };
   }
 
-  if (isVirtualAccountIssuedStatus(status) || hasVirtualAccount) {
+  if (forceVirtualAccountIssued || isVirtualAccountIssuedStatus(status) || hasVirtualAccount) {
     const issued = await supabaseRequest(
       "/rest/v1/rpc/mark_virtual_account_issued",
       process.env.SUPABASE_SERVICE_ROLE_KEY,
@@ -411,6 +423,12 @@ module.exports = async function handler(req, res) {
     const ledgerPayment = paymentForLedger(payment, ledgerOrderId, providerPaymentId);
     diagnostics.portoneStatus = paymentStatus(ledgerPayment);
     diagnostics.hasVirtualAccount = hasVirtualAccountInfo(pickVirtualAccount(ledgerPayment));
+    const forceVirtualAccountIssued = Boolean(
+      body.portoneResponse
+      && typeof body.portoneResponse === "object"
+      && !body.portoneResponse.code
+    );
+    diagnostics.forceVirtualAccountIssued = forceVirtualAccountIssued;
 
     const checkedAmount = paymentAmount(ledgerPayment);
     if (checkedAmount > 0 && checkedAmount !== Number(intent.amount)) {
@@ -422,7 +440,7 @@ module.exports = async function handler(req, res) {
     }
 
     diagnostics.stage = "apply_payment";
-    const applied = await applyPortOnePayment(user.id, ledgerOrderId, ledgerPayment, providerPaymentId);
+    const applied = await applyPortOnePayment(user.id, ledgerOrderId, ledgerPayment, providerPaymentId, forceVirtualAccountIssued);
     diagnostics.stage = "done";
     return json(res, 200, { ok: true, ...applied, lookupWarning, diagnostics });
   } catch (error) {
