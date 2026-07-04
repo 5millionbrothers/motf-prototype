@@ -2286,6 +2286,11 @@ input[type="range"] {
   color: var(--muted);
 }
 
+.mypage-logout-btn {
+  align-self: center;
+  white-space: nowrap;
+}
+
 .danger-panel {
   border-color: #e7c8b8;
 }

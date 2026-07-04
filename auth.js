@@ -56,6 +56,29 @@
     console.info(message);
   }
 
+  function formatPhone(value = "") {
+    const digits = String(value || "").replace(/\D/g, "").slice(0, 11);
+    if (digits.startsWith("02")) {
+      if (digits.length <= 2) return digits;
+      if (digits.length <= 6) return `${digits.slice(0, 2)}-${digits.slice(2)}`;
+      if (digits.length <= 10) return `${digits.slice(0, 2)}-${digits.slice(2, digits.length - 4)}-${digits.slice(-4)}`;
+    }
+    if (digits.length <= 3) return digits;
+    if (digits.length <= 7) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+    return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
+  }
+
+  function normalizePhone(value = "") {
+    return formatPhone(value);
+  }
+
+  function applyPhoneMask(input) {
+    if (!input) return;
+    const before = input.value;
+    const formatted = formatPhone(before);
+    if (before !== formatted) input.value = formatted;
+  }
+
   function createModal() {
     const modal = document.createElement("div");
     modal.className = "auth-modal";
@@ -250,7 +273,7 @@
     profileCompleteForm.hidden = false;
     document.querySelector(".auth-tabs").hidden = true;
     document.querySelector("#authTitle").textContent = "기본 정보 입력";
-    document.querySelector("#profileCompletePhone").value = profile?.phone || "";
+    document.querySelector("#profileCompletePhone").value = formatPhone(profile?.phone || "");
     document.querySelector("#profileCompleteOrganization").value = profile?.organization || "";
     modal.hidden = false;
     document.body.classList.add("auth-modal-open");
@@ -332,7 +355,7 @@
       inputs[2].value = profile?.organization || "";
       inputs[2].placeholder = "학교 또는 소속을 입력해주세요";
     }
-    if (inputs[3]) inputs[3].value = profile?.phone || "";
+    if (inputs[3]) inputs[3].value = formatPhone(profile?.phone || "");
 
     const dangerPanel = document.querySelector("#myAccount .danger-panel");
     if (!dangerPanel) return;
@@ -419,7 +442,7 @@
         data: {
           account_type: "user",
           full_name: document.querySelector("#customerSignupName").value.trim(),
-          phone: document.querySelector("#customerSignupPhone").value.trim(),
+          phone: normalizePhone(document.querySelector("#customerSignupPhone").value),
         },
       },
     });
@@ -471,7 +494,7 @@
   profileCompleteForm.addEventListener("submit", async (event) => {
     event.preventDefault();
     if (!session?.user) return;
-    const phone = document.querySelector("#profileCompletePhone").value.trim();
+    const phone = normalizePhone(document.querySelector("#profileCompletePhone").value);
     const organization = document.querySelector("#profileCompleteOrganization").value.trim();
     if (phone && phone.replace(/\D/g, "").length < 9) {
       setMessage("연락처를 다시 확인해주세요.", "error");
@@ -564,7 +587,7 @@
       const accountForm = document.querySelector("#accountForm");
       const inputs = [...accountForm.querySelectorAll("input")];
       const organization = inputs[2]?.value.trim() || "";
-      const phone = inputs[3]?.value.trim() || "";
+      const phone = normalizePhone(inputs[3]?.value || "");
       if (phone && phone.replace(/\D/g, "").length < 9) {
         showToast("연락처를 다시 확인해주세요.");
         inputs[3]?.focus();
@@ -596,6 +619,12 @@
       updateAccountView();
       showToast("회원정보가 저장되었습니다.");
     }
+  });
+
+  document.addEventListener("input", (event) => {
+    const target = event.target;
+    if (!target?.matches?.('input[type="tel"], #bookingPhone')) return;
+    applyPhoneMask(target);
   });
 
   document.addEventListener("click", (event) => {

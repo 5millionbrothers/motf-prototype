@@ -1,4 +1,15 @@
 const money = (value) => `${Number(value).toLocaleString("ko-KR")}원`;
+const formatPhone = (value = "") => {
+  const digits = String(value || "").replace(/\D/g, "").slice(0, 11);
+  if (digits.startsWith("02")) {
+    if (digits.length <= 2) return digits;
+    if (digits.length <= 6) return `${digits.slice(0, 2)}-${digits.slice(2)}`;
+    if (digits.length <= 10) return `${digits.slice(0, 2)}-${digits.slice(2, digits.length - 4)}-${digits.slice(-4)}`;
+  }
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 7) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+  return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
+};
 const formatDateTime = (value) => {
   if (!value) return "";
   const date = new Date(value);
@@ -576,7 +587,7 @@ window.motfGetReservationDraft = function getReservationDraft() {
     offering_id: state.selectedRoom.id,
     customer_name: qs("#bookingName").value.trim(),
     group_name: qs("#bookingOrg").value.trim() || null,
-    contact_phone: qs("#bookingPhone").value.trim() || null,
+    contact_phone: formatPhone(qs("#bookingPhone").value) || null,
     event_date: qs("#stayCheckInDate").value,
     check_out_date: qs("#stayCheckOutDate").value,
     guest_count: Number(qs("#bookingPeople").value),
