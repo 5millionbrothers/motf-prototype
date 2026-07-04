@@ -37,8 +37,13 @@ async function supabaseRequest(path, key, options = {}) {
   });
   if (!result.ok) {
     const data = result.data;
-    const error = new Error(data?.message || data?.error_description || "Supabase request failed.");
+    const rawMessage = data?.message || data?.error_description || "Supabase request failed.";
+    const permissionMessage = String(rawMessage).toLowerCase().includes("permission denied")
+      ? "Supabase 서버 권한이 없습니다. Vercel의 SUPABASE_SERVICE_ROLE_KEY가 현재 Supabase 프로젝트의 service_role/secret key인지 확인해주세요."
+      : rawMessage;
+    const error = new Error(permissionMessage);
     error.statusCode = result.status;
+    error.supabaseMessage = rawMessage;
     throw error;
   }
   return result.data;
