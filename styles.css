@@ -471,7 +471,7 @@ h3 {
 
 .filter-panel {
   display: grid;
-  grid-template-columns: 1.1fr 0.95fr 0.75fr 1.45fr auto;
+  grid-template-columns: 1fr 1fr 0.95fr 0.75fr 1.35fr auto;
   gap: 12px;
   padding: 16px;
   margin-bottom: 18px;
@@ -479,6 +479,27 @@ h3 {
   border: 1px solid var(--line);
   border-radius: 8px;
   box-shadow: none;
+}
+
+.stay-context-filter {
+  grid-template-columns: 1fr 1fr 0.9fr 0.75fr 1.1fr;
+}
+
+.stay-context-note {
+  display: grid;
+  align-content: center;
+  gap: 4px;
+  min-height: 42px;
+  padding: 10px 12px;
+  color: var(--teal-dark);
+  background: var(--warm);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+.stay-context-note span {
+  color: var(--muted);
 }
 
 label {
@@ -1384,11 +1405,9 @@ input[type="range"] {
 }
 
 .toss-widget-box {
-  min-height: 220px;
+  min-height: 0;
   align-content: start;
-  background:
-    linear-gradient(135deg, rgba(90, 107, 61, 0.1), transparent 42%),
-    var(--warm);
+  background: var(--paper);
 }
 
 .toss-widget-header {
@@ -1396,7 +1415,7 @@ input[type="range"] {
   align-items: center;
   gap: 9px;
   color: var(--teal-dark);
-  font-size: 18px;
+  font-size: 16px;
 }
 
 .key-row {
@@ -1424,17 +1443,14 @@ input[type="range"] {
 
 .toss-widget-area {
   overflow: hidden;
-  background: var(--paper);
+  background: #fff;
   border: 1px solid var(--line);
   border-radius: 8px;
 }
 
 .toss-widget-area:empty {
-  min-height: 54px;
-  background:
-    linear-gradient(90deg, var(--warm) 25%, var(--olive-soft) 37%, var(--warm) 63%);
-  background-size: 400% 100%;
-  animation: loading-stripe 1.4s ease infinite;
+  min-height: 0;
+  border: 0;
 }
 
 .toss-widget-status {
@@ -1442,6 +1458,50 @@ input[type="range"] {
   color: var(--muted);
   font-size: 13px;
   font-weight: 600;
+}
+
+.portone-method-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px;
+}
+
+.portone-method-card span,
+.portone-note-grid span {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.portone-method-card strong,
+.portone-note-grid strong {
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.portone-method-card i {
+  width: 22px;
+  height: 22px;
+  color: var(--teal);
+}
+
+.portone-note-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.portone-note-grid div {
+  min-width: 0;
+  padding: 13px;
+  border-right: 1px solid var(--line);
+}
+
+.portone-note-grid div:last-child {
+  border-right: 0;
 }
 
 @keyframes loading-stripe {
@@ -2375,6 +2435,11 @@ input[type="range"] {
   border-radius: 8px;
 }
 
+.result-detail-row.highlight {
+  background: rgba(90, 107, 61, 0.1);
+  border-color: rgba(90, 107, 61, 0.24);
+}
+
 .result-detail-row span {
   color: var(--muted);
   font-size: 13px;
@@ -2385,18 +2450,39 @@ input[type="range"] {
   text-align: right;
 }
 
-.result-detail-row.highlight {
-  background: var(--olive-soft);
-  border-color: var(--sage);
+.result-account-box,
+.pending-account {
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  background: rgba(90, 107, 61, 0.1);
+  border: 1px solid rgba(90, 107, 61, 0.24);
+  border-radius: 8px;
+}
+
+.result-account-box span,
+.pending-account span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.result-account-box strong {
+  color: var(--teal-dark);
+  font-size: 20px;
+  line-height: 1.35;
+  word-break: keep-all;
+}
+
+.result-account-box p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
 }
 
 .result-account-box {
-  display: grid;
   gap: 8px;
   padding: 18px;
-  background: var(--olive-soft);
-  border: 1px solid var(--sage);
-  border-radius: 8px;
 }
 
 .result-account-head,
@@ -2405,12 +2491,6 @@ input[type="range"] {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-}
-
-.result-account-head span {
-  color: var(--teal-dark);
-  font-size: 13px;
-  font-weight: 800;
 }
 
 .result-account-head em {
@@ -2445,36 +2525,38 @@ input[type="range"] {
   cursor: pointer;
 }
 
-.result-account-box p {
-  margin: 0;
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 700;
+.pending-account {
+  margin: 10px 0;
+}
+
+.pending-account strong {
+  color: var(--teal-dark);
+  font-size: 15px;
+  line-height: 1.45;
 }
 
 .result-next-steps {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 6px;
+  gap: 8px;
+  margin-bottom: 4px;
 }
 
 .result-next-steps div {
-  display: flex;
-  align-items: center;
-  gap: 7px;
+  display: grid;
+  gap: 5px;
   min-width: 0;
-  padding: 8px 10px;
-  background: var(--cream);
+  padding: 12px;
+  background: #fff;
   border: 1px solid var(--line);
   border-radius: 8px;
 }
 
 .result-next-steps span {
-  display: grid;
-  flex: 0 0 auto;
+  display: inline-grid;
   place-items: center;
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   color: #fff;
   background: var(--teal-dark);
   border-radius: 999px;
@@ -2483,9 +2565,14 @@ input[type="range"] {
 }
 
 .result-next-steps strong {
-  color: var(--teal-dark);
   font-size: 13px;
-  white-space: nowrap;
+}
+
+.result-next-steps p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .toast {
@@ -2666,8 +2753,19 @@ input[type="range"] {
   .product-grid,
   .room-grid,
   .board-grid,
+  .result-next-steps,
+  .portone-note-grid,
   .form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .portone-note-grid div {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .portone-note-grid div:last-child {
+    border-bottom: 0;
   }
 
   .market-intro img {
@@ -2693,10 +2791,6 @@ input[type="range"] {
     height: 160px;
   }
 
-  .complete-panel {
-    padding: 26px 18px;
-  }
-
   .result-account-head,
   .result-account-number {
     align-items: flex-start;
@@ -2709,19 +2803,5 @@ input[type="range"] {
 
   .result-account-number button {
     width: 100%;
-  }
-
-  .result-next-steps {
-    grid-template-columns: 1fr;
-  }
-
-  .result-detail-row {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 6px;
-  }
-
-  .result-detail-row strong {
-    text-align: left;
   }
 }
