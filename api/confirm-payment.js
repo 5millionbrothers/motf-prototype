@@ -358,7 +358,7 @@ async function applyPortOnePayment(userId, orderId, payment, providerPaymentId, 
     return { status: "paid", transactionId: result?.transaction_id, kind: result?.kind };
   }
 
-  if (forceVirtualAccountIssued || isVirtualAccountIssuedStatus(status) || hasVirtualAccount) {
+  if ((forceVirtualAccountIssued || isVirtualAccountIssuedStatus(status) || hasVirtualAccount) && hasVirtualAccount) {
     const issued = await supabaseRequest(
       "/rest/v1/rpc/mark_virtual_account_issued",
       process.env.SUPABASE_SERVICE_ROLE_KEY,
@@ -382,7 +382,7 @@ async function applyPortOnePayment(userId, orderId, payment, providerPaymentId, 
     };
   }
 
-  return { status: "pending", portoneStatus: status, virtualAccount: pickVirtualAccount(payment) };
+  return { status: "pending", portoneStatus: status, virtualAccount };
 }
 
 module.exports = async function handler(req, res) {
@@ -420,7 +420,11 @@ module.exports = async function handler(req, res) {
     diagnostics.hasClientResponse = Boolean(body.portoneResponse && typeof body.portoneResponse === "object");
     diagnostics.clientResponseKeys = diagnostics.hasClientResponse ? Object.keys(body.portoneResponse).slice(0, 30) : [];
     if (!ledgerOrderId) return json(res, 400, { ok: false, message: "orderId is required." });
-    if (providerPaymentId && providerPaymentId !== portOnePaymentId(ledgerOrderId)) {
+    const allowedProviderPaymentIds = new Set([
+      ledgerOrderId,
+      portOnePaymentId(ledgerOrderId),
+    ].filter(Boolean));
+    if (providerPaymentId && !allowedProviderPaymentIds.has(providerPaymentId)) {
       return json(res, 400, {
         ok: false,
         message: "Payment id does not match the prepared order id.",
@@ -496,11 +500,7 @@ module.exports = async function handler(req, res) {
     const ledgerPayment = paymentForLedger(payment, ledgerOrderId, providerPaymentId);
     diagnostics.portoneStatus = paymentStatus(ledgerPayment);
     diagnostics.hasVirtualAccount = hasVirtualAccountInfo(pickVirtualAccount(ledgerPayment));
-    const forceVirtualAccountIssued = Boolean(
-      body.portoneResponse
-      && typeof body.portoneResponse === "object"
-      && !body.portoneResponse.code
-    );
+    const forceVirtualAccountIssued = hasVirtualAccountInfo(pickVirtualAccount(ledgerPayment));
     diagnostics.forceVirtualAccountIssued = forceVirtualAccountIssued;
 
     const checkedAmount = paymentAmount(ledgerPayment);

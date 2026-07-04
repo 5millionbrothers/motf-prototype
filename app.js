@@ -2641,6 +2641,9 @@ async function markVirtualAccountIssuedFromClient(payment, portoneResponse = nul
   const userId = sessionData.session?.user?.id;
   if (!userId) throw new Error("Login expired. Please sign in again.");
   const normalizedAccount = normalizeVirtualAccount(portoneResponse || {});
+  if (!hasVirtualAccountInfo(normalizedAccount)) {
+    throw new Error("Browser payment response did not include virtual account info.");
+  }
   const responseForDb = {
     ...(portoneResponse && typeof portoneResponse === "object" ? portoneResponse : {}),
     id: payment.orderId,
@@ -2703,22 +2706,29 @@ async function requestTossPayment() {
     };
     navigate("paymentResult");
   };
-  const getIssuedAccountFromTransactions = async () => {
-    for (let attempt = 0; attempt < 4; attempt += 1) {
-      if (attempt > 0) {
-        await new Promise((resolve) => window.setTimeout(resolve, 600));
-      }
-      try {
-        await window.motfReloadTransactions?.();
-        const list = payment.type === "stay" ? state.reservations : state.orders;
-        const matched = list.find((item) => item.id === payment.orderId);
-        const account = normalizeVirtualAccount(matched?.virtualAccount || {});
-        if (hasVirtualAccountInfo(account)) return account;
-      } catch (error) {
-        console.warn("Could not reload issued virtual account from transactions.", error);
-      }
-    }
-    return {};
+  const showVirtualAccountLookupError = (error) => {
+    state.paymentResult = {
+      status: "fail",
+      type: payment.type,
+      eyebrow: "입금 정보 확인 실패",
+      title: "가상계좌 입금 정보를 불러오지 못했습니다",
+      text: error.message || "포트원 결제는 호출되었지만 계좌번호 확인이 완료되지 않았습니다. 잠시 후 마이페이지에서 확인하거나 다시 시도해주세요.",
+      icon: "x",
+      className: "fail",
+      orderId: payment.orderId,
+      itemName: payment.itemName,
+      amount: payment.amount,
+      stayName: payment.stayName,
+      roomName: payment.roomName,
+      storeName: payment.storeName,
+      location: payment.location,
+      date: payment.date,
+      checkOutDate: payment.checkOutDate,
+      people: payment.people,
+      pickupTime: payment.pickupTime,
+      backRoute: paymentBackRoute(),
+    };
+    navigate("paymentResult");
   };
 
   try {
@@ -2764,6 +2774,9 @@ async function requestTossPayment() {
         return;
       }
       const issuedAccount = normalizeVirtualAccount(result.virtualAccount || responseAccount);
+      if (!hasVirtualAccountInfo(issuedAccount)) {
+        throw new Error("서버가 가상계좌 계좌번호를 반환하지 않았습니다. api/confirm-payment.js 배포와 포트원 API Secret을 확인해주세요.");
+      }
       if (hasVirtualAccountInfo(issuedAccount)) saveLocalIssuedPayment(payment, issuedAccount);
       showVirtualAccountIssued(
         issuedAccount,
@@ -2787,15 +2800,15 @@ async function requestTossPayment() {
       } catch (fallbackError) {
         console.warn("Could not store virtual-account pending payment from client.", fallbackError);
       }
-      const dbAccount = hasBrowserAccount ? responseAccount : await getIssuedAccountFromTransactions();
-      const finalAccount = hasVirtualAccountInfo(dbAccount) ? dbAccount : responseAccount;
-      showVirtualAccountIssued(
-        finalAccount,
-        hasVirtualAccountInfo(finalAccount)
-          ? "가상계좌는 발급되었습니다. 입금 완료 후 예약 요청 상태로 전환됩니다."
-          : "가상계좌 결제 요청이 접수되었습니다. 입금 정보는 포트원 웹훅 처리 후 마이페이지와 관리자 화면에 반영됩니다.",
-        true
-      );
+      if (hasBrowserAccount) {
+        showVirtualAccountIssued(
+          responseAccount,
+          "가상계좌는 발급되었습니다. 입금 완료 후 예약 요청 상태로 전환됩니다.",
+          true
+        );
+        return;
+      }
+      showVirtualAccountLookupError(confirmError);
     }
   } catch (error) {
     state.paymentResult = {

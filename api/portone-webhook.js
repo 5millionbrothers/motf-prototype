@@ -298,7 +298,7 @@ module.exports = async function handler(req, res) {
     const orderFilter = candidateOrderIds
       .map((id) => `order_id.eq.${encodeURIComponent(id)}`)
       .join(",");
-    const query = `/rest/v1/payment_intents?select=order_id,customer_id,status&or=(${orderFilter})&limit=1`;
+    const query = `/rest/v1/payment_intents?select=order_id,customer_id,status,virtual_account&or=(${orderFilter})&limit=1`;
     const intents = await supabaseRequest(query, process.env.SUPABASE_SERVICE_ROLE_KEY);
     const intent = intents?.[0];
     if (!intent) {
@@ -330,8 +330,19 @@ module.exports = async function handler(req, res) {
     }
 
     if (isVirtualAccountIssuedStatus(status)) {
-      if (intent.status === "virtual_account_issued") {
+      const storedIntentAccount = pickVirtualAccount({ virtualAccount: intent.virtual_account || {} });
+      if (intent.status === "virtual_account_issued" && hasVirtualAccountInfo(storedIntentAccount)) {
         return json(res, 200, { ok: true, accepted: true, alreadyIssued: true });
+      }
+      const issuedAccount = pickVirtualAccount(payment);
+      if (!hasVirtualAccountInfo(issuedAccount)) {
+        return json(res, 200, {
+          ok: false,
+          accepted: true,
+          status: "virtual_account_issued",
+          message: "Virtual account was issued but account info was not available yet.",
+          lookupWarning,
+        });
       }
       await supabaseRequest(
         "/rest/v1/rpc/mark_virtual_account_issued",
