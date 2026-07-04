@@ -2535,6 +2535,13 @@ input[type="range"] {
   line-height: 1.45;
 }
 
+.pending-account p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
 .result-next-steps {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

@@ -120,6 +120,7 @@
         amount: item.amount,
         status: "입금 전",
         virtualAccount: account,
+        expiresAt: pendingAccountExpiresAt(item),
         isPendingVirtualAccount: true,
       };
       if (item.kind === "stay") {
@@ -148,6 +149,7 @@
           amount: item.amount,
           status: "입금 전",
           virtualAccount: item.virtualAccount,
+          expiresAt: pendingAccountExpiresAt(item),
           isPendingVirtualAccount: true,
         };
         if (item.type === "stay") {

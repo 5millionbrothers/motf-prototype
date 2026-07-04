@@ -2801,8 +2801,14 @@ async function handleTossRedirect() {
   return false;
 }
 
+function pendingAccountDueDate(item = {}) {
+  const account = item.virtualAccount || {};
+  return item.expiresAt || account.dueDate || account.due_date || account.expiredAt || account.expired_at || account.expiresAt || account.expires_at || account.expiry?.dueDate || account.expiry?.due_date || account.accountExpiry?.dueDate || account.accountExpiry?.due_date || "";
+}
+
 function reservationCard(item) {
   const account = item.virtualAccount ? readableAccount(item.virtualAccount) : "";
+  const dueDate = pendingAccountDueDate(item);
   const schedule = [item.date, item.checkOutDate].filter(Boolean).join(" ~ ") || item.date || "";
   return `
     <article class="listing-card ${item.isPendingVirtualAccount ? "pending-payment-card" : ""}">
@@ -2814,8 +2820,8 @@ function reservationCard(item) {
         </div>
         <h3>${item.stayName}</h3>
         <p>${item.roomName} · ${money(item.amount)}</p>
-        ${account ? `<div class="pending-account"><span>입금 계좌</span><strong>${account}</strong></div>` : ""}
-        ${item.isPendingVirtualAccount ? `<p class="muted">입금이 확인되면 예약 요청 완료 상태로 넘어가고, 사장님 확인 후 최종 확정됩니다.</p>` : ""}
+        ${account ? `<div class="pending-account"><span>입금 계좌</span><strong>${account}</strong>${dueDate ? `<p>입금 기한 ${formatDateTime(dueDate)}</p>` : ""}</div>` : ""}
+        ${item.isPendingVirtualAccount ? `<p class="muted">입금 완료가 자동 확인되면 예약 요청 완료 상태로 넘어가고, 사장님 확인 후 최종 확정됩니다.</p>` : ""}
         ${item.refundAmount ? `<p class="muted">환불 예정 금액 ${money(item.refundAmount)}</p>` : ""}
         <div class="button-row">
           <button class="secondary-btn" data-budget-file="${item.id}"><i data-lucide="file-spreadsheet"></i>예결산 엑셀 생성</button>
@@ -2828,6 +2834,7 @@ function reservationCard(item) {
 
 function orderCard(item) {
   const account = item.virtualAccount ? readableAccount(item.virtualAccount) : "";
+  const dueDate = pendingAccountDueDate(item);
   return `
     <article class="listing-card ${item.isPendingVirtualAccount ? "pending-payment-card" : ""}">
       <div class="listing-body">
@@ -2837,8 +2844,8 @@ function orderCard(item) {
         </div>
         <h3>${item.storeName}</h3>
         <p>${item.items.length}개 품목 · ${money(item.amount)}</p>
-        ${account ? `<div class="pending-account"><span>입금 계좌</span><strong>${account}</strong></div>` : ""}
-        ${item.isPendingVirtualAccount ? `<p class="muted">입금이 확인되면 주문 요청 완료 상태로 넘어갑니다.</p>` : ""}
+        ${account ? `<div class="pending-account"><span>입금 계좌</span><strong>${account}</strong>${dueDate ? `<p>입금 기한 ${formatDateTime(dueDate)}</p>` : ""}</div>` : ""}
+        ${item.isPendingVirtualAccount ? `<p class="muted">입금 완료가 자동 확인되면 주문 요청 완료 상태로 넘어갑니다.</p>` : ""}
         ${item.refundAmount ? `<p class="muted">환불 예정 금액 ${money(item.refundAmount)}</p>` : ""}
         <div class="button-row">
           <button class="secondary-btn" data-budget-file="${item.id}"><i data-lucide="file-spreadsheet"></i>예결산 엑셀 생성</button>
