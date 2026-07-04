@@ -117,7 +117,15 @@ function getPortOnePaymentWithHttps(path) {
 }
 
 function extractPaymentId(body) {
-  return body?.paymentId || body?.payment_id || body?.data?.paymentId || body?.data?.payment_id;
+  return body?.paymentId
+    || body?.payment_id
+    || body?.id
+    || body?.data?.paymentId
+    || body?.data?.payment_id
+    || body?.data?.id
+    || body?.resource?.paymentId
+    || body?.resource?.payment_id
+    || body?.resource?.id;
 }
 
 function paymentStatus(payment) {
@@ -125,7 +133,43 @@ function paymentStatus(payment) {
 }
 
 function isVirtualAccountIssuedStatus(status) {
-  return ["VIRTUAL_ACCOUNT_ISSUED", "READY", "PAY_PENDING", "PENDING"].includes(String(status || "").toUpperCase());
+  return [
+    "VIRTUAL_ACCOUNT_ISSUED",
+    "VIRTUAL_ACCOUNT_READY",
+    "READY",
+    "PAY_PENDING",
+    "PAYMENT_PENDING",
+    "PENDING",
+    "WAITING_FOR_DEPOSIT",
+    "WAITING_DEPOSIT",
+    "DEPOSIT_READY",
+    "VBANK_ISSUED",
+    "ISSUED",
+  ].includes(String(status || "").toUpperCase());
+}
+
+function ledgerOrderIdFromPaymentId(paymentId) {
+  const value = String(paymentId || "").trim();
+  if (value.startsWith("MS-")) return `MOTF-STAY-${value.slice(3)}`;
+  if (value.startsWith("MM-")) return `MOTF-MARKET-${value.slice(3)}`;
+  return value;
+}
+
+function inferWebhookStatus(body = {}) {
+  const raw = [
+    body.status,
+    body.paymentStatus,
+    body.type,
+    body.eventType,
+    body.event_type,
+    body.data?.status,
+    body.data?.paymentStatus,
+    body.data?.type,
+  ].filter(Boolean).join(" ").toUpperCase();
+  if (raw.includes("PAID") || raw.includes("PAYMENT.PAID") || raw.includes("TRANSACTION.PAID")) return "PAID";
+  if (raw.includes("CANCEL") || raw.includes("FAILED") || raw.includes("FAIL")) return "FAILED";
+  if (raw.includes("VIRTUAL") || raw.includes("VBANK") || raw.includes("READY") || raw.includes("PENDING")) return "VIRTUAL_ACCOUNT_ISSUED";
+  return "VIRTUAL_ACCOUNT_ISSUED";
 }
 
 function paymentKey(payment) {
@@ -234,29 +278,60 @@ module.exports = async function handler(req, res) {
 
   const missing = requiredEnv.filter((name) => !process.env[name]);
   if (missing.length) {
-    return json(res, 503, { ok: false, message: `Webhook env missing: ${missing.join(", ")}` });
+    console.error("portone-webhook env missing", missing);
+    return json(res, 200, { ok: false, accepted: true, message: `Webhook env missing: ${missing.join(", ")}` });
   }
 
   try {
     const body = typeof req.body === "string" ? JSON.parse(req.body) : (req.body || {});
     const paymentId = extractPaymentId(body);
-    if (!paymentId) return json(res, 400, { ok: false, message: "paymentId is required." });
+    if (!paymentId) {
+      console.warn("portone-webhook missing paymentId", body);
+      return json(res, 200, { ok: false, accepted: true, message: "paymentId is required." });
+    }
 
-    const ledgerOrderId = String(paymentId || "").trim();
-    const payment = paymentForLedger(await getPortOnePayment(paymentId), ledgerOrderId, paymentId);
-    const status = paymentStatus(payment);
-
-    const query = `/rest/v1/payment_intents?select=order_id,customer_id,status&order_id=eq.${encodeURIComponent(ledgerOrderId)}&limit=1`;
+    const providerPaymentId = String(paymentId || "").trim();
+    const candidateOrderIds = Array.from(new Set([
+      providerPaymentId,
+      ledgerOrderIdFromPaymentId(providerPaymentId),
+    ].filter(Boolean)));
+    const orderFilter = candidateOrderIds
+      .map((id) => `order_id.eq.${encodeURIComponent(id)}`)
+      .join(",");
+    const query = `/rest/v1/payment_intents?select=order_id,customer_id,status&or=(${orderFilter})&limit=1`;
     const intents = await supabaseRequest(query, process.env.SUPABASE_SERVICE_ROLE_KEY);
     const intent = intents?.[0];
-    if (!intent) return json(res, 404, { ok: false, message: "Payment intent was not found." });
+    if (!intent) {
+      console.warn("portone-webhook intent not found", { providerPaymentId, candidateOrderIds, body });
+      return json(res, 200, { ok: false, accepted: true, message: "Payment intent was not found.", paymentId: providerPaymentId });
+    }
+
+    const ledgerOrderId = intent.order_id;
+    let rawPayment = null;
+    let lookupWarning = "";
+    try {
+      rawPayment = await getPortOnePayment(providerPaymentId);
+    } catch (error) {
+      lookupWarning = error.message || "PortOne lookup failed.";
+      rawPayment = {
+        ...(body && typeof body === "object" ? body : {}),
+        id: ledgerOrderId,
+        paymentId: ledgerOrderId,
+        orderId: ledgerOrderId,
+        portonePaymentId: providerPaymentId,
+        motfProviderPaymentId: providerPaymentId,
+        status: inferWebhookStatus(body),
+      };
+    }
+    const payment = paymentForLedger(rawPayment, ledgerOrderId, providerPaymentId);
+    const status = paymentStatus(payment);
     if (intent.status === "confirmed") {
-      return json(res, 200, { ok: true, alreadyConfirmed: true });
+      return json(res, 200, { ok: true, accepted: true, alreadyConfirmed: true });
     }
 
     if (isVirtualAccountIssuedStatus(status)) {
       if (intent.status === "virtual_account_issued") {
-        return json(res, 200, { ok: true, alreadyIssued: true });
+        return json(res, 200, { ok: true, accepted: true, alreadyIssued: true });
       }
       await supabaseRequest(
         "/rest/v1/rpc/mark_virtual_account_issued",
@@ -270,11 +345,11 @@ module.exports = async function handler(req, res) {
           }),
         },
       );
-      return json(res, 200, { ok: true, status: "virtual_account_issued" });
+      return json(res, 200, { ok: true, accepted: true, status: "virtual_account_issued", lookupWarning });
     }
 
     if (status !== "PAID") {
-      return json(res, 200, { ok: true, ignored: true, status });
+      return json(res, 200, { ok: true, accepted: true, ignored: true, status, lookupWarning });
     }
 
     const finalized = await supabaseRequest(
@@ -291,11 +366,12 @@ module.exports = async function handler(req, res) {
       },
     );
     const result = Array.isArray(finalized) ? finalized[0] : finalized;
-    return json(res, 200, { ok: true, transactionId: result?.transaction_id, kind: result?.kind });
+    return json(res, 200, { ok: true, accepted: true, transactionId: result?.transaction_id, kind: result?.kind, lookupWarning });
   } catch (error) {
     console.error("portone-webhook", error);
-    return json(res, error.statusCode || 500, {
+    return json(res, 200, {
       ok: false,
+      accepted: true,
       code: "PORTONE_WEBHOOK_ERROR",
       message: error.message || "Webhook handling failed.",
     });
