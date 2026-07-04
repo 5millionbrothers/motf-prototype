@@ -22,9 +22,11 @@
     if (item.refund_status && item.refund_status !== "none") return refundText[item.refund_status] || statusText[item.status] || item.status;
     return statusText[item.status] || item.status;
   }
-  function localIssuedPayments() {
+  function localIssuedPayments(userId) {
     try {
-      return JSON.parse(window.localStorage.getItem("motf.localIssuedPayments") || "[]");
+      if (!userId) return [];
+      return JSON.parse(window.localStorage.getItem("motf.localIssuedPayments") || "[]")
+        .filter((item) => item.userId && item.userId === userId);
     } catch {
       return [];
     }
@@ -76,19 +78,23 @@
 
   async function loadMyTransactions() {
     const { data: authData } = await client.auth.getSession();
-    if (!authData.session?.user) return;
+    const userId = authData.session?.user?.id;
+    if (!userId) {
+      window.motfApplyMyTransactions?.([], []);
+      return;
+    }
     const [reservationResult, orderResult, intentResult] = await Promise.all([
       client.from("reservations")
         .select("id, event_date, guest_count, offering_name, total_amount, status, refund_status, refund_amount, businesses(business_name)")
-        .eq("customer_id", authData.session.user.id)
+        .eq("customer_id", userId)
         .order("created_at", { ascending: false }),
       client.from("market_orders")
         .select("id, pickup_time, total_amount, status, refund_status, refund_amount, businesses(business_name), market_order_items(id)")
-        .eq("customer_id", authData.session.user.id)
+        .eq("customer_id", userId)
         .order("created_at", { ascending: false }),
       client.from("payment_intents")
         .select("order_id, kind, amount, order_name, status, virtual_account, virtual_account_issued_at, created_at, expires_at")
-        .eq("customer_id", authData.session.user.id)
+        .eq("customer_id", userId)
         .eq("status", "virtual_account_issued")
         .order("created_at", { ascending: false }),
     ]);
@@ -140,7 +146,7 @@
         });
       }
     });
-    localIssuedPayments()
+    localIssuedPayments(userId)
       .filter((item) => !reservations.some((reservation) => reservation.id === item.orderId) && !orders.some((order) => order.id === item.orderId))
       .filter((item) => isFutureDate(pendingAccountExpiresAt(item)))
       .forEach((item) => {
@@ -263,6 +269,7 @@
 
   client.auth.onAuthStateChange((event) => {
     if (event === "SIGNED_IN") window.setTimeout(loadMyTransactions, 0);
+    if (event === "SIGNED_OUT") window.motfApplyMyTransactions?.([], []);
   });
   window.setTimeout(loadMyTransactions, 0);
 })();

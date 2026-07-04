@@ -613,6 +613,7 @@ window.motfStartPreparedPayment = function startPreparedPayment(intent, draft) {
     itemName: intent.order_name,
     amount,
     orderId: intent.order_id,
+    userId: window.motfCurrentUserId || "",
     customerName: draft.customer_name || window.motfCurrentUserProfile?.full_name || "이용자",
     customerPhone: draft.contact_phone || window.motfCurrentUserProfile?.phone || "",
     customerEmail: window.motfCurrentUserEmail || "",
@@ -638,6 +639,14 @@ window.motfApplyMyTransactions = function applyMyTransactions(reservations, orde
   state.reservations = reservations;
   state.orders = orders;
   renderMypage();
+};
+
+window.motfClearUserScopedState = function clearUserScopedState() {
+  state.reservations = [];
+  state.orders = [];
+  state.pendingPayment = null;
+  clearPendingPayment();
+  if (currentRoute() === "myUsage" || currentRoute() === "mypage") renderMypage();
 };
 
 const routeParents = {
@@ -1750,8 +1759,10 @@ function clearPendingPayment() {
 function saveLocalIssuedPayment(payment, virtualAccount) {
   if (!hasVirtualAccountInfo(virtualAccount)) return;
   const current = JSON.parse(window.localStorage.getItem(PORTONE_LOCAL_ISSUED_KEY) || "[]");
+  const userId = window.motfCurrentUserId || payment.userId || "";
   const nextItem = {
     orderId: payment.orderId,
+    userId,
     type: payment.type,
     itemName: payment.itemName,
     amount: payment.amount,
@@ -1766,7 +1777,7 @@ function saveLocalIssuedPayment(payment, virtualAccount) {
     pickupTime: payment.pickupTime,
     issuedAt: new Date().toISOString(),
   };
-  const next = [nextItem, ...current.filter((item) => item.orderId !== payment.orderId)].slice(0, 20);
+  const next = [nextItem, ...current.filter((item) => item.orderId !== payment.orderId || item.userId !== userId)].slice(0, 20);
   window.localStorage.setItem(PORTONE_LOCAL_ISSUED_KEY, JSON.stringify(next));
 }
 
@@ -1900,7 +1911,10 @@ function displayOrderNumber(orderId = "", type = "stay") {
 
 function localIssuedPayments() {
   try {
-    return JSON.parse(window.localStorage.getItem(PORTONE_LOCAL_ISSUED_KEY) || "[]");
+    const userId = window.motfCurrentUserId || "";
+    if (!userId) return [];
+    return JSON.parse(window.localStorage.getItem(PORTONE_LOCAL_ISSUED_KEY) || "[]")
+      .filter((item) => item.userId && item.userId === userId);
   } catch {
     return [];
   }

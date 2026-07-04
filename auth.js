@@ -46,6 +46,7 @@
   let session = null;
   let profile = null;
   let pendingAction = null;
+  let lastUserId = null;
 
   function showToast(message) {
     if (typeof window.toast === "function") {
@@ -125,6 +126,17 @@
           </label>
           <button class="primary-btn auth-submit" type="submit">새 비밀번호 저장</button>
         </form>
+        <form class="auth-form" id="profileCompleteForm" hidden>
+          <p class="auth-helper-text">예약 안내와 정산 파일에 사용할 기본 정보를 채워주세요.</p>
+          <label>휴대전화번호
+            <input id="profileCompletePhone" type="tel" autocomplete="tel" maxlength="20" placeholder="010-0000-0000" />
+          </label>
+          <label>학교/소속
+            <input id="profileCompleteOrganization" autocomplete="organization" maxlength="80" placeholder="예: 한국대 경영학과 학생회" />
+          </label>
+          <button class="primary-btn auth-submit" type="submit">기본 정보 저장</button>
+          <button class="auth-link" type="button" data-profile-complete-later>나중에 입력하기</button>
+        </form>
         <p class="auth-message" id="authMessage" aria-live="polite"></p>
       </section>
     `;
@@ -137,6 +149,7 @@
   const loginForm = document.querySelector("#customerLoginForm");
   const signupForm = document.querySelector("#customerSignupForm");
   const passwordForm = document.querySelector("#customerPasswordForm");
+  const profileCompleteForm = document.querySelector("#profileCompleteForm");
   const message = document.querySelector("#authMessage");
 
   function setMessage(text, type = "") {
@@ -197,6 +210,7 @@
     loginForm.hidden = !isLogin;
     signupForm.hidden = isLogin;
     passwordForm.hidden = true;
+    profileCompleteForm.hidden = true;
     document.querySelector(".auth-tabs").hidden = false;
     document.querySelector("#authTitle").textContent = isLogin ? "로그인" : "회원가입";
     document.querySelectorAll("[data-auth-tab]").forEach((button) => {
@@ -219,11 +233,43 @@
     return !signupForm.hidden;
   }
 
+  function profileCompletionDismissKey() {
+    return session?.user?.id ? `motf.profileCompletion.dismissed.${session.user.id}` : "";
+  }
+
+  function needsProfileCompletion() {
+    if (!session?.user || !profile || profile.role !== "user") return false;
+    return !profile.phone || !profile.organization;
+  }
+
+  function openProfileCompletion() {
+    if (!needsProfileCompletion()) return;
+    loginForm.hidden = true;
+    signupForm.hidden = true;
+    passwordForm.hidden = true;
+    profileCompleteForm.hidden = false;
+    document.querySelector(".auth-tabs").hidden = true;
+    document.querySelector("#authTitle").textContent = "기본 정보 입력";
+    document.querySelector("#profileCompletePhone").value = profile?.phone || "";
+    document.querySelector("#profileCompleteOrganization").value = profile?.organization || "";
+    modal.hidden = false;
+    document.body.classList.add("auth-modal-open");
+    setMessage("전화번호와 학교/소속을 입력하면 예약 안내와 정산 확인이 더 정확해져요.");
+    window.setTimeout(() => document.querySelector(profile?.phone ? "#profileCompleteOrganization" : "#profileCompletePhone")?.focus(), 0);
+  }
+
+  function maybePromptProfileCompletion() {
+    const key = profileCompletionDismissKey();
+    if (!key || window.localStorage.getItem(key) === "1") return;
+    if (needsProfileCompletion()) window.setTimeout(openProfileCompletion, 250);
+  }
+
   function openPasswordChange() {
     pendingAction = null;
     loginForm.hidden = true;
     signupForm.hidden = true;
     passwordForm.hidden = false;
+    profileCompleteForm.hidden = true;
     document.querySelector(".auth-tabs").hidden = true;
     document.querySelector("#authTitle").textContent = "새 비밀번호 설정";
     modal.hidden = false;
@@ -248,7 +294,12 @@
 
   async function loadProfile() {
     profile = null;
-    if (!session?.user) return;
+    window.motfCurrentUserId = session?.user?.id || "";
+    window.motfCurrentUserEmail = session?.user?.email || "";
+    if (!session?.user) {
+      window.motfCurrentUserProfile = null;
+      return;
+    }
     const { data, error } = await client
       .from("profiles")
       .select("email, full_name, phone, organization, role, status")
@@ -321,6 +372,7 @@
     pendingAction = null;
     showToast("로그인되었습니다.");
     if (typeof action === "function") action();
+    maybePromptProfileCompletion();
   }
 
   loginForm.addEventListener("submit", async (event) => {
@@ -416,6 +468,48 @@
     showToast("비밀번호가 변경되었습니다.");
   });
 
+  profileCompleteForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!session?.user) return;
+    const phone = document.querySelector("#profileCompletePhone").value.trim();
+    const organization = document.querySelector("#profileCompleteOrganization").value.trim();
+    if (phone && phone.replace(/\D/g, "").length < 9) {
+      setMessage("연락처를 다시 확인해주세요.", "error");
+      return;
+    }
+    if (!phone && !organization) {
+      setMessage("전화번호 또는 학교/소속 중 하나 이상 입력해주세요.", "error");
+      return;
+    }
+
+    const submitButton = profileCompleteForm.querySelector('[type="submit"]');
+    submitButton.disabled = true;
+    submitButton.textContent = "저장 중...";
+    const { data, error } = await client
+      .from("profiles")
+      .update({
+        phone: phone || null,
+        organization: organization || null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", session.user.id)
+      .select("email, full_name, phone, organization, role, status")
+      .single();
+    submitButton.disabled = false;
+    submitButton.textContent = "기본 정보 저장";
+
+    if (error) {
+      setMessage(`기본 정보를 저장하지 못했습니다: ${error.message}`, "error");
+      return;
+    }
+    profile = data;
+    window.motfCurrentUserProfile = profile;
+    window.localStorage.removeItem(profileCompletionDismissKey());
+    updateAccountView();
+    closeModal();
+    showToast("기본 정보가 저장되었습니다.");
+  });
+
   document.addEventListener("click", async (event) => {
     const closeButton = event.target.closest("[data-auth-close]");
     if (closeButton) {
@@ -444,6 +538,13 @@
         redirectTo: `${window.location.origin}${window.location.pathname}`,
       });
       setMessage(error ? `재설정 메일 발송에 실패했습니다: ${error.message}` : "비밀번호 재설정 메일을 보냈어요.", error ? "error" : "success");
+      return;
+    }
+
+    if (event.target.closest("[data-profile-complete-later]")) {
+      const key = profileCompletionDismissKey();
+      if (key) window.localStorage.setItem(key, "1");
+      closeModal();
       return;
     }
 
@@ -540,19 +641,34 @@
   });
 
   client.auth.onAuthStateChange((event, nextSession) => {
+    const previousUserId = lastUserId;
     session = nextSession;
-    if (event === "SIGNED_OUT") profile = null;
-    if (event === "SIGNED_OUT") window.motfCurrentUserProfile = null;
+    const nextUserId = nextSession?.user?.id || null;
+    lastUserId = nextUserId;
+    window.motfCurrentUserId = nextUserId || "";
+    window.motfCurrentUserEmail = nextSession?.user?.email || "";
+    if (event === "SIGNED_OUT" || event === "SIGNED_IN" || (previousUserId && previousUserId !== nextUserId)) {
+      profile = null;
+      window.motfCurrentUserProfile = null;
+      window.motfClearUserScopedState?.();
+    }
     if (event === "PASSWORD_RECOVERY") {
       window.setTimeout(openPasswordChange, 0);
     }
-    window.setTimeout(refreshAuthUi, 0);
+    window.setTimeout(async () => {
+      await refreshAuthUi();
+      if (event === "SIGNED_IN" || event === "INITIAL_SESSION") maybePromptProfileCompletion();
+    }, 0);
   });
 
   (async function initializeAuth() {
     const { data } = await client.auth.getSession();
     session = data.session;
+    lastUserId = session?.user?.id || null;
+    window.motfCurrentUserId = lastUserId || "";
+    window.motfCurrentUserEmail = session?.user?.email || "";
     await refreshAuthUi();
+    maybePromptProfileCompletion();
 
     const activeRoute = typeof window.currentRoute === "function" ? window.currentRoute() : "home";
     if (!session?.user && protectedRoutes.has(activeRoute)) {
