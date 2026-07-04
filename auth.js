@@ -388,8 +388,23 @@
     updateAccountView();
   }
 
+  async function blockInactiveUserSession() {
+    if (!session?.user || !profile || profile.role !== "user" || profile.status === "approved") return false;
+    const message = profile.status === "suspended"
+      ? "탈퇴 처리되었거나 이용이 중지된 계정입니다."
+      : "현재 이용할 수 없는 계정입니다.";
+    await client.auth.signOut();
+    session = null;
+    profile = null;
+    window.motfClearUserScopedState?.();
+    await refreshAuthUi();
+    showToast(message);
+    return true;
+  }
+
   async function finishLogin() {
     await refreshAuthUi();
+    if (await blockInactiveUserSession()) return;
     const action = pendingAction;
     closeModal(false);
     pendingAction = null;
@@ -581,6 +596,45 @@
       return;
     }
 
+    const accountWithdrawalButton = event.target.closest("[data-account-withdrawal]");
+    if (accountWithdrawalButton) {
+      if (!requireLogin()) return;
+
+      const confirmed = window.confirm(
+        "회원 탈퇴를 요청할까요?\n진행 중인 예약, 주문, 입금 대기 건이 있으면 탈퇴가 처리되지 않습니다.",
+      );
+      if (!confirmed) return;
+
+      const reasonInput = window.prompt("탈퇴 사유를 남길 수 있어요. 건너뛰려면 빈칸으로 두세요.", "");
+      if (reasonInput === null) return;
+
+      const originalHtml = accountWithdrawalButton.innerHTML;
+      accountWithdrawalButton.disabled = true;
+      accountWithdrawalButton.textContent = "탈퇴 요청 중...";
+
+      const { error } = await client.rpc("request_account_withdrawal", {
+        request_reason: reasonInput.trim(),
+      });
+
+      accountWithdrawalButton.disabled = false;
+      accountWithdrawalButton.innerHTML = originalHtml;
+      if (typeof window.refreshIcons === "function") window.refreshIcons();
+
+      if (error) {
+        showToast(error.message || "회원 탈퇴 요청을 처리하지 못했습니다.");
+        return;
+      }
+
+      await client.auth.signOut();
+      session = null;
+      profile = null;
+      window.motfClearUserScopedState?.();
+      await refreshAuthUi();
+      if (typeof window.navigate === "function") window.navigate("home");
+      showToast("회원 탈퇴 요청이 처리되었습니다. 이용해주셔서 감사합니다.");
+      return;
+    }
+
     const accountSaveButton = event.target.closest("[data-account-save]");
     if (accountSaveButton) {
       if (!requireLogin()) return;
@@ -697,6 +751,7 @@
     window.motfCurrentUserId = lastUserId || "";
     window.motfCurrentUserEmail = session?.user?.email || "";
     await refreshAuthUi();
+    await blockInactiveUserSession();
     maybePromptProfileCompletion();
 
     const activeRoute = typeof window.currentRoute === "function" ? window.currentRoute() : "home";
