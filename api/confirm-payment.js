@@ -1,4 +1,6 @@
 const { json } = require("./_utils");
+const dns = require("dns");
+const https = require("https");
 
 const requiredEnv = [
   "PORTONE_API_SECRET",
@@ -46,40 +48,111 @@ async function getPaymentIntent(orderId) {
 
 async function getPortOnePayment(paymentId, diagnostics = {}) {
   const startedAt = Date.now();
+  const path = `/payments/${encodeURIComponent(paymentId)}`;
   try {
-    const response = await fetch(`https://api.portone.io/payments/${encodeURIComponent(paymentId)}`, {
+    const payment = await Promise.any([
+      getPortOnePaymentWithFetch(path).catch((error) => {
+        error.lookupMethod = "fetch";
+        throw error;
+      }),
+      getPortOnePaymentWithHttps(path).catch((error) => {
+        error.lookupMethod = "https-ipv4";
+        throw error;
+      }),
+    ]);
+    diagnostics.portoneLookup = {
+      ok: true,
+      status: 200,
+      durationMs: Date.now() - startedAt,
+      type: payment?.type || "",
+      message: "",
+    };
+    return payment;
+  } catch (error) {
+    const aggregateDetails = error instanceof AggregateError
+      ? error.errors.map((item) => `${item.lookupMethod || "lookup"}: ${item.message}`).join(" | ")
+      : error.message;
+    const aggregateStatus = error instanceof AggregateError
+      ? error.errors.find((item) => item.statusCode)?.statusCode
+      : error.statusCode;
+    diagnostics.portoneLookup = {
+      ok: false,
+      durationMs: Date.now() - startedAt,
+      message: aggregateDetails || "fetch failed",
+    };
+    const lookupError = new Error(`PortOne payment lookup failed: ${aggregateDetails || "network error"}`);
+    lookupError.stage = "portone_lookup";
+    lookupError.statusCode = aggregateStatus || 502;
+    lookupError.diagnostics = diagnostics;
+    throw lookupError;
+  }
+}
+
+async function getPortOnePaymentWithFetch(path) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(new Error("PortOne fetch lookup timed out.")), 4500);
+  try {
+    const response = await fetch(`https://api.portone.io${path}`, {
+      signal: controller.signal,
       headers: {
         Authorization: `PortOne ${String(process.env.PORTONE_API_SECRET || "").trim()}`,
         "Content-Type": "application/json",
       },
     });
     const data = await response.json().catch(() => null);
-    diagnostics.portoneLookup = {
-      ok: response.ok,
-      status: response.status,
-      durationMs: Date.now() - startedAt,
-      type: data?.type || "",
-      message: data?.message || "",
-    };
     if (!response.ok) {
       const error = new Error(data?.message || data?.type || "PortOne payment lookup failed.");
       error.statusCode = response.status;
-      error.stage = "portone_lookup";
-      error.diagnostics = diagnostics;
       throw error;
     }
     return data;
-  } catch (error) {
-    diagnostics.portoneLookup = diagnostics.portoneLookup || {
-      ok: false,
-      durationMs: Date.now() - startedAt,
-      message: error.message || "fetch failed",
-    };
-    error.stage = error.stage || "portone_lookup";
-    error.statusCode = error.statusCode || 502;
-    error.diagnostics = diagnostics;
-    throw error;
+  } finally {
+    clearTimeout(timeout);
   }
+}
+
+function getPortOnePaymentWithHttps(path) {
+  return new Promise((resolve, reject) => {
+    const request = https.request({
+      hostname: "api.portone.io",
+      path,
+      method: "GET",
+      family: 4,
+      timeout: 4500,
+      lookup: (hostname, options, callback) => dns.lookup(hostname, { ...options, family: 4 }, callback),
+      headers: {
+        Authorization: `PortOne ${String(process.env.PORTONE_API_SECRET || "").trim()}`,
+        "Content-Type": "application/json",
+      },
+    }, (response) => {
+      let body = "";
+      response.setEncoding("utf8");
+      response.on("data", (chunk) => {
+        body += chunk;
+      });
+      response.on("end", () => {
+        let data = null;
+        try {
+          data = body ? JSON.parse(body) : null;
+        } catch (error) {
+          reject(new Error("PortOne returned invalid JSON."));
+          return;
+        }
+        if (response.statusCode < 200 || response.statusCode >= 300) {
+          const error = new Error(data?.message || data?.type || "PortOne payment lookup failed.");
+          error.statusCode = response.statusCode;
+          reject(error);
+          return;
+        }
+        resolve(data);
+      });
+    });
+    request.on("timeout", () => {
+      request.destroy(new Error("PortOne payment lookup timed out."));
+    });
+    request.on("error", reject);
+    request.end();
+  });
 }
 
 function paymentAmount(payment) {

@@ -1798,8 +1798,13 @@ function findVirtualAccountSource(value, seen = new Set()) {
     value.vBank ||
     value.vbankIssued ||
     value.virtualAccountIssued ||
+    value.virtual_account_issued ||
     value.bankAccount ||
     value.account ||
+    value.paymentMethodDetail ||
+    value.payment_method_detail ||
+    value.paymentMethod ||
+    value.payment_method ||
     value.raw;
   if (preferred && typeof preferred === "object") {
     const found = findVirtualAccountSource(preferred, seen);
@@ -2699,15 +2704,21 @@ async function requestTossPayment() {
     navigate("paymentResult");
   };
   const getIssuedAccountFromTransactions = async () => {
-    try {
-      await window.motfReloadTransactions?.();
-      const list = payment.type === "stay" ? state.reservations : state.orders;
-      const matched = list.find((item) => item.id === payment.orderId);
-      return normalizeVirtualAccount(matched?.virtualAccount || {});
-    } catch (error) {
-      console.warn("Could not reload issued virtual account from transactions.", error);
-      return {};
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      if (attempt > 0) {
+        await new Promise((resolve) => window.setTimeout(resolve, 600));
+      }
+      try {
+        await window.motfReloadTransactions?.();
+        const list = payment.type === "stay" ? state.reservations : state.orders;
+        const matched = list.find((item) => item.id === payment.orderId);
+        const account = normalizeVirtualAccount(matched?.virtualAccount || {});
+        if (hasVirtualAccountInfo(account)) return account;
+      } catch (error) {
+        console.warn("Could not reload issued virtual account from transactions.", error);
+      }
     }
+    return {};
   };
 
   try {
