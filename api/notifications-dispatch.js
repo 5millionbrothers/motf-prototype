@@ -165,6 +165,43 @@ async function completeNotification(item, status, provider, providerMessageId, r
   });
 }
 
+async function optionalRpc(functionName, payload = {}) {
+  try {
+    const data = await supabaseRequest(`/rest/v1/rpc/${functionName}`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+    return { functionName, ok: true, data };
+  } catch (error) {
+    const message = String(error.message || "");
+    const isMissingFunction = error.statusCode === 404
+      || /Could not find|schema cache|not found/i.test(message);
+
+    if (isMissingFunction) {
+      return { functionName, ok: false, skipped: true, message };
+    }
+
+    console.warn(`notification maintenance RPC failed: ${functionName}`, error);
+    return { functionName, ok: false, message };
+  }
+}
+
+async function runNotificationMaintenance(source) {
+  if (source === "notification_outbox_trigger") return [];
+
+  const jobs = [
+    ["sync_partner_settlements", {}],
+    ["enqueue_deposit_deadline_notifications", { deadline_window_hours: 3 }],
+    ["enqueue_delayed_chat_notifications", { threshold_minutes: 30 }],
+  ];
+
+  const results = [];
+  for (const [functionName, payload] of jobs) {
+    results.push(await optionalRpc(functionName, payload));
+  }
+  return results;
+}
+
 function buildMockRequestPayload(item) {
   return {
     channel: "kakao_alimtalk",
@@ -224,7 +261,10 @@ module.exports = async function handler(req, res) {
     const body = req.method === "POST"
       ? (typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {}))
       : {};
-    const queryLimit = Number(new URL(req.url, "https://motf.co.kr").searchParams.get("limit"));
+    const requestUrl = new URL(req.url, "https://motf.co.kr");
+    const queryLimit = Number(requestUrl.searchParams.get("limit"));
+    const source = String(body.source || requestUrl.searchParams.get("source") || "");
+    const maintenance = await runNotificationMaintenance(source);
     const limit = Math.max(1, Math.min(Number(body.limit || queryLimit || 20), 100));
     const items = await claimBatch(limit);
     const results = [];
@@ -271,6 +311,7 @@ module.exports = async function handler(req, res) {
       mode: auth.mode,
       provider: "mock",
       claimed: items.length,
+      maintenance,
       results,
     });
   } catch (error) {
