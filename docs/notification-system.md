@@ -88,8 +88,101 @@ Body: {"limit":20}
 
 ## 다음 단계
 
+## 자동 큐 적재 이벤트
+
+SQL 파일:
+
+```text
+motf-database/supabase/41_notification_event_hooks.sql
+```
+
+아래 이벤트가 발생하면 `notification_outbox`에 자동으로 알림이 쌓입니다.
+
+| 이벤트 | 쌓이는 알림 |
+| --- | --- |
+| 가상계좌 발급 | 이용자 가상계좌 발급 안내 |
+| 예약 요청 생성 | 이용자 예약 요청 접수, 사장님 새 예약 요청 |
+| 예약 확정 | 이용자 예약 확정, 관리자 예약 상태 변경 |
+| 예약 취소/거절 | 이용자 예약 취소/환불 안내, 관리자 예약 상태 변경, 환불 필요 알림 |
+| 공판장 주문 생성 | 이용자 주문 접수, 사장님 새 주문 요청, 관리자 새 주문 |
+| 공판장 주문 상태 변경 | 이용자 주문 상태 변경, 환불 필요 시 관리자 알림 |
+| 채팅 메시지 생성 | 상대방에게 채팅 도착 알림 |
+
+채팅 알림은 같은 대화방/수신자 기준 약 5분 단위로 dedupe key가 묶여 과도하게 쌓이지 않도록 설계되어 있습니다.
+
+## 다음 단계
+
 1. 딜러사 선택
 2. 승인된 템플릿 코드 입력
 3. 실제 발송 API 연결
-4. 예약/주문/채팅 이벤트에서 `enqueue_notification` 호출
-5. 사장님 수락/취소용 일회용 토큰 페이지 구현
+4. 사장님 수락/취소용 일회용 토큰 페이지 구현
+5. 입금 기한 임박 알림용 스케줄러 추가
+
+## 자동 발송 호출 준비
+
+알림 발송 API는 이제 `POST`와 `GET`을 모두 지원합니다.
+
+```text
+GET  https://motf.co.kr/api/notifications-dispatch?limit=20
+POST https://motf.co.kr/api/notifications-dispatch
+```
+
+지원하는 인증 방식:
+
+| 방식 | 사용처 |
+| --- | --- |
+| `x-notification-secret: NOTIFICATION_DISPATCH_SECRET` | 수동 테스트, 외부 스케줄러 |
+| `Authorization: Bearer CRON_SECRET` | Vercel Cron |
+| `Authorization: Bearer NOTIFICATION_DISPATCH_SECRET` | 외부 스케줄러가 Authorization 헤더만 지원할 때 |
+| 관리자 로그인 토큰 | 관리자 화면에서 직접 실행할 때 |
+
+Vercel Cron은 `GET` 요청으로 실행되며, `CRON_SECRET` 환경변수가 있으면 자동으로 `Authorization: Bearer <CRON_SECRET>` 헤더를 붙입니다.
+
+## 즉시 발송 구조
+
+알림은 기본적으로 즉시 발송을 시도합니다.
+
+SQL 파일:
+
+```text
+motf-database/supabase/42A_setup_notification_dispatch_secret.sql
+motf-database/supabase/42B_notification_immediate_dispatch.sql
+```
+
+동작 방식:
+
+1. 예약, 주문, 채팅 이벤트가 생깁니다.
+2. Supabase가 `notification_outbox`에 발송 대기 알림을 생성합니다.
+3. `notification_outbox`에 `queued` 알림이 생기는 순간 `pg_net`이 Vercel의 `/api/notifications-dispatch`를 비동기로 호출합니다.
+4. Vercel API가 알림을 처리합니다.
+
+비밀키는 SQL 함수에 직접 넣지 않고 Supabase Vault에 `motf_notification_dispatch_secret` 이름으로 저장합니다.
+
+## 5분 Cron 백업
+
+현재 `vercel.json`에는 아래처럼 5분마다 알림 발송 API를 호출하는 Cron도 등록되어 있습니다.
+
+```json
+{
+  "path": "/api/notifications-dispatch",
+  "schedule": "*/5 * * * *"
+}
+```
+
+이 Cron은 메인 발송 수단이 아니라 보험 장치입니다. 즉시 발송이 순간적으로 실패하거나 Vercel/카카오 딜러사 API가 잠깐 흔들렸을 때, `queued` 상태로 남아 있는 알림을 다시 주워서 처리합니다.
+
+이 설정은 실서비스 기준 구조입니다. Vercel Hobby 플랜에서는 자주 실행되는 Cron이 제한될 수 있으므로, 실제 배포 시 Pro 이상 플랜 업그레이드가 필요할 수 있습니다.
+
+Vercel Cron 대신 외부 스케줄러를 쓰는 경우에는 cron-job.org, EasyCron, UptimeRobot 같은 서비스에서 `https://motf.co.kr/api/notifications-dispatch?limit=20`을 1~5분 주기로 호출하면 됩니다.
+
+외부 스케줄러를 쓰는 경우에는 요청 헤더에 아래 둘 중 하나를 넣으면 됩니다.
+
+```text
+x-notification-secret: Vercel의 NOTIFICATION_DISPATCH_SECRET 값
+```
+
+또는
+
+```text
+Authorization: Bearer Vercel의 NOTIFICATION_DISPATCH_SECRET 값
+```

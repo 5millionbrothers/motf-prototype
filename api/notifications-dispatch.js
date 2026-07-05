@@ -124,6 +124,16 @@ async function authorizeDispatch(req) {
     return { ok: true, mode: "secret" };
   }
 
+  const authorization = String(req.headers.authorization || "").trim();
+  const cronSecret = String(process.env.CRON_SECRET || "").trim();
+  if (cronSecret && authorization === `Bearer ${cronSecret}`) {
+    return { ok: true, mode: "cron" };
+  }
+
+  if (configuredSecret && authorization === `Bearer ${configuredSecret}`) {
+    return { ok: true, mode: "secret" };
+  }
+
   const user = await authenticatedUser(req.headers.authorization);
   if (user?.id && await isAdminUser(user.id)) {
     return { ok: true, mode: "admin", userId: user.id };
@@ -189,8 +199,8 @@ async function sendMockAlimtalk(item) {
 }
 
 module.exports = async function handler(req, res) {
-  if (req.method !== "POST") {
-    return json(res, 405, { ok: false, message: "POST only." });
+  if (!["GET", "POST"].includes(req.method)) {
+    return json(res, 405, { ok: false, message: "GET or POST only." });
   }
 
   const missing = REQUIRED_ENV.filter((name) => !process.env[name]);
@@ -211,8 +221,11 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
-    const limit = Math.max(1, Math.min(Number(body.limit || 20), 100));
+    const body = req.method === "POST"
+      ? (typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {}))
+      : {};
+    const queryLimit = Number(new URL(req.url, "https://motf.co.kr").searchParams.get("limit"));
+    const limit = Math.max(1, Math.min(Number(body.limit || queryLimit || 20), 100));
     const items = await claimBatch(limit);
     const results = [];
 
