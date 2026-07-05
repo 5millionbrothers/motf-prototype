@@ -244,7 +244,7 @@ let stays = [
 let stores = [
   {
     id: "gapyeong",
-    name: "가평 청춘 공판장",
+    name: "가평 마마트 공판장",
     region: "가평",
     type: "숙소 배송 가능",
     rating: 4.9,
@@ -504,22 +504,8 @@ const state = {
     },
   ],
   orders: [],
-  reviews: [
-    {
-      target: "가평 리버사이드 펜션",
-      score: 5,
-      tags: ["소통이 빨라요", "단체 이용 좋아요"],
-      text: "바베큐장 동선이 좋아서 30명대 MT 진행이 편했습니다. 사장님 답변도 빨랐어요.",
-      author: "경영학과 학생회",
-    },
-    {
-      target: "가평 청춘 공판장",
-      score: 4,
-      tags: ["가격이 합리적", "픽업이 편해요"],
-      text: "삼겹살 양 계산이 쉬웠고 일회용품을 같이 담을 수 있어서 준비 시간이 줄었습니다.",
-      author: "동아리 기획팀",
-    },
-  ],
+  reviews: [],
+  reviewTargets: [],
   chats: [
     {
       id: "river-chat",
@@ -533,7 +519,7 @@ const state = {
     },
     {
       id: "market-chat",
-      title: "가평 청춘 공판장",
+      title: "가평 마마트 공판장",
       subtitle: "수령 시간, 주류 확인",
       messages: [
         { from: "admin", text: "주류 주문은 수령 시 성인 인증이 필요합니다.", read: true },
@@ -542,7 +528,7 @@ const state = {
     },
   ],
   activeChatId: "river-chat",
-  rating: 5,
+  rating: 10,
   activeBoardId: "market-share",
   activeActivityId: "bingo",
   activePostId: "share-soju",
@@ -2882,11 +2868,72 @@ function orderCard(item) {
 }
 
 function renderReviews() {
-  qs("#reviewList").innerHTML = state.reviews.map(reviewCard).join("");
-  qs("#ratingRow").innerHTML = [1, 2, 3, 4, 5]
-    .map((score) => `<button type="button" class="star-btn ${score <= state.rating ? "active" : ""}" data-rating="${score}">★</button>`)
-    .join("");
+  const targetSelect = qs("#reviewTarget");
+  const submitButton = qs("#reviewForm")?.querySelector('[type="submit"]');
+  const helper = qs("#reviewEligibilityNote");
+  if (targetSelect) {
+    targetSelect.innerHTML = state.reviewTargets.length
+      ? state.reviewTargets.map((target) => `<option value="${escapeHtml(target.id)}">${escapeHtml(target.label)}</option>`).join("")
+      : `<option value="">이용 완료 내역이 없습니다</option>`;
+    targetSelect.disabled = !state.reviewTargets.length;
+  }
+  if (submitButton) submitButton.disabled = !state.reviewTargets.length;
+  if (helper) {
+    helper.textContent = state.reviewTargets.length
+      ? "이용 완료된 예약이나 주문만 리뷰를 작성할 수 있어요."
+      : "리뷰는 실제 이용 완료된 예약이나 공판장 주문이 있을 때 작성할 수 있어요.";
+  }
+  renderReviewKeywords();
+  qs("#reviewList").innerHTML = state.reviews.length
+    ? state.reviews.map(reviewCard).join("")
+    : `<div class="empty-state">아직 등록된 후기가 없습니다.</div>`;
+  const ratingRange = qs("#reviewRatingRange");
+  const ratingLabel = qs("#reviewRatingLabel");
+  if (ratingRange) ratingRange.value = String(state.rating);
+  if (ratingLabel) ratingLabel.textContent = `${state.rating}점`;
+  qs("#ratingRow").innerHTML = renderStarPreview(state.rating);
   refreshIcons();
+}
+
+function activeReviewTarget() {
+  const targetId = qs("#reviewTarget")?.value || "";
+  return state.reviewTargets.find((item) => item.id === targetId) || null;
+}
+
+function reviewKeywordsForTarget(target) {
+  const common = ["소통이 빨라요", "단체 이용 좋아요", "합리적인 가격", "응답이 빨라요", "사장님이 친절해요", "재방문하고 싶어요"];
+  const stay = ["숙소가 깨끗해요", "사진과 같아요", "방이 넓어요", "바베큐장이 좋아요", "편의시설이 좋아요", "주차가 편해요", "소음 안내가 명확해요"];
+  const market = ["상품 품질이 좋아요", "포장이 꼼꼼해요", "수량이 정확해요", "신선해요", "픽업이 편해요", "배송이 편해요", "대량 주문이 편해요"];
+  return [...common, ...(target?.type === "market_order" ? market : stay)];
+}
+
+function renderReviewKeywords() {
+  const target = activeReviewTarget();
+  const list = qs("#reviewKeywordList");
+  const label = qs("#reviewKeywordTypeLabel");
+  if (!list) return;
+  const keywords = reviewKeywordsForTarget(target);
+  list.innerHTML = keywords.map((keyword, index) => `
+    <button type="button" class="tag-chip ${index < 3 ? "active" : ""}">${escapeHtml(keyword)}</button>
+  `).join("");
+  if (label) {
+    label.textContent = target?.type === "market_order"
+      ? "공판장 주문에 맞는 키워드예요"
+      : "숙소 이용에 맞는 키워드예요";
+  }
+}
+
+function renderStarPreview(score) {
+  const normalized = Math.max(1, Math.min(10, Number(score) || 10));
+  return [1, 2, 3, 4, 5].map((index) => {
+    const fill = Math.max(0, Math.min(100, (normalized - (index - 1) * 2) * 50));
+    return `
+      <span class="star-meter" aria-hidden="true">
+        <span class="star-meter-base">★</span>
+        <span class="star-meter-fill" style="width:${fill}%">★</span>
+      </span>
+    `;
+  }).join("");
 }
 
 function reviewCard(review) {
@@ -2894,14 +2941,43 @@ function reviewCard(review) {
     <article class="review-card">
       <div class="listing-meta">
         <span class="pill">${escapeHtml(review.target)}</span>
-        <span class="review-score">${"★".repeat(review.score)}${"☆".repeat(5 - review.score)}</span>
+        <span class="review-score">${renderStarPreview(review.score)} <b>${Number(review.score || 0).toFixed(0)}점</b></span>
       </div>
+      ${Array.isArray(review.images) && review.images.length ? `
+        <div class="review-photo-grid">
+          ${review.images.map((image) => `<img src="${escapeHtml(image)}" alt="리뷰 사진" loading="lazy" />`).join("")}
+        </div>
+      ` : ""}
       <p>${escapeHtml(review.text)}</p>
       <div class="detail-meta">${review.tags.map((tag) => `<span class="pill">${escapeHtml(tag)}</span>`).join("")}</div>
       <strong>${escapeHtml(review.author)}</strong>
     </article>
   `;
 }
+
+window.motfApplyReviews = function applyReviews(nextReviews = []) {
+  state.reviews = Array.isArray(nextReviews) ? nextReviews : [];
+  if (currentRoute() === "review") renderReviews();
+};
+
+window.motfApplyReviewTargets = function applyReviewTargets(nextTargets = []) {
+  state.reviewTargets = Array.isArray(nextTargets) ? nextTargets : [];
+  if (currentRoute() === "review") renderReviews();
+};
+
+window.motfGetReviewDraft = function getReviewDraft() {
+  const targetId = qs("#reviewTarget")?.value || "";
+  const target = state.reviewTargets.find((item) => item.id === targetId);
+  if (!target) return null;
+  return {
+    targetType: target.type,
+    transactionId: target.transactionId,
+    rating: state.rating,
+    body: qs("#reviewText")?.value.trim() || "",
+    tags: qsa(".tag-chip.active").map((tag) => tag.textContent.trim()).filter(Boolean),
+    files: qs("#reviewImages")?.files ? [...qs("#reviewImages").files] : [],
+  };
+};
 
 function complete(type, title, text) {
   qs("#completeEyebrow").textContent = type;
@@ -3115,13 +3191,6 @@ document.addEventListener("click", (event) => {
     return;
   }
 
-  const ratingButton = event.target.closest("[data-rating]");
-  if (ratingButton) {
-    state.rating = Number(ratingButton.dataset.rating);
-    renderReviews();
-    return;
-  }
-
   const tagButton = event.target.closest(".tag-chip");
   if (tagButton) {
     tagButton.classList.toggle("active");
@@ -3178,6 +3247,11 @@ document.addEventListener("input", (event) => {
   if (event.target.matches("#marketPeople")) renderStores();
   if (event.target.matches("#recommendPeople, #mealStyle")) renderCommunity();
   if (event.target.matches("#activityPeople, #activitySpace, #activityMood")) renderRecreation();
+  if (event.target.matches("#reviewRatingRange")) {
+    state.rating = Number(event.target.value || 10);
+    renderReviews();
+  }
+  if (event.target.matches("#reviewTarget")) renderReviewKeywords();
   if (event.target.matches("[data-cart-input]")) {
     const item = state.cart.find((row) => row.productId === event.target.dataset.cartInput);
     if (item) {
@@ -3202,6 +3276,7 @@ document.addEventListener("change", (event) => {
   if (event.target.matches("#marketPeople")) renderStores();
   if (event.target.matches("#mealStyle")) renderCommunity();
   if (event.target.matches("#activityPeople, #activitySpace, #activityMood")) renderRecreation();
+  if (event.target.matches("#reviewTarget")) renderReviewKeywords();
 });
 
 qs("#bookingForm").addEventListener("submit", (event) => {
@@ -3304,8 +3379,12 @@ qs("#postCommentForm").addEventListener("submit", (event) => {
   renderPostDetail();
 });
 
-qs("#reviewForm").addEventListener("submit", (event) => {
+qs("#reviewForm").addEventListener("submit", async (event) => {
   event.preventDefault();
+  if (window.motfSubmitVerifiedReview) {
+    await window.motfSubmitVerifiedReview(event.target);
+    return;
+  }
   const activeTags = qsa(".tag-chip.active").map((tag) => tag.textContent);
   state.reviews.unshift({
     target: qs("#reviewTarget").value,
