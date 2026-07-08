@@ -14,18 +14,11 @@ jobs:
         with:
           node-version: 22
       - name: Check JavaScript syntax
+        shell: bash
         run: |
-          node --check app.js
-          node --check auth.js
-          node --check catalog.js
-          node --check chat-data.js
-          node --check support-data.js
-          node --check transactions.js
-          node --check api/_utils.js
-          node --check api/health.js
-          node --check api/payment-config.js
-          node --check api/portone-diagnostics.js
-          node --check api/confirm-payment.js
-          node --check api/portone-webhook.js
-      - name: Ensure DB SQL is not duplicated here
+          set -euo pipefail
+          while IFS= read -r -d '' file; do
+            node --check "$file"
+          done < <(find . -type f -name '*.js' -not -path './node_modules/*' -print0)
+      - name: Ensure database migrations stay in motf-database
         run: test ! -d supabase
