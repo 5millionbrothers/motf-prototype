@@ -2494,6 +2494,10 @@ input[type="range"] {
   gap: 16px;
 }
 
+.budget-page-helper {
+  margin-top: 12px;
+}
+
 .budget-receipt {
   display: grid;
   gap: 14px;

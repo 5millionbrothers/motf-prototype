@@ -22,6 +22,12 @@
     return date.toLocaleDateString("ko-KR", { year: "numeric", month: "2-digit", day: "2-digit" });
   }
 
+  function shortReceiptNo(row) {
+    const raw = String(row.id || "").replace(/[^a-zA-Z0-9]/g, "");
+    const suffix = (raw.slice(-8) || "00000000").toUpperCase();
+    return `${row.type === "공판장 주문" ? "주문" : "예약"}-${suffix}`;
+  }
+
   function normalizeRows(selectedId = "") {
     const snapshot = window.motfGetUsageSnapshot?.() || { reservations: [], orders: [] };
     const reservations = (snapshot.reservations || []).map((item) => ({
@@ -96,7 +102,7 @@
             <div>
               <p class="eyebrow">MOTF RECEIPT</p>
               <h2>${escapeHtml(report.title)}</h2>
-              <p>발급일 ${escapeHtml(formatDate(report.generatedAt))} · 학생회/동행자 공유용 증빙 파일</p>
+              <p>발급일 ${escapeHtml(formatDate(report.generatedAt))}</p>
             </div>
             <div class="pill success">다운로드 전 미리보기</div>
           </div>
@@ -126,7 +132,7 @@
                 ${report.rows.map((row) => `
                   <tr>
                     <td>${escapeHtml(row.type)}</td>
-                    <td>${escapeHtml(row.id)}</td>
+                    <td>${escapeHtml(shortReceiptNo(row))}</td>
                     <td>${escapeHtml(row.place)}</td>
                     <td>${escapeHtml(row.itemName)}</td>
                     <td>${escapeHtml(row.date || "-")}</td>
@@ -163,7 +169,7 @@
       ["구분", "번호", "업체/장소", "항목", "일정", "인원", "상태", "결제금액", "환불/차감", "증빙 합계", "비고"],
       ...report.rows.map((row) => [
         row.type,
-        row.id,
+        shortReceiptNo(row),
         row.place,
         row.itemName,
         row.date || "-",
