@@ -34,7 +34,7 @@
   async function loadReviews() {
     const { data, error } = await client
       .from("reviews")
-      .select("id, author_name, rating, body, tags, image_urls, created_at, businesses(business_name)")
+      .select("id, reservation_id, market_order_id, author_name, rating, body, tags, image_urls, created_at, businesses(business_name)")
       .eq("is_hidden", false)
       .order("created_at", { ascending: false })
       .limit(40);
@@ -46,6 +46,7 @@
 
     window.motfApplyReviews?.((data || []).map((review) => ({
       id: review.id,
+      type: review.market_order_id ? "market" : "stay",
       target: escapeHtml(review.businesses?.business_name || "이용 후기"),
       score: Number(review.rating) || 5,
       tags: Array.isArray(review.tags) ? review.tags.map(escapeHtml) : [],

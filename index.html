@@ -536,6 +536,19 @@
         </div>
       </section>
 
+      <section id="budgetPreview" class="view">
+        <button class="ghost-btn back-btn" data-route="myUsage"><i data-lucide="chevron-left"></i>이용 내역</button>
+        <div class="view-title mypage-subpage-title">
+          <div>
+            <p class="eyebrow">예결산 증빙</p>
+            <h1>같이 간 사람들에게 공유할 결산 파일 미리보기</h1>
+            <p>다운로드 전에 금액과 항목을 확인한 뒤 엑셀 파일로 저장할 수 있어요.</p>
+          </div>
+          <button class="primary-btn" type="button" data-budget-download><i data-lucide="download"></i>엑셀 다운로드</button>
+        </div>
+        <div id="budgetPreviewArea"></div>
+      </section>
+
       <section id="myAccount" class="view">
         <button class="ghost-btn back-btn" data-route="mypage"><i data-lucide="chevron-left"></i>마이페이지</button>
         <div class="account-layout">
@@ -764,8 +777,10 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
     <script src="config.js?v=20260622-naver1"></script>
     <script src="app.js?v=motf-user-v9"></script>
+    <script src="budget-export.js?v=20260710-user-budget1"></script>
     <script src="auth.js?v=20260705-withdrawal2"></script>
     <script src="catalog.js?v=20260621-hardening1"></script>
     <script src="transactions.js?v=20260705-user-scoped-transactions1"></script>

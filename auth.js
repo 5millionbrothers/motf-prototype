@@ -105,7 +105,10 @@
             <input id="customerLoginEmail" type="email" autocomplete="email" required placeholder="example@email.com" />
           </label>
           <label>비밀번호
-            <input id="customerLoginPassword" type="password" autocomplete="current-password" required placeholder="비밀번호를 입력해주세요" />
+            <span class="password-field">
+              <input id="customerLoginPassword" type="password" autocomplete="current-password" required placeholder="비밀번호를 입력해주세요" />
+              <button class="password-toggle" type="button" data-toggle-login-password aria-label="비밀번호 보기">보기</button>
+            </span>
           </label>
           <button class="primary-btn auth-submit" type="submit">이메일로 로그인</button>
           <div class="auth-divider"><span>또는</span></div>
@@ -447,6 +450,17 @@
     }
     session = data.session;
     await finishLogin();
+  });
+
+  document.addEventListener("click", (event) => {
+    const toggleButton = event.target.closest("[data-toggle-login-password]");
+    if (!toggleButton) return;
+    const passwordInput = document.querySelector("#customerLoginPassword");
+    if (!passwordInput) return;
+    const shouldShow = passwordInput.type === "password";
+    passwordInput.type = shouldShow ? "text" : "password";
+    toggleButton.textContent = shouldShow ? "숨김" : "보기";
+    toggleButton.setAttribute("aria-label", shouldShow ? "비밀번호 숨기기" : "비밀번호 보기");
   });
 
   signupForm.addEventListener("submit", async (event) => {

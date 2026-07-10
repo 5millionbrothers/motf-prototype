@@ -505,6 +505,7 @@ const state = {
   ],
   orders: [],
   reviews: [],
+  reviewScope: "all",
   reviewTargets: [],
   chats: [
     {
@@ -663,6 +664,7 @@ const routeParents = {
   myUsage: "mypage",
   myAccount: "mypage",
   myGuide: "mypage",
+  budgetPreview: "myUsage",
   review: "mypage",
   businessInfo: "home",
   terms: "home",
@@ -693,6 +695,7 @@ const appRoutes = new Set([
   "myUsage",
   "myAccount",
   "myGuide",
+  "budgetPreview",
   "review",
   "businessInfo",
   "terms",
@@ -794,6 +797,7 @@ function renderRoute(route) {
   if (route === "chat") renderChat();
   if (route === "mypage") renderMypage();
   if (route === "myUsage") renderMypage();
+  if (route === "budgetPreview") window.motfRenderBudgetPreview?.();
   if (route === "review") renderReviews();
 }
 
@@ -1359,6 +1363,7 @@ function renderStores() {
         </div>
         <div class="button-row">
           <button class="secondary-btn" data-open-chat="${store.name}"><i data-lucide="messages-square"></i>공판장 문의</button>
+          <button class="ghost-btn" data-route="review" data-review-scope="market"><i data-lucide="star"></i>공판장 리뷰</button>
           <button class="ghost-btn" data-route="cart"><i data-lucide="shopping-cart"></i>장바구니 보기</button>
         </div>
       </div>
@@ -2580,6 +2585,10 @@ window.motfApplyChats = function applyChats(chats, activeChatId) {
 window.motfGetActiveChatId = () => state.activeChatId;
 window.motfFindBusinessByName = (name) => [...stays, ...stores].find((item) => item.name === escapeHtml(name)) || null;
 window.motfNavigate = navigate;
+window.motfGetUsageSnapshot = () => ({
+  reservations: state.reservations.map((item) => ({ ...item })),
+  orders: state.orders.map((item) => ({ ...item })),
+});
 
 function renderMypage() {
   hydrateLocalIssuedTransactions();
@@ -2884,9 +2893,14 @@ function renderReviews() {
       : "리뷰는 실제 이용 완료된 예약이나 공판장 주문이 있을 때 작성할 수 있어요.";
   }
   renderReviewKeywords();
-  qs("#reviewList").innerHTML = state.reviews.length
-    ? state.reviews.map(reviewCard).join("")
-    : `<div class="empty-state">아직 등록된 후기가 없습니다.</div>`;
+  const visibleReviews = state.reviewScope === "market"
+    ? state.reviews.filter((review) => review.type === "market")
+    : state.reviewScope === "stay"
+      ? state.reviews.filter((review) => review.type !== "market")
+      : state.reviews;
+  qs("#reviewList").innerHTML = visibleReviews.length
+    ? visibleReviews.map(reviewCard).join("")
+    : `<div class="empty-state">${state.reviewScope === "market" ? "아직 등록된 공판장 후기가 없습니다." : "아직 등록된 후기가 없습니다."}</div>`;
   const ratingRange = qs("#reviewRatingRange");
   const ratingLabel = qs("#reviewRatingLabel");
   if (ratingRange) ratingRange.value = String(state.rating);
@@ -2965,6 +2979,11 @@ window.motfApplyReviewTargets = function applyReviewTargets(nextTargets = []) {
   if (currentRoute() === "review") renderReviews();
 };
 
+window.motfSetReviewScope = function setReviewScope(scope = "all") {
+  state.reviewScope = ["all", "stay", "market"].includes(scope) ? scope : "all";
+  if (currentRoute() === "review") renderReviews();
+};
+
 window.motfGetReviewDraft = function getReviewDraft() {
   const targetId = qs("#reviewTarget")?.value || "";
   const target = state.reviewTargets.find((item) => item.id === targetId);
@@ -3011,6 +3030,7 @@ document.addEventListener("click", (event) => {
 
   const routeButton = event.target.closest("[data-route]");
   if (routeButton) {
+    if (routeButton.dataset.route === "review") window.motfSetReviewScope?.(routeButton.dataset.reviewScope || "all");
     navigate(routeButton.dataset.route);
     return;
   }
@@ -3228,7 +3248,7 @@ document.addEventListener("click", (event) => {
 
   const budgetButton = event.target.closest("[data-budget-file]");
   if (budgetButton) {
-    toast("예결산 양식 선택 화면으로 연결됩니다.");
+    window.motfOpenBudgetPreview?.(budgetButton.dataset.budgetFile);
   }
 });
 
