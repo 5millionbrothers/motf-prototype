@@ -7,7 +7,7 @@
     <title>moTF - 모두의 TF</title>
     <link rel="icon" href="assets/motf-logo-icon.png" />
     <link rel="apple-touch-icon" href="assets/motf-logo-icon.png" />
-    <link rel="stylesheet" href="styles.css?v=20260712-community-polish2" />
+    <link rel="stylesheet" href="styles.css?v=20260712-layout-polish3" />
     <link rel="stylesheet" href="auth.css?v=20260712-policy-links1" />
     <script async src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" onload="window.__motfRefreshIcons && window.__motfRefreshIcons()"></script>
     <script async src="https://cdn.portone.io/v2/browser-sdk.js"></script>
@@ -119,8 +119,6 @@
         <section class="advanced-filter-panel" id="stayAdvancedFilters" hidden>
           <div class="advanced-filter-header">
             <div>
-              <p class="eyebrow">세부 필터</p>
-              <h2>MT 팀 상황에 맞는 조건을 더 골라주세요</h2>
             </div>
             <button class="ghost-btn" type="button" data-reset-stay-filters><i data-lucide="rotate-ccw"></i>초기화</button>
           </div>
@@ -132,7 +130,7 @@
               <label class="check-card"><input type="checkbox" data-stay-filter value="waterside" />바닷가/강가</label>
               <label class="check-card"><input type="checkbox" data-stay-filter value="valley" />계곡 인접</label>
             </fieldset>
-            <fieldset>
+            <fieldset class="space-count-filter">
               <legend>공간 구성</legend>
               <label>방 최소 개수<input type="number" id="stayMinRooms" min="0" max="20" value="0" /></label>
               <label>화장실 최소 개수<input type="number" id="stayMinBaths" min="0" max="20" value="0" /></label>
@@ -238,21 +236,21 @@
       </section>
 
       <section id="cart" class="view">
+        <button class="ghost-btn back-btn cart-back-btn" data-route="market"><i data-lucide="chevron-left"></i>공판장</button>
+        <div class="view-title compact cart-page-title">
+          <div>
+            <h1>장바구니 결제</h1>
+          </div>
+        </div>
         <div class="checkout-layout">
           <section>
-            <div class="view-title compact">
-              <div>
-                <p class="eyebrow">주문 결제</p>
-                <h1>수량을 마지막으로 확인해주세요</h1>
-              </div>
-            </div>
             <div id="cartItems" class="cart-list"></div>
           </section>
           <form class="summary-panel" id="orderForm">
             <h2>수령 정보</h2>
             <label>수령 장소<input required id="pickupPlace" placeholder="예: 가평 리버사이드 펜션 앞" /></label>
             <label>수령 시간<input required type="time" id="pickupTime" value="17:00" /></label>
-            <label>요청사항<textarea id="pickupMemo" rows="3" placeholder="예: 아이스박스 포장, 술은 별도 박스"></textarea></label>
+            <label>요청사항<textarea id="pickupMemo" rows="3"></textarea></label>
             <div id="cartSummary"></div>
             <div class="toss-ready-card">
               <strong>포트원 KG이니시스 가상계좌</strong>
@@ -482,8 +480,7 @@
       <section id="mypage" class="view">
         <div class="view-title">
           <div>
-            <p class="eyebrow">마이페이지</p>
-            <h1>내 이용 내역과 계정 정보를 한 곳에서 관리하기</h1>
+            <h1>마이페이지</h1>
           </div>
           <button class="secondary-btn mypage-logout-btn" type="button" data-auth-logout>
             <i data-lucide="log-out"></i>로그아웃
@@ -547,7 +544,7 @@
             <p class="eyebrow">계정</p>
             <h1>로그인 정보</h1>
             <label>아이디<input value="motf_demo_user" /></label>
-            <label>비밀번호<input type="password" value="password" /></label>
+            <label>비밀번호<input type="password" placeholder="변경할 때만 입력" /></label>
             <label>학교/소속<input value="한국대 경영학과 학생회" /></label>
             <label>대표 연락처<input value="010-0000-0000" /></label>
             <button class="primary-btn" type="button" data-account-save><i data-lucide="save"></i>수정 내용 저장</button>
@@ -593,7 +590,7 @@
       </section>
 
       <section id="businessInfo" class="view legal-view">
-        <button class="ghost-btn back-btn" data-route="home"><i data-lucide="chevron-left"></i>메인으로</button>
+        <button class="ghost-btn back-btn" data-history-back data-fallback-route="myGuide"><i data-lucide="chevron-left"></i>뒤로가기</button>
         <div class="legal-layout">
           <div class="view-title compact">
             <div>
@@ -616,7 +613,7 @@
       </section>
 
       <section id="terms" class="view legal-view">
-        <button class="ghost-btn back-btn" data-route="home"><i data-lucide="chevron-left"></i>메인으로</button>
+        <button class="ghost-btn back-btn" data-history-back data-fallback-route="myGuide"><i data-lucide="chevron-left"></i>뒤로가기</button>
         <div class="legal-layout">
           <div class="view-title compact">
             <div>
@@ -647,7 +644,7 @@
       </section>
 
       <section id="privacy" class="view legal-view">
-        <button class="ghost-btn back-btn" data-route="home"><i data-lucide="chevron-left"></i>메인으로</button>
+        <button class="ghost-btn back-btn" data-history-back data-fallback-route="myGuide"><i data-lucide="chevron-left"></i>뒤로가기</button>
         <div class="legal-layout">
           <div class="view-title compact">
             <div>
@@ -674,7 +671,7 @@
       </section>
 
       <section id="refundPolicy" class="view legal-view">
-        <button class="ghost-btn back-btn" data-route="home"><i data-lucide="chevron-left"></i>메인으로</button>
+        <button class="ghost-btn back-btn" data-history-back data-fallback-route="myGuide"><i data-lucide="chevron-left"></i>뒤로가기</button>
         <div class="legal-layout">
           <div class="view-title compact">
             <div>
@@ -778,9 +775,9 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
     <script src="config.js?v=20260622-naver1"></script>
-    <script src="app.js?v=20260712-community-polish2"></script>
-    <script src="budget-export.js?v=20260710-user-budget1"></script>
-    <script src="auth.js?v=20260712-policy-links1"></script>
+    <script src="app.js?v=20260712-layout-polish3"></script>
+    <script src="budget-export.js?v=20260712-budget-template1"></script>
+    <script src="auth.js?v=20260712-login-clear1"></script>
     <script src="catalog.js?v=20260621-hardening1"></script>
     <script src="transactions.js?v=20260705-user-scoped-transactions1"></script>
     <script src="chat-data.js?v=20260621-chat2"></script>

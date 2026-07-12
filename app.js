@@ -846,9 +846,11 @@ function scrollToCommunitySection(section = "") {
       ? qs("#communityOrderRecommend")
       : null;
   if (!target) return;
-  window.setTimeout(() => {
-    target.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, 40);
+  [80, 220].forEach((delay) => {
+    window.setTimeout(() => {
+      target.scrollIntoView({ behavior: delay > 100 ? "auto" : "smooth", block: "start" });
+    }, delay);
+  });
 }
 
 function hasNaverMapKey() {
@@ -1400,7 +1402,7 @@ function renderStores() {
       <div class="market-intro-body">
         <p class="eyebrow">${store.region} 계약 공판장</p>
         <h2>${store.name}</h2>
-        <p>${store.intro} 숙소 일정에 맞춰 수령 또는 배송 요청을 남길 수 있습니다.</p>
+        <p>${store.intro}<br />숙소 일정에 맞춰 수령 또는 배송 요청을 남길 수 있습니다.</p>
         <div class="detail-meta">
           <span class="pill">★ ${store.rating}</span>
           <span class="pill success">${store.type}</span>
@@ -1585,7 +1587,7 @@ function renderCart() {
             <article class="cart-row">
               <img src="${found.product.image}" alt="${found.product.name} 사진" />
               <div>
-                <span class="pill">${found.store.name}</span>
+                <span class="cart-store-name">${found.store.name}</span>
                 <h3>${found.product.name}</h3>
                 <p>${found.product.unit} · ${money(found.product.price)}</p>
               </div>
@@ -2535,6 +2537,12 @@ function renderBoardDetail() {
   qs("#boardPostBoard").value = board.id;
   qs("#boardPostTitle").value = "";
   qs("#boardPostBody").value = "";
+  const writePanel = qs("#boardWriteForm");
+  const header = qs("#boardDetailHeader");
+  if (writePanel && header) {
+    const headerHeight = Math.ceil(header.getBoundingClientRect().height);
+    writePanel.style.marginTop = window.matchMedia("(max-width: 1080px)").matches ? "0px" : `${headerHeight + 22}px`;
+  }
   refreshIcons();
 }
 

@@ -256,9 +256,21 @@
   function openModal(tab = "login", action = null) {
     pendingAction = action;
     switchTab(tab);
+    const loginPassword = document.querySelector("#customerLoginPassword");
+    if (loginPassword) {
+      loginPassword.value = "";
+      loginPassword.type = "password";
+    }
+    const toggleButton = document.querySelector("[data-toggle-login-password]");
+    if (toggleButton) {
+      toggleButton.innerHTML = '<i data-lucide="eye"></i>';
+      toggleButton.setAttribute("aria-label", "비밀번호 보기");
+    }
     modal.hidden = false;
     document.body.classList.add("auth-modal-open");
+    window.refreshIcons?.();
     window.setTimeout(() => {
+      if (loginPassword) loginPassword.value = "";
       document.querySelector(isSignupTab() ? "#customerSignupName" : "#customerLoginEmail")?.focus();
     }, 0);
   }

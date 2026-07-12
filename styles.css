@@ -603,7 +603,7 @@ input[type="range"] {
 .advanced-filter-header {
   display: flex;
   align-items: flex-start;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 12px;
 }
 
@@ -632,6 +632,15 @@ input[type="range"] {
   color: var(--teal-dark);
   font-size: 13px;
   font-weight: 650;
+}
+
+.space-count-filter {
+  gap: 16px;
+}
+
+.space-count-filter label {
+  display: grid;
+  gap: 8px;
 }
 
 .check-card {
@@ -1578,8 +1587,12 @@ input[type="range"] {
 
 .market-intro-body {
   display: grid;
-  align-content: start;
-  gap: 12px;
+  align-content: center;
+  gap: 14px;
+}
+
+.market-intro-body p {
+  line-height: 1.75;
 }
 
 .market-intro-body h2 {
@@ -1727,18 +1740,47 @@ input[type="range"] {
 
 .cart-list {
   display: grid;
-  gap: 10px;
+  gap: 14px;
 }
 
 .cart-row {
   display: grid;
   grid-template-columns: 82px 1fr auto;
-  gap: 12px;
+  gap: 16px;
   align-items: center;
-  padding: 12px;
+  padding: 16px;
   background: var(--paper);
   border: 1px solid var(--line);
   border-radius: 8px;
+}
+
+.cart-page-title {
+  margin-bottom: 18px;
+}
+
+.cart-back-btn {
+  margin-bottom: 18px;
+}
+
+.cart-row > div {
+  display: grid;
+  gap: 9px;
+}
+
+.cart-row > div:last-child {
+  justify-items: end;
+  gap: 14px;
+}
+
+.cart-store-name {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.cart-row h3,
+.cart-row p {
+  margin: 0;
 }
 
 .cart-row img {
@@ -2364,6 +2406,15 @@ input[type="range"] {
 .mypage-logout-btn {
   align-self: center;
   white-space: nowrap;
+}
+
+#myAccount > .back-btn {
+  margin-bottom: 18px;
+}
+
+#communityBoardSection,
+#communityOrderRecommend {
+  scroll-margin-top: 92px;
 }
 
 .danger-panel {
