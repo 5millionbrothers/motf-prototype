@@ -2003,6 +2003,18 @@ input[type="range"] {
   overflow: hidden;
 }
 
+.board-write-panel {
+  margin-top: 96px;
+}
+
+.submit-panel {
+  gap: 18px;
+}
+
+.submit-panel label {
+  gap: 10px;
+}
+
 .post-detail-media {
   width: 100%;
   max-height: 360px;
@@ -2125,6 +2137,14 @@ input[type="range"] {
 
 #activityDetail > .back-btn {
   margin-bottom: 18px;
+}
+
+#boardDetail > .back-btn {
+  margin-bottom: 24px;
+}
+
+#boardDetail .view-title.compact {
+  margin-bottom: 22px;
 }
 
 #activitySubmitForm .primary-btn {
@@ -2928,6 +2948,10 @@ input[type="range"] {
   .summary-panel {
     position: relative;
     top: auto;
+  }
+
+  .board-write-panel {
+    margin-top: 0;
   }
 
   .map-panel {

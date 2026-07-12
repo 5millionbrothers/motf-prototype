@@ -250,7 +250,7 @@ let stores = [
     rating: 4.9,
     location: { lat: 37.8329, lng: 127.5107 },
     image: photo("photo-1542838132-92c53300491e"),
-    intro: "MT용 바베큐 세트와 주류, 일회용품을 한 번에 준비하는 공판장입니다.",
+    intro: "MT에 필요한 식자재와 주류, 일회용품을 일정에 맞춰 한 번에 준비하는 공판장입니다.",
     products: [
       {
         id: "pork-set",
@@ -839,6 +839,18 @@ function renderRoute(route) {
   if (route === "review") renderReviews();
 }
 
+function scrollToCommunitySection(section = "") {
+  const target = section === "boards"
+    ? qs("#communityBoardSection")
+    : section === "orderRecommend"
+      ? qs("#communityOrderRecommend")
+      : null;
+  if (!target) return;
+  window.setTimeout(() => {
+    target.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, 40);
+}
+
 function hasNaverMapKey() {
   return Boolean(NAVER_MAP_KEY_ID);
 }
@@ -1394,14 +1406,8 @@ function renderStores() {
           <span class="pill success">${store.type}</span>
           <span class="pill warning">주류 성인 인증</span>
         </div>
-        <div class="market-controls">
-          <label>참여 인원<input type="number" id="marketPeople" min="10" max="120" value="${people}" /></label>
-          <div class="market-reco">
-            <strong>${people}명 기준</strong>
-            <span>고기 약 ${porkKg}kg · 생수 2L 약 ${Math.ceil(people * 0.6)}병</span>
-          </div>
-        </div>
         <div class="button-row">
+          <button class="secondary-btn" type="button" data-open-order-recommend><i data-lucide="calculator"></i>추천 주문량 보기</button>
           <button class="secondary-btn" data-open-chat="${store.name}"><i data-lucide="messages-square"></i>공판장 문의</button>
           <button class="ghost-btn" data-route="review" data-review-scope="market"><i data-lucide="star"></i>공판장 리뷰</button>
           <button class="ghost-btn" data-route="cart"><i data-lucide="shopping-cart"></i>장바구니 보기</button>
@@ -2394,7 +2400,7 @@ function renderCommunity() {
   const style = qs("#mealStyle").value;
   const factor = style === "heavy" ? 0.45 : style === "light" ? 0.28 : 0.35;
   const pork = Math.ceil(people * factor);
-  const alcohol = Math.ceil(people * (style === "light" ? 1.1 : style === "heavy" ? 2.1 : 1.6));
+  const drink = Math.ceil(people * (style === "light" ? 1.1 : style === "heavy" ? 1.8 : 1.4));
   const water = Math.ceil(people * 0.6);
   const snacks = Math.ceil(people * (style === "heavy" ? 0.35 : 0.25));
   qs("#recommendResult").innerHTML = `
@@ -2403,7 +2409,7 @@ function renderCommunity() {
       <span>${style === "heavy" ? "든든한" : style === "light" ? "간단한" : "기본"} MT 장보기 기준</span>
     </div>
     <div class="recommend-row"><span>고기</span><strong>약 ${pork}kg</strong></div>
-    <div class="recommend-row"><span>술/음료</span><strong>약 ${alcohol}병 또는 캔</strong></div>
+    <div class="recommend-row"><span>음료</span><strong>약 ${drink}병 또는 캔</strong></div>
     <div class="recommend-row"><span>생수</span><strong>2L ${water}병</strong></div>
     <div class="recommend-row"><span>안주</span><strong>약 ${snacks}kg · ${Math.ceil(people / 6)}세트</strong></div>
   `;
@@ -2537,7 +2543,6 @@ function renderActivityDetail() {
   qs("#activityDetailContent").innerHTML = `
     <img class="post-detail-media" src="${activity.image}" alt="${escapeHtml(activity.title)}" />
     <div class="post-detail-body">
-      <p class="eyebrow">추천 레크레이션</p>
       <h1>${escapeHtml(activity.title)}</h1>
       <p class="activity-detail-description">${escapeHtml(activity.detail)}</p>
       <div class="detail-meta activity-detail-meta">
@@ -3071,6 +3076,9 @@ document.addEventListener("click", (event) => {
   if (routeButton) {
     if (routeButton.dataset.route === "review") window.motfSetReviewScope?.(routeButton.dataset.reviewScope || "all");
     navigate(routeButton.dataset.route);
+    if (routeButton.dataset.route === "community" && routeButton.dataset.communitySection) {
+      scrollToCommunitySection(routeButton.dataset.communitySection);
+    }
     return;
   }
 
@@ -3142,6 +3150,13 @@ document.addEventListener("click", (event) => {
   if (communityWriteButton) {
     state.activeBoardId = communityBoards[0].id;
     navigate("boardDetail");
+    return;
+  }
+
+  const orderRecommendButton = event.target.closest("[data-open-order-recommend]");
+  if (orderRecommendButton) {
+    navigate("community");
+    scrollToCommunitySection("orderRecommend");
     return;
   }
 

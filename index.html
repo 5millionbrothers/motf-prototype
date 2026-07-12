@@ -7,7 +7,7 @@
     <title>moTF - 모두의 TF</title>
     <link rel="icon" href="assets/motf-logo-icon.png" />
     <link rel="apple-touch-icon" href="assets/motf-logo-icon.png" />
-    <link rel="stylesheet" href="styles.css?v=20260712-ui-polish1" />
+    <link rel="stylesheet" href="styles.css?v=20260712-community-polish2" />
     <link rel="stylesheet" href="auth.css?v=20260712-policy-links1" />
     <script async src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" onload="window.__motfRefreshIcons && window.__motfRefreshIcons()"></script>
     <script async src="https://cdn.portone.io/v2/browser-sdk.js"></script>
@@ -316,7 +316,7 @@
           </div>
         </div>
         <div class="community-grid">
-          <section class="tool-panel recommend-tool-panel">
+          <section class="tool-panel recommend-tool-panel" id="communityOrderRecommend">
             <h2>인원별 추천 주문량</h2>
             <label>참여 인원<input type="number" id="recommendPeople" min="10" max="120" value="32" /></label>
             <label>식사 스타일
@@ -335,10 +335,9 @@
             </div>
             <div class="mini-card-list" id="activityList"></div>
           </section>
-          <section class="tool-panel wide">
+          <section class="tool-panel wide" id="communityBoardSection">
             <div class="section-toolbar">
               <h2>MT 익명 게시판</h2>
-              <button class="secondary-btn" type="button" data-community-write><i data-lucide="pencil"></i>글쓰기</button>
             </div>
             <div class="board-grid" id="communityBoards"></div>
           </section>
@@ -346,13 +345,11 @@
       </section>
 
       <section id="recreation" class="view">
-        <button class="ghost-btn back-btn" data-route="community"><i data-lucide="chevron-left"></i>커뮤니티</button>
+        <button class="ghost-btn back-btn" data-route="community" data-community-section="boards"><i data-lucide="chevron-left"></i>커뮤니티</button>
         <div class="view-title">
           <div>
-            <p class="eyebrow">추천 레크레이션</p>
             <h1>인원과 공간에 맞는 MT 게임을 고르기</h1>
           </div>
-          <button class="secondary-btn" type="button" data-open-recreation-form><i data-lucide="plus"></i>레크레이션 추천</button>
         </div>
         <form class="filter-panel community-filter" id="recreationFilters">
           <label>참여 인원
@@ -781,7 +778,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
     <script src="config.js?v=20260622-naver1"></script>
-    <script src="app.js?v=20260712-ui-polish1"></script>
+    <script src="app.js?v=20260712-community-polish2"></script>
     <script src="budget-export.js?v=20260710-user-budget1"></script>
     <script src="auth.js?v=20260712-policy-links1"></script>
     <script src="catalog.js?v=20260621-hardening1"></script>
