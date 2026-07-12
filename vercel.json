@@ -20,6 +20,72 @@
       "schedule": "*/5 * * * *"
     }
   ],
+  "rewrites": [
+    {
+      "source": "/stays",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/stays/:path*",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/market",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/market/:path*",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/community",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/community/:path*",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/chat",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/mypage",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/mypage/:path*",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/payment",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/payment/:path*",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/business-info",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/terms",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/privacy",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/refund-policy",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/complete",
+      "destination": "/index.html"
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)",

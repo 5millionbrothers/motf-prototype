@@ -704,6 +704,42 @@ const appRoutes = new Set([
   "complete",
 ]);
 
+const routePaths = {
+  home: "/",
+  stays: "/stays",
+  stayDetail: "/stays/detail",
+  roomDetail: "/stays/room",
+  booking: "/stays/booking",
+  market: "/market",
+  storeDetail: "/market/store",
+  productDetail: "/market/product",
+  cart: "/market/cart",
+  payment: "/payment",
+  paymentResult: "/payment/result",
+  community: "/community",
+  recreation: "/community/recreation",
+  activityDetail: "/community/recreation/detail",
+  boardDetail: "/community/board",
+  postDetail: "/community/post",
+  chat: "/chat",
+  mypage: "/mypage",
+  myUsage: "/mypage/usage",
+  myAccount: "/mypage/account",
+  myGuide: "/mypage/guide",
+  budgetPreview: "/mypage/budget",
+  review: "/mypage/review",
+  businessInfo: "/business-info",
+  terms: "/terms",
+  privacy: "/privacy",
+  refundPolicy: "/refund-policy",
+  complete: "/complete",
+};
+
+const pathRoutes = Object.entries(routePaths).reduce((routes, [route, path]) => {
+  routes[path] = route;
+  return routes;
+}, { "/index.html": "home" });
+
 const routeHistory = [];
 let appHistoryDepth = 0;
 const qs = (selector) => document.querySelector(selector);
@@ -731,12 +767,14 @@ function currentRoute() {
 
 function routeFromLocation() {
   const hashRoute = window.location.hash.replace(/^#!/, "").replace("#", "");
-  return appRoutes.has(hashRoute) ? hashRoute : "home";
+  if (appRoutes.has(hashRoute)) return hashRoute;
+  const normalizedPath = window.location.pathname.replace(/\/+$/, "") || "/";
+  return pathRoutes[normalizedPath] || "home";
 }
 
 function routeUrl(route) {
-  const baseUrl = getBaseUrl();
-  return route === "home" ? baseUrl : `${baseUrl}#!${route}`;
+  const path = routePaths[route] || "/";
+  return `${window.location.origin}${path}`;
 }
 
 function updateBrowserRoute(route, options = {}) {
