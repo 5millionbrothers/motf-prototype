@@ -107,7 +107,9 @@
           <label>비밀번호
             <span class="password-field">
               <input id="customerLoginPassword" type="password" autocomplete="current-password" required placeholder="비밀번호를 입력해주세요" />
-              <button class="password-toggle" type="button" data-toggle-login-password aria-label="비밀번호 보기">보기</button>
+              <button class="password-toggle" type="button" data-toggle-login-password aria-label="비밀번호 보기">
+                <i data-lucide="eye"></i>
+              </button>
             </span>
           </label>
           <button class="primary-btn auth-submit" type="submit">이메일로 로그인</button>
@@ -135,7 +137,13 @@
           </label>
           <label class="auth-agreement">
             <input id="customerSignupTerms" type="checkbox" required />
-            <span>이용약관과 개인정보 처리방침에 동의합니다.</span>
+            <span>
+              이용약관과 개인정보 처리방침에 동의합니다.
+              <span class="auth-policy-links">
+                <button type="button" data-auth-legal-route="terms">이용약관 보기</button>
+                <button type="button" data-auth-legal-route="privacy">개인정보 처리방침 보기</button>
+              </span>
+            </span>
           </label>
           <button class="primary-btn auth-submit" type="submit">회원가입</button>
           <div class="auth-divider"><span>또는</span></div>
@@ -459,8 +467,16 @@
     if (!passwordInput) return;
     const shouldShow = passwordInput.type === "password";
     passwordInput.type = shouldShow ? "text" : "password";
-    toggleButton.textContent = shouldShow ? "숨김" : "보기";
+    toggleButton.innerHTML = `<i data-lucide="${shouldShow ? "eye-off" : "eye"}"></i>`;
     toggleButton.setAttribute("aria-label", shouldShow ? "비밀번호 숨기기" : "비밀번호 보기");
+    window.refreshIcons?.();
+  });
+
+  document.addEventListener("click", (event) => {
+    const legalButton = event.target.closest("[data-auth-legal-route]");
+    if (!legalButton) return;
+    closeModal(false);
+    window.motfNavigate?.(legalButton.dataset.authLegalRoute);
   });
 
   signupForm.addEventListener("submit", async (event) => {

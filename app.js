@@ -892,6 +892,8 @@ function mapItems(kind, matches) {
     region: item.region,
     line: kind === "stays" ? `최대 ${item.maxPeople}명` : item.type,
     amount: kind === "stays" ? money(item.price) : `상품 ${item.products.length}개`,
+    markerLabel: kind === "stays" ? money(item.price).replace("원", "원~") : item.name,
+    markerSubLabel: kind === "stays" ? item.name : item.type,
     location: item.location,
   }));
 }
@@ -899,7 +901,7 @@ function mapItems(kind, matches) {
 function fallbackMarker(item, kind, index) {
   const markerClass = ["marker-a", "marker-b", "marker-c", "marker-d"][index % 4];
   const dataAttr = kind === "stays" ? `data-stay-id="${item.id}"` : `data-store-id="${item.id}"`;
-  return `<button class="map-marker ${markerClass}" ${dataAttr}>${item.region}<br />${item.line.replace("최대 ", "")}</button>`;
+  return `<button class="map-marker ${markerClass}" ${dataAttr}>${escapeHtml(item.markerLabel)}<br /><span>${escapeHtml(item.markerSubLabel)}</span></button>`;
 }
 
 function renderFallbackMap(kind, matches, statusMessage) {
@@ -942,8 +944,8 @@ function openListingFromMap(kind, itemId) {
 function markerContent(item, kind) {
   return `
     <div class="naver-map-marker ${kind === "market" ? "market" : ""}">
-      ${item.region}
-      <span>${item.line}</span>
+      ${escapeHtml(item.markerLabel)}
+      <span>${escapeHtml(item.markerSubLabel)}</span>
     </div>
   `;
 }
@@ -1000,8 +1002,8 @@ function drawNaverMap(kind, matches, maps) {
       title: item.name,
       icon: {
         content: markerContent(item, kind),
-        size: new maps.Size(102, 58),
-        anchor: new maps.Point(51, 58),
+        size: new maps.Size(122, 58),
+        anchor: new maps.Point(61, 58),
       },
     });
 
@@ -2502,7 +2504,6 @@ function renderBoardDetail() {
   const board = activeBoard();
   qs("#boardDetailHeader").innerHTML = `
     <div>
-      <p class="eyebrow">MT 익명 게시판</p>
       <h1>${board.title}</h1>
       <p>${board.description}</p>
     </div>
