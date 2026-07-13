@@ -5,10 +5,65 @@
   const isUuid = (value) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value || "");
   let activeConversationId = "";
   let reloadTimer = 0;
+  let presenceTimer = 0;
+  let presenceConversationId = "";
 
   function messageBody(text, attachments) {
     const fileText = attachments.length ? `\n${attachments.map((name) => `[첨부: ${name}]`).join("\n")}` : "";
     return `${text}${fileText}`.trim();
+  }
+
+  function isChatVisible() {
+    return document.body.dataset.currentRoute === "chat"
+      && document.visibilityState === "visible"
+      && isUuid(activeConversationId);
+  }
+
+  async function setPresence(conversationId, isActive) {
+    if (!isUuid(conversationId)) return;
+    const { error } = await client.rpc("set_chat_presence", {
+      target_conversation_id: conversationId,
+      is_active: isActive,
+    });
+    if (error) console.error(error);
+  }
+
+  function stopPresence() {
+    window.clearInterval(presenceTimer);
+    presenceTimer = 0;
+    const previousId = presenceConversationId;
+    presenceConversationId = "";
+    if (previousId) void setPresence(previousId, false);
+  }
+
+  async function syncActiveConversation({ markRead = true } = {}) {
+    if (!isChatVisible()) {
+      stopPresence();
+      return;
+    }
+
+    if (presenceConversationId && presenceConversationId !== activeConversationId) {
+      void setPresence(presenceConversationId, false);
+    }
+    presenceConversationId = activeConversationId;
+
+    if (markRead) {
+      const { error } = await client.rpc("mark_conversation_read", {
+        target_conversation_id: activeConversationId,
+      });
+      if (error) console.error(error);
+    } else {
+      await setPresence(activeConversationId, true);
+    }
+
+    window.clearInterval(presenceTimer);
+    presenceTimer = window.setInterval(() => {
+      if (!isChatVisible() || presenceConversationId !== activeConversationId) {
+        stopPresence();
+        return;
+      }
+      void setPresence(activeConversationId, true);
+    }, 45_000);
   }
 
   async function loadChats(preferredId = activeConversationId) {
@@ -38,12 +93,7 @@
     });
     activeConversationId = chats.some((item) => item.id === preferredId) ? preferredId : chats[0]?.id || "";
     window.motfApplyChats?.(chats, activeConversationId);
-    if (activeConversationId) {
-      const { error: readError } = await client.rpc("mark_conversation_read", {
-        target_conversation_id: activeConversationId,
-      });
-      if (readError) console.error(readError);
-    }
+    await syncActiveConversation({ markRead: true });
   }
 
   window.motfOpenDatabaseChat = function openDatabaseChat(businessName) {
@@ -74,7 +124,10 @@
 
   document.addEventListener("click", (event) => {
     const thread = event.target.closest("[data-chat-id]");
-    if (thread && isUuid(thread.dataset.chatId)) activeConversationId = thread.dataset.chatId;
+    if (thread && isUuid(thread.dataset.chatId)) {
+      activeConversationId = thread.dataset.chatId;
+      window.setTimeout(() => void loadChats(activeConversationId), 0);
+    }
   }, true);
 
   document.addEventListener("submit", async (event) => {
@@ -120,7 +173,20 @@
 
   client.auth.onAuthStateChange((event) => {
     if (event === "SIGNED_IN") window.setTimeout(() => loadChats(), 0);
-    if (event === "SIGNED_OUT") window.motfApplyChats?.([], "");
+    if (event === "SIGNED_OUT") {
+      stopPresence();
+      window.motfApplyChats?.([], "");
+    }
   });
+
+  window.addEventListener("motf:routechange", () => {
+    if (isChatVisible()) void loadChats(activeConversationId);
+    else stopPresence();
+  });
+  document.addEventListener("visibilitychange", () => {
+    if (isChatVisible()) void syncActiveConversation({ markRead: true });
+    else stopPresence();
+  });
+  window.addEventListener("pagehide", stopPresence);
   window.setTimeout(() => loadChats(), 0);
 })();

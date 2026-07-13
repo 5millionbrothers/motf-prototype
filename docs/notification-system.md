@@ -106,9 +106,13 @@ motf-database/supabase/41_notification_event_hooks.sql
 | 예약 취소/거절 | 이용자 예약 취소/환불 안내, 관리자 예약 상태 변경, 환불 필요 알림 |
 | 공판장 주문 생성 | 이용자 주문 접수, 사장님 새 주문 요청, 관리자 새 주문 |
 | 공판장 주문 상태 변경 | 이용자 주문 상태 변경, 환불 필요 시 관리자 알림 |
-| 채팅 메시지 생성 | 상대방에게 채팅 도착 알림 |
+| 채팅 메시지 생성 | 미접속 수신자에게 첫 미확인 문의/답변 즉시 알림 |
 
-채팅 알림은 같은 대화방/수신자 기준 약 5분 단위로 dedupe key가 묶여 과도하게 쌓이지 않도록 설계되어 있습니다.
+채팅 알림은 같은 대화방을 보고 있는 수신자에게는 발송하지 않습니다. 수신자가 미접속 상태일 때 첫 미확인 메시지만 즉시 발송하고, 읽기 전 추가 메시지는 발송하지 않습니다. 수신자가 대화를 읽으면 상태가 초기화되어 이후 새 메시지 묶음에서 다시 1회 발송됩니다.
+
+이 정책은 `motf-database/supabase/46_chat_notification_presence.sql`에서 적용합니다. 이용자와 사장님 화면은 채팅방을 보고 있는 동안 45초마다 활성 상태를 갱신하며, DB는 마지막 갱신 후 75초까지 해당 대화방을 활성 상태로 판단합니다.
+
+알리고에서 수정 템플릿이 승인되면 `notification_templates`의 `OWNER_CHAT_RECEIVED_V1`, `USER_CHAT_RECEIVED_V1` 상태를 `approved`로 변경하고 실제 발송 테스트를 진행합니다.
 
 ## 풀커버리지 알림 보강
 
@@ -137,7 +141,6 @@ motf-database/supabase/43_notification_full_coverage.sql
 
 | RPC | 용도 |
 | --- | --- |
-| `enqueue_owner_admin_notice` | 특정 사장님에게 운영 안내 발송 |
 | `enqueue_owner_cancel_refund_request` | 특정 예약의 취소/환불 확인 요청 발송 |
 
 ## 남은 외부 연동 단계

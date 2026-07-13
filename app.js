@@ -845,6 +845,9 @@ function navigate(route, options = {}) {
   qsa(".nav-link").forEach((link) => link.classList.toggle("active", link.dataset.route === activeNav));
   renderRoute(route);
   updateBrowserRoute(route, options);
+  window.dispatchEvent(new CustomEvent("motf:routechange", {
+    detail: { route, previousRoute },
+  }));
   if (options.scroll !== false) {
     window.scrollTo({ top: 0, behavior: "auto" });
   }
