@@ -481,7 +481,13 @@
     submitButton.disabled = false;
     submitButton.textContent = "이메일로 로그인";
     if (error) {
-      setMessage(loginErrorMessage(error), "error");
+      const friendlyMessage = loginErrorMessage(error);
+      const code = error?.code || "";
+      const detail = String(error?.message || "").toLowerCase();
+      if (code === "email_not_confirmed" || detail.includes("email not confirmed")) {
+        alert(friendlyMessage);
+      }
+      setMessage(friendlyMessage, "error");
       return;
     }
     session = data.session;
@@ -552,7 +558,9 @@
     signupForm.reset();
     switchTab("login");
     document.querySelector("#customerLoginEmail").value = email;
-    setMessage(`회원가입 신청이 완료되었습니다. ${email}로 보낸 인증 링크를 눌러야 최종 가입되며, 인증 전에는 로그인할 수 없습니다. 스팸 메일함도 확인해주세요.`, "success");
+    const verificationMessage = `인증 메일을 보냈습니다.\n\n${email}로 보낸 인증 링크를 눌러야 최종 가입됩니다.\n인증 전에는 로그인할 수 없으니 스팸 메일함도 함께 확인해주세요.`;
+    alert(verificationMessage);
+    setMessage("인증 메일을 보냈습니다. 이메일 인증 후 로그인해 주세요.", "success");
   });
 
   passwordForm.addEventListener("submit", async (event) => {
