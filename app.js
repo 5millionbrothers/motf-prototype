@@ -777,6 +777,10 @@ const pathRoutes = Object.entries(routePaths).reduce((routes, [route, path]) => 
   return routes;
 }, { "/index.html": "home" });
 
+const legacyRouteAliases = {
+  mySupport: "mypage",
+};
+
 const routeHistory = [];
 let appHistoryDepth = 0;
 const qs = (selector) => document.querySelector(selector);
@@ -805,6 +809,9 @@ function currentRoute() {
 function routeFromLocation() {
   const hashRoute = window.location.hash.replace(/^#!/, "").replace("#", "");
   if (appRoutes.has(hashRoute)) return hashRoute;
+  const queryRoute = new URLSearchParams(window.location.search).get("route");
+  const resolvedQueryRoute = legacyRouteAliases[queryRoute] || queryRoute;
+  if (appRoutes.has(resolvedQueryRoute)) return resolvedQueryRoute;
   const normalizedPath = window.location.pathname.replace(/\/+$/, "") || "/";
   return pathRoutes[normalizedPath] || "home";
 }
