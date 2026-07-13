@@ -1,4 +1,5 @@
 @import url("https://cdn.jsdelivr.net/gh/sun-typeface/SUIT/fonts/variable/woff2/SUIT-Variable.css");
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css");
 
 :root {
   --ink: #171717;
@@ -3295,7 +3296,20 @@ main { width: min(1520px, 100%); padding: clamp(20px, 2.5vw, 40px); }
   padding: clamp(42px, 6vw, 72px) 18px 32px;
   text-align: center;
 }
-.home-hero h1 { margin: 2px 0 4px; font-size: clamp(40px, 4.6vw, 64px); line-height: 1.12; }
+.home-hero h1 {
+  display: grid;
+  justify-items: center;
+  gap: 7px;
+  margin: 4px 0 8px;
+  font-family: "Pretendard Variable", Pretendard, SUIT, sans-serif;
+  font-size: clamp(36px, 3.8vw, 54px);
+  font-weight: 670;
+  line-height: 1.14;
+  letter-spacing: 0;
+}
+.home-hero h1 .brand-definition { color: #242823; }
+.home-hero h1 strong { display: block; color: #242823; font-size: 1.08em; font-weight: 720; }
+.home-hero h1 strong b { color: var(--olive); font-weight: 780; }
 .home-hero > p:not(.home-kicker) { margin: 0; color: #555d52; font-size: 17px; line-height: 1.75; }
 .home-hero .task-force-word small { font-size: .42em; }
 .home-service-grid { max-width: 1440px; }
@@ -3335,7 +3349,7 @@ main { width: min(1520px, 100%); padding: clamp(20px, 2.5vw, 40px); }
 @media (max-width: 820px) {
   main { padding: 16px; }
   .home-hero { padding: 38px 4px 28px; }
-  .home-hero h1 { font-size: 39px; }
+  .home-hero h1 { gap: 5px; font-size: 36px; }
   .home-hero > p:not(.home-kicker) { font-size: 15px; }
   #boardDetail.compose-mode .board-write-panel,
   #recreation.compose-mode .submit-panel { min-height: 0; padding: 22px 16px; }

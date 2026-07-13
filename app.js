@@ -37,6 +37,7 @@ const PORTONE_PENDING_PAYMENT_KEY = "motf.pendingPayment";
 const PORTONE_LOCAL_ISSUED_KEY = "motf.localIssuedPayments";
 const DEFAULT_STAY_REGION = "대성리";
 const DEFAULT_STAY_PEOPLE = 10;
+const LAUNCH_STAY_REGION = "대성리";
 const STANDARD_REFUND_POLICY = ["이용 14일 전까지 전액 환불", "이용 7일 전까지 50% 환불", "이용 3일 전까지 20% 환불", "이후 및 당일 취소는 환불 불가"];
 
 let NAVER_MAP_KEY_ID = window.MOTF_CONFIG?.NAVER_MAP_KEY_ID?.trim() || "";
@@ -545,7 +546,8 @@ const state = {
 
 window.motfApplyCatalog = function applyCatalog(nextStays, nextStores) {
   if (Array.isArray(nextStays) && nextStays.length) {
-    stays = nextStays;
+    // 1차 숙소 모집은 대성리만 운영합니다. 지역 확장 시 이 정규화만 제거하면 됩니다.
+    stays = nextStays.map((stay) => ({ ...stay, region: LAUNCH_STAY_REGION }));
     const regionSelect = qs("#stayRegion");
     if (regionSelect) {
       regionSelect.innerHTML = '<option value="대성리">대성리</option>';
@@ -2648,6 +2650,7 @@ function renderBoardDetail() {
       <h1>${board.title}</h1>
       <p>${board.description}</p>
     </div>
+    <button class="primary-btn board-compose-button" type="button" data-community-write><i data-lucide="square-pen"></i>글쓰기</button>
   `;
   qs("#boardPostList").innerHTML = board.posts
     .map(
@@ -3700,6 +3703,8 @@ window.addEventListener("popstate", () => {
 });
 
 (async function boot() {
+  // DB 연결 전 데모 숙소도 1차 운영 지역인 대성리 목록에 함께 표시합니다.
+  stays = stays.map((stay) => ({ ...stay, region: LAUNCH_STAY_REGION }));
   initializeStaySearchDefaults();
   await loadPaymentConfig();
   const handledRedirect = await handleTossRedirect();
