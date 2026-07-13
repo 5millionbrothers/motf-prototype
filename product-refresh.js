@@ -7,7 +7,7 @@
     flatpickr.localize(flatpickr.l10ns.ko);
     qsa('input[type="date"]').forEach((input) => {
       if (input._flatpickr) return;
-      flatpickr(input, { dateFormat: "Y-m-d", altInput: true, altFormat: "Y년 m월 d일", minDate: input.id?.includes("usage") ? null : "today", disableMobile: true });
+      flatpickr(input, { dateFormat: "Y-m-d", altInput: true, altFormat: "Y년 m월 d일", minDate: input.id?.includes("usage") ? null : "today", disableMobile: true, monthSelectorType: "static", position: "below left" });
     });
     qsa('input[type="time"]').forEach((input) => {
       if (input._flatpickr) return;
@@ -78,6 +78,8 @@
     if (error) return window.toast?.("추천을 접수하지 못했습니다. DB 44번 SQL 적용을 확인해주세요.");
     form.reset();
     form.hidden = true;
+    form.classList.remove("full-page-compose");
+    qs("#recreation")?.classList.remove("compose-mode");
     window.toast?.("관리자 검토 요청이 접수되었습니다. 승인 후 목록에 공개됩니다.");
     renderMyActivity();
   };
@@ -155,9 +157,24 @@
     const recreationButton = event.target.closest("[data-open-recreation-form]");
     if (recreationButton) {
       const form = qs("#activitySubmitForm");
+      qs("#recreation")?.classList.add("compose-mode");
       form.hidden = false;
       form.classList.add("full-page-compose");
       form.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+    if (event.target.closest("[data-close-recreation-compose]")) {
+      const form = qs("#activitySubmitForm");
+      form.hidden = true;
+      form.classList.remove("full-page-compose");
+      qs("#recreation")?.classList.remove("compose-mode");
+      qs("#recreation .view-title")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+    if (event.target.closest("[data-close-board-compose]")) {
+      const form = qs("#boardWriteForm");
+      form.hidden = true;
+      form.classList.remove("full-page-compose", "compose-open");
+      qs("#boardDetail")?.classList.remove("compose-mode");
+      qs("#boardDetailHeader")?.scrollIntoView({ behavior: "smooth", block: "start" });
     }
     const add = event.target.closest("[data-add-affiliation]");
     if (add) {

@@ -32,19 +32,9 @@
     <main>
       <section id="home" class="view active home-view">
         <div class="home-hero">
-          <div class="home-hero-copy">
-            <p class="home-kicker">단체 여행 준비 플랫폼</p>
-            <h1>모두의 <span class="task-force-word">T<small>ask</small> F<small>orce</small></span>,<br /><strong>moTF 모티프</strong></h1>
-            <p>숙소 예약부터 장보기, 현장 준비와 소통까지.<br />MT·워크숍·수련회 준비를 한곳에서 이어가세요.</p>
-            <div class="home-hero-actions">
-              <button class="primary-btn" data-route="stays"><i data-lucide="search"></i>숙소 찾아보기</button>
-              <button class="secondary-btn" data-route="market">공판장 둘러보기</button>
-            </div>
-          </div>
-          <div class="home-hero-preview" aria-label="모티프 서비스 미리보기">
-            <img src="https://images.unsplash.com/photo-1529156069898-49953e39b3ac?auto=format&fit=crop&w=1200&q=85" alt="함께 여행을 준비하는 대학생 모임" />
-            <div class="hero-preview-caption"><strong>준비는 가볍게, 추억은 오래.</strong><span>단체 일정에 맞는 선택을 한 번에 확인하세요.</span></div>
-          </div>
+          <p class="home-kicker">MT·워크숍·수련회 준비를 한곳에서</p>
+          <h1>모두의 <span class="task-force-word">T<small>ask</small> F<small>orce</small></span>,<br /><strong>moTF 모티프</strong></h1>
+          <p>숙소를 찾고, 필요한 물품을 주문하고, 현장 준비 정보를 나눠보세요.<br />여러 곳을 오가던 단체 여행 준비를 모티프에서 이어갑니다.</p>
         </div>
 
         <section class="home-service-grid" aria-label="서비스 선택">
@@ -96,10 +86,6 @@
           <label>
             지역
             <select id="stayRegion">
-              <option value="전체">전체</option>
-              <option value="가평">가평</option>
-              <option value="양평">양평</option>
-              <option value="강촌">강촌</option>
               <option value="대성리">대성리</option>
             </select>
           </label>
@@ -306,7 +292,6 @@
           <div>
             <h1>커뮤니티</h1>
           </div>
-          <button class="primary-btn" type="button" data-community-write><i data-lucide="square-pen"></i>글쓰기</button>
         </div>
         <div class="community-grid">
           <section class="tool-panel recommend-tool-panel" id="communityOrderRecommend">
@@ -373,6 +358,7 @@
           <section class="activity-directory" id="activityDirectory"></section>
           <form class="tool-panel submit-panel" id="activitySubmitForm" hidden>
             <h2>새 레크레이션 추천</h2>
+            <button class="ghost-btn compose-back-button" type="button" data-close-recreation-compose><i data-lucide="arrow-left"></i>레크레이션 목록으로</button>
             <label>제목<input id="activitySubmitTitle" placeholder="예: 과잠 색깔 스피드퀴즈" /></label>
             <label>추천 인원<input id="activitySubmitPeople" placeholder="예: 20~60명" /></label>
             <label>진행 공간
@@ -387,7 +373,7 @@
             <button class="primary-btn" type="submit"><i data-lucide="send"></i>관리자 검토 요청</button>
           </form>
         </div>
-        <button class="community-floating-write" type="button" data-open-recreation-form><i data-lucide="plus"></i><span>레크레이션 추천</span></button>
+        <button class="community-floating-write" type="button" data-open-recreation-form><i data-lucide="plus"></i><span>새로운 레크레이션 추천하기</span></button>
       </section>
 
       <section id="activityDetail" class="view">
@@ -417,6 +403,7 @@
               <p class="eyebrow">익명 글쓰기</p>
               <h2>새 글 작성</h2>
             </div>
+            <button class="ghost-btn compose-back-button" type="button" data-close-board-compose><i data-lucide="arrow-left"></i>게시글 목록으로</button>
             <label>게시판
               <select id="boardPostBoard">
                 <option value="market-share">나눔장터</option>
@@ -550,7 +537,8 @@
             <p class="eyebrow">계정</p>
             <h1>로그인 정보</h1>
             <label>아이디<input value="motf_demo_user" /></label>
-            <label>비밀번호<input type="password" placeholder="변경할 때만 입력" /></label>
+            <label>비밀번호<input type="password" placeholder="비밀번호는 보안상 표시하지 않습니다" readonly /></label>
+            <button class="secondary-btn account-password-button" type="button" data-open-password-change><i data-lucide="key-round"></i>비밀번호 변경</button>
             <label>대표 소속<input value="한국대 경영학과 학생회" /></label>
             <label>대표 연락처<input value="010-0000-0000" /></label>
             <button class="primary-btn" type="button" data-account-save><i data-lucide="save"></i>수정 내용 저장</button>

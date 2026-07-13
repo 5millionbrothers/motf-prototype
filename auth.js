@@ -651,6 +651,16 @@
       return;
     }
 
+    if (event.target.closest("[data-open-password-change]")) {
+      if (!session?.user) {
+        openModal("login");
+        setMessage("로그인 후 비밀번호를 변경할 수 있어요.");
+        return;
+      }
+      openPasswordChange();
+      return;
+    }
+
     if (event.target.closest("[data-profile-complete-later]")) {
       const key = profileCompletionDismissKey();
       if (key) window.localStorage.setItem(key, "1");

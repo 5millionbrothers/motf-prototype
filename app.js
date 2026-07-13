@@ -548,10 +548,8 @@ window.motfApplyCatalog = function applyCatalog(nextStays, nextStores) {
     stays = nextStays;
     const regionSelect = qs("#stayRegion");
     if (regionSelect) {
-      const current = regionSelect.value;
-      const regions = [...new Set(stays.map((stay) => stay.region).filter(Boolean))];
-      regionSelect.innerHTML = ['<option value="전체">전체</option>', ...regions.map((region) => `<option value="${escapeHtml(region)}">${escapeHtml(region)}</option>`)].join("");
-      regionSelect.value = regions.includes(current) ? current : "전체";
+      regionSelect.innerHTML = '<option value="대성리">대성리</option>';
+      regionSelect.value = "대성리";
     }
     state.selectedStay = stays[0];
     state.selectedRoom = stays[0].rooms[0];
@@ -866,7 +864,12 @@ function renderRoute(route) {
   if (route === "payment") renderPayment();
   if (route === "paymentResult") renderPaymentResult();
   if (route === "community") renderCommunity();
-  if (route === "recreation") renderRecreation();
+  if (route === "recreation") {
+    qs("#recreation")?.classList.remove("compose-mode");
+    const recreationForm = qs("#activitySubmitForm");
+    if (recreationForm) { recreationForm.hidden = true; recreationForm.classList.remove("full-page-compose"); }
+    renderRecreation();
+  }
   if (route === "activityDetail") renderActivityDetail();
   if (route === "boardDetail") renderBoardDetail();
   if (route === "postDetail") renderPostDetail();
@@ -2637,6 +2640,9 @@ function likeOnce(kind, id) {
 
 function renderBoardDetail() {
   const board = activeBoard();
+  qs("#boardDetail")?.classList.remove("compose-mode");
+  const initialWriteForm = qs("#boardWriteForm");
+  if (initialWriteForm) { initialWriteForm.hidden = true; initialWriteForm.classList.remove("full-page-compose", "compose-open"); }
   qs("#boardDetailHeader").innerHTML = `
     <div>
       <h1>${board.title}</h1>
@@ -3305,6 +3311,7 @@ document.addEventListener("click", (event) => {
     navigate("boardDetail");
     window.setTimeout(() => {
       const form = qs("#boardWriteForm");
+      qs("#boardDetail")?.classList.add("compose-mode");
       form.hidden = false;
       form.classList.add("full-page-compose", "compose-open");
       form.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -3631,6 +3638,7 @@ qs("#boardWriteForm").addEventListener("submit", (event) => {
   state.activePostId = post.id;
   renderBoardDetail();
   event.target.hidden = true;
+  qs("#boardDetail")?.classList.remove("compose-mode");
   toast("익명 게시글이 등록되었습니다.");
 });
 
