@@ -25,7 +25,11 @@
   function shortReceiptNo(row) {
     const raw = String(row.id || "").replace(/[^a-zA-Z0-9]/g, "");
     const suffix = (raw.slice(-8) || "00000000").toUpperCase();
-    return `${row.type === "공판장 주문" ? "주문" : "예약"}-${suffix}`;
+    return `${isMarketOrderType(row.type) ? "주문" : "예약"}-${suffix}`;
+  }
+
+  function isMarketOrderType(type) {
+    return type === "마트 주문" || type === "공판장 주문";
   }
 
   function normalizeRows(selectedId = "") {
@@ -46,16 +50,16 @@
     }));
     const orders = (snapshot.orders || []).map((item) => ({
       id: item.id,
-      type: "공판장 주문",
+      type: "마트 주문",
       category: "식자재 및 일회용품",
-      place: item.storeName || "공판장",
-      itemName: `공판장 주문 ${Array.isArray(item.items) ? item.items.length : 0}개 품목`,
+      place: item.storeName || "마트",
+      itemName: `마트 주문 ${Array.isArray(item.items) ? item.items.length : 0}개 품목`,
       date: item.pickupTime || "",
       people: "-",
       status: item.status || "-",
       amount: Number(item.amount || 0),
       refundAmount: Number(item.refundAmount || 0),
-      purchaseMethod: "moTF 공판장 주문",
+      purchaseMethod: "moTF 마트 주문",
       note: item.isPendingVirtualAccount ? "가상계좌 입금 대기" : "주문/결제 증빙",
     }));
     const allRows = [...reservations, ...orders];
@@ -203,7 +207,7 @@
         row.note,
         "",
         shortReceiptNo(row),
-        row.type === "공판장 주문" ? row.itemName : `${row.place} ${row.itemName}`.trim(),
+        isMarketOrderType(row.type) ? row.itemName : `${row.place} ${row.itemName}`.trim(),
       ]),
     ];
   }

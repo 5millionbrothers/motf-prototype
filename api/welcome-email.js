@@ -37,7 +37,7 @@ module.exports = async function handler(req, res) {
         from: sender,
         to: [user.email],
         subject: "모티프 회원가입이 완료되었습니다",
-        html: `<div style="font-family:Arial,'Noto Sans KR',sans-serif;max-width:560px;margin:auto;padding:36px 24px;color:#20251f"><p style="color:#657552;font-weight:700">moTF 모티프</p><h1 style="font-size:26px;margin:16px 0">${escapeHtml(displayName)}님, 반가워요.</h1><p style="font-size:16px;line-height:1.7;color:#535b51">이메일 인증과 회원가입이 완료되었습니다. 이제 숙소와 공판장을 찾고, 필요한 준비를 한곳에서 이어갈 수 있어요.</p><a href="https://motf.co.kr" style="display:inline-block;margin-top:20px;padding:13px 20px;background:#4f6540;color:#fff;text-decoration:none;border-radius:8px;font-weight:700">모티프 시작하기</a></div>`,
+        html: `<div style="font-family:Arial,'Noto Sans KR',sans-serif;max-width:560px;margin:auto;padding:36px 24px;color:#20251f"><p style="color:#657552;font-weight:700">moTF 모티프</p><h1 style="font-size:26px;margin:16px 0">${escapeHtml(displayName)}님, 반가워요.</h1><p style="font-size:16px;line-height:1.7;color:#535b51">이메일 인증과 회원가입이 완료되었습니다. 이제 숙소와 마트를 찾고, 필요한 준비를 한곳에서 이어갈 수 있어요.</p><a href="https://motf.co.kr" style="display:inline-block;margin-top:20px;padding:13px 20px;background:#4f6540;color:#fff;text-decoration:none;border-radius:8px;font-weight:700">모티프 시작하기</a></div>`,
       }),
     });
     const result = await response.json().catch(() => null);

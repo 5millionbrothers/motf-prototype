@@ -246,13 +246,13 @@ let stays = [
 let stores = [
   {
     id: "gapyeong",
-    name: "가평 마마트 공판장",
+    name: "가평 마마트",
     region: "가평",
     type: "숙소 배송 가능",
     rating: 4.9,
     location: { lat: 37.8329, lng: 127.5107 },
     image: photo("photo-1542838132-92c53300491e"),
-    intro: "MT에 필요한 식자재와 주류, 일회용품을 일정에 맞춰 한 번에 준비하는 공판장입니다.",
+    intro: "MT에 필요한 식자재와 주류, 일회용품을 일정에 맞춰 한 번에 준비하는 마트입니다.",
     products: [
       {
         id: "pork-set",
@@ -522,7 +522,7 @@ const state = {
     },
     {
       id: "market-chat",
-      title: "가평 마마트 공판장",
+      title: "가평 마마트",
       subtitle: "수령 시간, 주류 확인",
       messages: [
         { from: "admin", text: "주류 주문은 수령 시 성인 인증이 필요합니다.", read: true },
@@ -563,7 +563,7 @@ window.motfApplyCatalog = function applyCatalog(nextStays, nextStores) {
     state.cart = [];
   }
   const route = currentRoute();
-  if (route === "home") renderHomePicks();
+  if (route === "home") renderHome();
   if (route === "stays") renderStays();
   if (route === "stayDetail") renderStayDetail();
   if (route === "market") renderStores();
@@ -616,7 +616,7 @@ window.motfStartPreparedPayment = function startPreparedPayment(intent, draft) {
   const amount = Number(intent.amount);
   state.pendingPayment = {
     type,
-    title: isStay ? "숙소 예약" : "공판장 주문",
+    title: isStay ? "숙소 예약" : "마트 주문",
     itemName: intent.order_name,
     amount,
     orderId: intent.order_id,
@@ -627,7 +627,7 @@ window.motfStartPreparedPayment = function startPreparedPayment(intent, draft) {
     stayName: isStay ? state.selectedStay.name : undefined,
     roomName: isStay ? state.selectedRoom.name : undefined,
     storeName: isStay ? undefined : state.selectedStore.name,
-    location: isStay ? state.selectedStay.distance : "공판장 수령 장소는 주문 정보 기준",
+    location: isStay ? state.selectedStay.distance : "마트 수령 장소는 주문 정보 기준",
     date: isStay ? draft.event_date : undefined,
     checkOutDate: isStay ? draft.check_out_date : undefined,
     people: isStay ? draft.guest_count : undefined,
@@ -864,7 +864,7 @@ function goBack(fallbackRoute = "home") {
 }
 
 function renderRoute(route) {
-  if (route === "home") renderHomePicks();
+  if (route === "home") renderHome();
   if (route === "stays") renderStays();
   if (route === "stayDetail") renderStayDetail();
   if (route === "roomDetail") renderRoomDetail();
@@ -892,20 +892,109 @@ function renderRoute(route) {
   if (route === "review") renderReviews();
 }
 
+const homeStories = [
+  {
+    category: "moTF PICK",
+    title: "MT에서 미친 텐션 끌어올리는 게임을 원한다면?",
+    summary: "moTF 엄선 뜨거워지는 게임들",
+    image: photo("photo-1529156069898-49953e39b3ac", "auto=format&fit=crop&w=1200&q=84"),
+    route: "recreation",
+    featured: true,
+  },
+  {
+    category: "장보기 가이드",
+    title: "50명 MT, 얼마나 사야 되지?",
+    summary: "moTF 데이터로 보는 평균 주문량",
+    image: photo("photo-1529193591184-b1d58069ecdd", "auto=format&fit=crop&w=900&q=82"),
+    route: "community",
+    section: "orderRecommend",
+  },
+  {
+    category: "게시판 모음",
+    title: "새로운 경험을 하고 싶다면?",
+    summary: "익명 고백부터 대결 신청까지",
+    image: photo("photo-1527529482837-4698179dc6ce", "auto=format&fit=crop&w=900&q=82"),
+    route: "community",
+    section: "boards",
+  },
+];
+
+const marketBundleImages = [
+  photo("photo-1544025162-d76694265947", "auto=format&fit=crop&w=1000&q=84"),
+  photo("photo-1510812431401-41d2bd2722f3", "auto=format&fit=crop&w=1000&q=84"),
+  photo("photo-1612929633738-8fe44f7ec841", "auto=format&fit=crop&w=1000&q=84"),
+];
+
+function renderHome() {
+  renderHomePicks();
+  renderHomeMarketPicks();
+  renderHomeStories();
+  syncStaySearchPanel(qs("#home") || document);
+}
+
 function renderHomePicks() {
   const container = qs("#homeStayPicks");
   if (!container) return;
-  container.innerHTML = stays.slice(0, 3).map((stay) => `
+  container.innerHTML = stays.map((stay) => `
     <button class="home-stay-pick" type="button" data-stay-id="${stay.id}">
       <img src="${stay.image}" alt="${escapeHtml(stay.name)}" />
       <span class="home-stay-pick-body">
         <small>${escapeHtml(stay.region)} · 최대 ${stay.maxPeople}명</small>
         <strong>${escapeHtml(stay.name)}</strong>
+        <span class="home-stay-features">${(stay.amenities || []).slice(0, 3).map((amenity) => `<b>${escapeHtml(amenity)}</b>`).join("")}</span>
         <span>${money(stayDisplayPrice(stay))}부터</span>
       </span>
     </button>
   `).join("");
+  window.requestAnimationFrame(() => {
+    const canScroll = container.scrollWidth > container.clientWidth + 2;
+    qsa("[data-home-stay-scroll]").forEach((button) => { button.hidden = !canScroll; });
+  });
   refreshIcons();
+}
+
+function renderHomeStories() {
+  const container = qs("#homeStoryGrid");
+  if (!container) return;
+  container.innerHTML = homeStories.map((story) => `
+    <button class="home-story-card ${story.featured ? "featured" : ""}" type="button" data-route="${story.route}" ${story.section ? `data-community-section="${story.section}"` : ""}>
+      <img src="${story.image}" alt="" />
+      <span class="home-story-copy">
+        <small>${escapeHtml(story.category)}</small>
+        <strong>${escapeHtml(story.title)}</strong>
+        <span>${escapeHtml(story.summary)}</span>
+      </span>
+    </button>
+  `).join("");
+  refreshIcons();
+}
+
+function renderHomeMarketPicks() {
+  const container = qs("#homeMarketPicks");
+  if (!container) return;
+  const products = ensureMarketBundleProducts(stores[0]);
+  container.innerHTML = products.map((product) => `
+    <button class="home-stay-pick home-market-pick" type="button" data-product-id="${product.id}">
+      <img src="${product.image}" alt="${escapeHtml(product.name)}" />
+      <span class="home-stay-pick-body home-market-pick-body">
+        <small>마마트 · ${escapeHtml(product.unit)}</small>
+        <strong>${escapeHtml(product.name)}</strong>
+        <span class="home-stay-features">
+          <b>moTF 전용</b>
+          <b>${product.bundleProductIds?.length || 1}종 구성</b>
+          <b>단체 패키지</b>
+        </span>
+        <span>${money(product.price)}</span>
+      </span>
+    </button>
+  `).join("");
+  window.requestAnimationFrame(() => {
+    const canScroll = container.scrollWidth > container.clientWidth + 2;
+    qsa("[data-home-market-scroll]").forEach((button) => {
+      button.disabled = !canScroll;
+      button.setAttribute("aria-disabled", String(!canScroll));
+    });
+  });
 }
 
 function scrollToCommunitySection(section = "") {
@@ -999,7 +1088,7 @@ function renderFallbackMap(kind, matches, statusMessage) {
     ${
       items.length
         ? items.map((item, index) => fallbackMarker(item, kind, index)).join("")
-        : `<div class="map-empty">조건에 맞는 ${kind === "stays" ? "숙소" : "공판장"}이 없습니다.</div>`
+        : `<div class="map-empty">조건에 맞는 ${kind === "stays" ? "숙소" : "마트"}이 없습니다.</div>`
     }
   `;
   setMapStatus(kind, statusMessage);
@@ -1034,7 +1123,7 @@ function markerContent(item, kind) {
 }
 
 function infoContent(item, kind) {
-  const action = kind === "stays" ? "숙소 상세로 이동" : "공판장 상품 보기";
+  const action = kind === "stays" ? "숙소 상세로 이동" : "마트 상품 보기";
   return `
     <div class="naver-map-info">
       <strong>${item.name}</strong>
@@ -1475,7 +1564,8 @@ function renderBooking() {
 function renderStores() {
   const store = stores[0];
   state.selectedStore = store;
-  const categories = ["전체", "식재료", "주류/음료", "일회용품", "냉동식품", "기타"];
+  ensureMarketBundleProducts(store);
+  const categories = ["전체", "MT 세트", "식재료", "주류/음료", "일회용품", "냉동식품", "기타"];
   if (!categories.includes(state.activeCategory)) state.activeCategory = "전체";
   const products = state.activeCategory === "전체"
     ? store.products
@@ -1486,7 +1576,7 @@ function renderStores() {
     <section class="market-intro">
       <img src="${store.image}" alt="${store.name} 매장 사진" />
       <div class="market-intro-body">
-        <p class="eyebrow">${store.region} 계약 공판장</p>
+        <p class="eyebrow">${store.region} 제휴 마트</p>
         <h2>${store.name}</h2>
         <p>${store.intro}<br />숙소 일정에 맞춰 수령 또는 배송 요청을 남길 수 있습니다.</p>
         <div class="detail-meta">
@@ -1496,22 +1586,16 @@ function renderStores() {
         </div>
         <div class="button-row">
           <button class="secondary-btn" type="button" data-open-order-recommend><i data-lucide="calculator"></i>추천 주문량 보기</button>
-          <button class="secondary-btn" data-open-chat="${store.name}"><i data-lucide="messages-square"></i>공판장 문의</button>
-          <button class="ghost-btn" data-route="review" data-review-scope="market"><i data-lucide="star"></i>공판장 리뷰</button>
+          <button class="secondary-btn" data-open-chat="${store.name}"><i data-lucide="messages-square"></i>마트 문의</button>
+          <button class="ghost-btn" data-route="review" data-review-scope="market"><i data-lucide="star"></i>마트 리뷰</button>
           <button class="ghost-btn" data-route="cart"><i data-lucide="shopping-cart"></i>장바구니 보기</button>
         </div>
       </div>
     </section>
   `;
   qs("#marketProducts").innerHTML = `
-    <section class="recommended-set-section">
-      <div class="section-toolbar"><div><p class="eyebrow">단체 주문 추천</p><h2>추천 세트 상품</h2></div><span>인원에 맞춰 빠르게 준비하세요</span></div>
-      <div class="recommended-set-grid">
-        ${marketRecommendedSets(store).map((set) => `<article><span class="pill success">${escapeHtml(set.people)}</span><h3>${escapeHtml(set.name)}</h3><p>${escapeHtml(set.description)}</p><strong>${money(set.price)}</strong><button class="secondary-btn" type="button" data-set-products="${escapeHtml((set.productIds || []).join(","))}">구성 담기</button></article>`).join("")}
-      </div>
-    </section>
     <div class="section-toolbar">
-      <h2>상품 둘러보기</h2>
+      <div><p class="eyebrow">moTF 전용 패키지부터 일반 상품까지</p><h2>상품 둘러보기</h2></div>
       <span>${products.length}개 상품</span>
     </div>
     <div class="category-tabs">
@@ -1544,7 +1628,7 @@ function storeCard(store) {
         </div>
         <div class="listing-actions">
           <span class="price">상품 ${store.products.length}개</span>
-          <button class="primary-btn" data-store-id="${store.id}"><i data-lucide="shopping-bag"></i>공판장 보기</button>
+          <button class="primary-btn" data-store-id="${store.id}"><i data-lucide="shopping-bag"></i>마트 보기</button>
           <button class="ghost-btn" data-open-chat="${store.name}"><i data-lucide="message-circle"></i>문의</button>
         </div>
       </div>
@@ -1554,7 +1638,8 @@ function storeCard(store) {
 
 function renderStoreDetail() {
   const store = state.selectedStore;
-  const categories = ["전체", "식재료", "주류/음료", "일회용품", "냉동식품", "기타"];
+  ensureMarketBundleProducts(store);
+  const categories = ["전체", "MT 세트", "식재료", "주류/음료", "일회용품", "냉동식품", "기타"];
   const products = state.activeCategory === "전체"
     ? store.products
     : store.products.filter((product) => product.category === state.activeCategory);
@@ -1571,7 +1656,7 @@ function renderStoreDetail() {
           <span class="pill warning">주류 성인 인증</span>
         </div>
         <div class="button-row">
-          <button class="secondary-btn" data-open-chat="${store.name}"><i data-lucide="messages-square"></i>공판장 문의</button>
+          <button class="secondary-btn" data-open-chat="${store.name}"><i data-lucide="messages-square"></i>마트 문의</button>
           <button class="ghost-btn" data-route="cart"><i data-lucide="shopping-cart"></i>장바구니 보기</button>
         </div>
       </div>
@@ -1588,10 +1673,10 @@ function renderStoreDetail() {
 
 function productCard(product) {
   return `
-    <article class="product-card">
+    <article class="product-card ${product.isBundle ? "bundle-product-card" : ""}">
       <img src="${product.image}" alt="${product.name} 사진" />
       <div>
-        <span class="pill">${product.category}</span>
+        <span class="pill ${product.isBundle ? "success" : ""}">${product.isBundle ? "moTF 전용 패키지" : product.category}</span>
         <h3>${product.name}</h3>
         <p>${product.unit} · ${product.origin}</p>
         <p class="price">${money(product.price)}</p>
@@ -1615,11 +1700,12 @@ function renderProductDetail() {
     <div class="product-detail">
       <img src="${product.image}" alt="${product.name} 사진" />
       <section class="info-panel">
-        <p class="eyebrow">${product.category}</p>
+        <p class="eyebrow">${product.isBundle ? "moTF 전용 할인 패키지" : product.category}</p>
         <h1>${product.name}</h1>
         <div class="product-meta">
           <span class="pill">${product.unit}</span>
           <span class="pill success">${product.origin}</span>
+          ${product.isBundle ? '<span class="pill">세트 구성 상품</span>' : ""}
           <span class="pill warning">수령 전 변경 가능</span>
           ${alcoholProduct ? '<span class="pill danger">성인 인증 필수</span>' : ""}
         </div>
@@ -1643,7 +1729,7 @@ function renderProductDetail() {
         <div><dt>상품명</dt><dd>${escapeHtml(product.name)}</dd></div>
         <div><dt>용량·단위</dt><dd>${escapeHtml(product.unit)}</dd></div>
         <div><dt>원산지</dt><dd>${escapeHtml(product.origin)}</dd></div>
-        <div><dt>보관 방법</dt><dd>${escapeHtml(product.detailSections?.storage || "상품 표기 및 공판장 안내에 따릅니다.")}</dd></div>
+        <div><dt>보관 방법</dt><dd>${escapeHtml(product.detailSections?.storage || "상품 표기 및 마트 안내에 따릅니다.")}</dd></div>
         <div><dt>영양 정보</dt><dd>${escapeHtml(Object.entries(product.nutritionInfo || {}).map(([key, value]) => `${key} ${value}`).join(" · ") || "상품 포장지의 영양정보를 확인해주세요.")}</dd></div>
         <div><dt>판매자 안내</dt><dd>${escapeHtml(product.detailSections?.sellerNote || product.detail)}</dd></div>
       </dl>
@@ -1713,7 +1799,7 @@ function renderCart() {
           `;
         })
         .join("")
-    : `<div class="empty-state">장바구니가 비어 있습니다. 공판장에서 상품을 담아보세요.</div>`;
+    : `<div class="empty-state">장바구니가 비어 있습니다. 마트에서 상품을 담아보세요.</div>`;
   const total = cartTotal();
   qs("#cartSummary").innerHTML = `
     <div class="summary-line"><span>상품 금액</span><strong>${money(total)}</strong></div>
@@ -1858,16 +1944,25 @@ function syncStaySearchPanel(container = document) {
   const values = staySearchValues();
   container.querySelectorAll("[data-stay-search-field]").forEach((input) => {
     const field = input.dataset.staySearchField;
-    if (field === "checkIn") input.value = values.checkIn;
-    if (field === "checkOut") input.value = values.checkOut;
+    if (field === "checkIn") setDateInputValue(input, values.checkIn);
+    if (field === "checkOut") setDateInputValue(input, values.checkOut);
     if (field === "region") input.value = values.region;
     if (field === "people") input.value = values.people;
   });
 }
 
+function setDateInputValue(input, value) {
+  if (!input) return;
+  if (input._flatpickr) {
+    input._flatpickr.setDate(value, false);
+    return;
+  }
+  input.value = value;
+}
+
 function applyStaySearchField(field, value) {
-  if (field === "checkIn") qs("#stayCheckInDate").value = value;
-  if (field === "checkOut") qs("#stayCheckOutDate").value = value;
+  if (field === "checkIn") setDateInputValue(qs("#stayCheckInDate"), value);
+  if (field === "checkOut") setDateInputValue(qs("#stayCheckOutDate"), value);
   if (field === "region") qs("#stayRegion").value = value;
   if (field === "people") qs("#stayPeople").value = Math.max(DEFAULT_STAY_PEOPLE, Number(value || DEFAULT_STAY_PEOPLE));
   normalizeStaySearchDates();
@@ -2101,7 +2196,7 @@ function hydrateLocalIssuedTransactions() {
     if (state.orders.some((order) => order.id === item.orderId)) return;
     state.orders.unshift({
       id: item.orderId,
-      storeName: item.storeName || "공판장 주문 요청",
+      storeName: item.storeName || "마트 주문 요청",
       pickupTime: item.pickupTime || String(item.issuedAt || "").slice(11, 16),
       amount: item.amount,
       status: "입금 전",
@@ -2383,7 +2478,7 @@ function setPaymentResult(status) {
   const resultText = {
     success: {
       eyebrow: "토스페이먼츠 승인 완료",
-      title: payment.type === "stay" ? "결제 완료, 숙소 예약 요청이 접수되었습니다" : "결제 완료, 공판장 주문 요청이 접수되었습니다",
+      title: payment.type === "stay" ? "결제 완료, 숙소 예약 요청이 접수되었습니다" : "결제 완료, 마트 주문 요청이 접수되었습니다",
       text: payment.type === "stay"
         ? "사장님이 예약 가능 여부를 확인한 뒤 확정합니다. 거절 시 결제 취소·환불 처리가 필요합니다."
         : "사장님이 주문 가능 여부를 확인한 뒤 확정합니다. 거절 시 결제 취소·환불 처리가 필요합니다.",
@@ -2702,6 +2797,31 @@ function marketRecommendedSets(store) {
   ];
 }
 
+function ensureMarketBundleProducts(store) {
+  if (!store) return [];
+  const existing = store.products.filter((product) => product.isBundle);
+  if (existing.length) return existing;
+
+  const bundles = marketRecommendedSets(store).map((set, index) => ({
+    id: `motf-bundle-${store.id}-${index + 1}`,
+    category: "MT 세트",
+    name: set.name,
+    unit: set.people || "단체 구성",
+    price: Number(set.price || 0),
+    origin: "마마트 moTF 전용 구성",
+    image: set.image || marketBundleImages[index % marketBundleImages.length],
+    detail: `${set.description} 필요한 품목을 한 번에 준비할 수 있도록 묶은 moTF 전용 할인가 패키지입니다.`,
+    detailSections: {
+      storage: "구성 상품별 표기와 마트 안내에 따라 보관해주세요.",
+      sellerNote: "구성 상품의 재고 상황에 따라 동일 가격대의 유사 상품으로 대체될 수 있습니다.",
+    },
+    isBundle: true,
+    bundleProductIds: set.productIds || [],
+  }));
+  store.products = [...bundles, ...store.products];
+  return bundles;
+}
+
 function renderActivityDetail() {
   const activity = activeActivity();
   qs("#activityDetailContent").innerHTML = `
@@ -2750,7 +2870,7 @@ function renderPostDetail() {
 function renderChat() {
   if (!state.chats.length) {
     qs("#chatList").innerHTML = `<div class="empty-state">아직 시작한 대화가 없습니다.</div>`;
-    qs("#chatRoomHeader").innerHTML = `<h2>채팅</h2><p class="muted">숙소 또는 공판장에서 문의를 시작해보세요.</p>`;
+    qs("#chatRoomHeader").innerHTML = `<h2>채팅</h2><p class="muted">숙소 또는 마트에서 문의를 시작해보세요.</p>`;
     qs("#chatMessages").innerHTML = `<div class="empty-state">대화를 선택하면 메시지가 표시됩니다.</div>`;
     refreshIcons();
     return;
@@ -2819,7 +2939,7 @@ function renderMypage() {
     : `<div class="empty-state">아직 예약한 숙소가 없습니다.</div>`;
   orderList.innerHTML = state.orders.length
     ? state.orders.map(orderCard).join("")
-    : `<div class="empty-state">아직 공판장 주문이 없습니다.</div>`;
+    : `<div class="empty-state">아직 마트 주문이 없습니다.</div>`;
   refreshIcons();
 }
 
@@ -3106,7 +3226,7 @@ function renderReviews() {
   if (helper) {
     helper.textContent = state.reviewTargets.length
       ? "이용 완료된 예약이나 주문만 리뷰를 작성할 수 있어요."
-      : "리뷰는 실제 이용 완료된 예약이나 공판장 주문이 있을 때 작성할 수 있어요.";
+      : "리뷰는 실제 이용 완료된 예약이나 마트 주문이 있을 때 작성할 수 있어요.";
   }
   renderReviewKeywords();
   const visibleReviews = state.reviewScope === "market"
@@ -3116,7 +3236,7 @@ function renderReviews() {
       : state.reviews;
   qs("#reviewList").innerHTML = visibleReviews.length
     ? visibleReviews.map(reviewCard).join("")
-    : `<div class="empty-state">${state.reviewScope === "market" ? "아직 등록된 공판장 후기가 없습니다." : "아직 등록된 후기가 없습니다."}</div>`;
+    : `<div class="empty-state">${state.reviewScope === "market" ? "아직 등록된 마트 후기가 없습니다." : "아직 등록된 후기가 없습니다."}</div>`;
   const ratingRange = qs("#reviewRatingRange");
   const ratingLabel = qs("#reviewRatingLabel");
   if (ratingRange) ratingRange.value = String(state.rating);
@@ -3148,7 +3268,7 @@ function renderReviewKeywords() {
   `).join("");
   if (label) {
     label.textContent = target?.type === "market_order"
-      ? "공판장 주문에 맞는 키워드예요"
+      ? "마트 주문에 맞는 키워드예요"
       : "숙소 이용에 맞는 키워드예요";
   }
 }
@@ -3241,6 +3361,22 @@ document.addEventListener("click", (event) => {
   const historyBackButton = event.target.closest("[data-history-back]");
   if (historyBackButton) {
     goBack(historyBackButton.dataset.fallbackRoute || "home");
+    return;
+  }
+
+  const homeStayScrollButton = event.target.closest("[data-home-stay-scroll]");
+  if (homeStayScrollButton) {
+    const rail = qs("#homeStayPicks");
+    const direction = Number(homeStayScrollButton.dataset.homeStayScroll || 1);
+    rail?.scrollBy({ left: direction * Math.max(280, rail.clientWidth * 0.82), behavior: "smooth" });
+    return;
+  }
+
+  const homeMarketScrollButton = event.target.closest("[data-home-market-scroll]");
+  if (homeMarketScrollButton) {
+    const rail = qs("#homeMarketPicks");
+    const direction = Number(homeMarketScrollButton.dataset.homeMarketScroll || 1);
+    rail?.scrollBy({ left: direction * Math.max(280, rail.clientWidth * 0.82), behavior: "smooth" });
     return;
   }
 
@@ -3561,6 +3697,13 @@ document.addEventListener("change", (event) => {
   if (event.target.matches("#mealStyle")) renderCommunity();
   if (event.target.matches("#activityPeople, #activitySpace, #activityMood")) renderRecreation();
   if (event.target.matches("#reviewTarget")) renderReviewKeywords();
+});
+
+document.addEventListener("submit", (event) => {
+  if (!event.target.matches("[data-home-stay-search]")) return;
+  event.preventDefault();
+  syncStaySearchPanel();
+  navigate("stays");
 });
 
 qs("#bookingForm").addEventListener("submit", (event) => {

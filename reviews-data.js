@@ -107,7 +107,7 @@
         id: `market_order:${item.id}`,
         type: "market_order",
         transactionId: item.id,
-        label: `${item.businesses?.business_name || "공판장"} · 공판장 주문 · ${formatDate(item.pickup_time)} · ${statusText[item.status] || item.status}`,
+        label: `${item.businesses?.business_name || "마트"} · 마트 주문 · ${formatDate(item.pickup_time)} · ${statusText[item.status] || item.status}`,
       }));
 
     window.motfApplyReviewTargets?.([...reservationTargets, ...orderTargets]);

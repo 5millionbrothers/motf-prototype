@@ -111,7 +111,7 @@
     }));
     const orders = (orderResult.data || []).map((item) => ({
       id: item.id,
-      storeName: item.businesses?.business_name || "공판장",
+      storeName: item.businesses?.business_name || "마트",
       pickupTime: String(item.pickup_time || "").slice(0, 5),
       amount: item.total_amount,
       status: displayStatus(item),
@@ -170,7 +170,7 @@
         } else {
           orders.unshift({
             ...pendingItem,
-            storeName: item.storeName || "공판장 주문 요청",
+            storeName: item.storeName || "마트 주문 요청",
             pickupTime: item.pickupTime || String(item.issuedAt || "").slice(11, 16),
             items: [{ id: item.orderId }],
           });
@@ -225,7 +225,7 @@
       if (!draft || !isUuid(draft.business_id)) {
         event.preventDefault();
         event.stopImmediatePropagation();
-        alert("이 공판장은 아직 데모 정보라 실제 주문을 접수할 수 없습니다.\n사장님이 등록한 실제 공판장을 선택해주세요.");
+        alert("이 마트는 아직 데모 정보라 실제 주문을 접수할 수 없습니다.\n사장님이 등록한 실제 마트를 선택해주세요.");
         return;
       }
       event.preventDefault();
