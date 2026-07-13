@@ -411,6 +411,22 @@
     updateAccountView();
   }
 
+  async function requestWelcomeEmail() {
+    if (!session?.access_token || !session.user?.email_confirmed_at) return;
+    try {
+      await fetch("/api/welcome-email", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ name: profile?.full_name || session.user.user_metadata?.full_name || "" }),
+      });
+    } catch (error) {
+      console.warn("가입 완료 안내 메일을 요청하지 못했습니다.", error);
+    }
+  }
+
   async function blockInactiveUserSession() {
     if (!session?.user || !profile || profile.role !== "user" || profile.status === "approved") return false;
     const message = profile.status === "suspended"
@@ -707,6 +723,7 @@
       if (!requireLogin()) return;
       const accountForm = document.querySelector("#accountForm");
       const inputs = [...accountForm.querySelectorAll("input")];
+      const newPassword = inputs[1]?.value || "";
       const organization = inputs[2]?.value.trim() || "";
       const phone = normalizePhone(inputs[3]?.value || "");
       if (phone && phone.replace(/\D/g, "").length < 9) {
@@ -718,6 +735,22 @@
       const originalHtml = accountSaveButton.innerHTML;
       accountSaveButton.disabled = true;
       accountSaveButton.textContent = "저장 중...";
+      if (newPassword && newPassword.length < 8) {
+        accountSaveButton.disabled = false;
+        accountSaveButton.innerHTML = originalHtml;
+        showToast("새 비밀번호는 8자 이상 입력해주세요.");
+        return;
+      }
+      if (newPassword) {
+        const { error: passwordError } = await client.auth.updateUser({ password: newPassword });
+        if (passwordError) {
+          accountSaveButton.disabled = false;
+          accountSaveButton.innerHTML = originalHtml;
+          showToast("비밀번호를 변경하지 못했습니다. 다시 로그인한 뒤 시도해주세요.");
+          return;
+        }
+        inputs[1].value = "";
+      }
       const { data, error } = await client
         .from("profiles")
         .update({
@@ -807,7 +840,10 @@
     }
     window.setTimeout(async () => {
       await refreshAuthUi();
-      if (event === "SIGNED_IN" || event === "INITIAL_SESSION") maybePromptProfileCompletion();
+      if (event === "SIGNED_IN" || event === "INITIAL_SESSION") {
+        maybePromptProfileCompletion();
+        requestWelcomeEmail();
+      }
     }, 0);
   });
 
@@ -820,6 +856,7 @@
     await refreshAuthUi();
     await blockInactiveUserSession();
     maybePromptProfileCompletion();
+    requestWelcomeEmail();
 
     const activeRoute = typeof window.currentRoute === "function" ? window.currentRoute() : "home";
     if (!session?.user && protectedRoutes.has(activeRoute)) {

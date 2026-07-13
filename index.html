@@ -7,7 +7,8 @@
     <title>moTF - 모두의 TF</title>
     <link rel="icon" href="assets/motf-logo-icon.png" />
     <link rel="apple-touch-icon" href="assets/motf-logo-icon.png" />
-    <link rel="stylesheet" href="styles.css?v=20260712-layout-polish3" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" />
+    <link rel="stylesheet" href="styles.css?v=20260713-product-refresh1" />
     <link rel="stylesheet" href="auth.css?v=20260712-policy-links1" />
     <script async src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" onload="window.__motfRefreshIcons && window.__motfRefreshIcons()"></script>
     <script async src="https://cdn.portone.io/v2/browser-sdk.js"></script>
@@ -31,47 +32,47 @@
     <main>
       <section id="home" class="view active home-view">
         <div class="home-hero">
-          <p class="home-kicker">MT 준비 · 숙소 예약 · 장보기 · 정산을 한 곳에서</p>
-          <h1>우리 MT,<br /><span>한 번에 다 준비해요</span></h1>
-          <p>숙소를 찾고, 공판장 장보기를 연결하고, 사장님과의 소통까지 moTF에서 차분하게 정리합니다.</p>
+          <div class="home-hero-copy">
+            <p class="home-kicker">단체 여행 준비 플랫폼</p>
+            <h1>모두의 <span class="task-force-word">T<small>ask</small> F<small>orce</small></span>,<br /><strong>moTF 모티프</strong></h1>
+            <p>숙소 예약부터 장보기, 현장 준비와 소통까지.<br />MT·워크숍·수련회 준비를 한곳에서 이어가세요.</p>
+            <div class="home-hero-actions">
+              <button class="primary-btn" data-route="stays"><i data-lucide="search"></i>숙소 찾아보기</button>
+              <button class="secondary-btn" data-route="market">공판장 둘러보기</button>
+            </div>
+          </div>
+          <div class="home-hero-preview" aria-label="모티프 서비스 미리보기">
+            <img src="https://images.unsplash.com/photo-1529156069898-49953e39b3ac?auto=format&fit=crop&w=1200&q=85" alt="함께 여행을 준비하는 대학생 모임" />
+            <div class="hero-preview-caption"><strong>준비는 가볍게, 추억은 오래.</strong><span>단체 일정에 맞는 선택을 한 번에 확인하세요.</span></div>
+          </div>
         </div>
 
         <section class="home-service-grid" aria-label="서비스 선택">
           <button class="service-card" data-route="stays">
             <span class="service-icon"><i data-lucide="home"></i></span>
             <strong>숙소 예약</strong>
-            <span>날짜, 지역, 인원, 예산에 맞는 단체 숙소를 찾고 바로 예약해요.</span>
+            <span>날짜와 인원에 맞는 객실만 골라 비교하고 예약해요.</span>
           </button>
           <button class="service-card" data-route="market">
             <span class="service-icon"><i data-lucide="shopping-basket"></i></span>
             <strong>공판장 주문</strong>
-            <span>고기, 술, 음료, 일회용품을 MT 일정에 맞춰 한 번에 담아요.</span>
+            <span>고기부터 음료와 일회용품까지 필요한 만큼 주문해요.</span>
           </button>
           <button class="service-card" data-route="community">
             <span class="service-icon"><i data-lucide="users-round"></i></span>
             <strong>커뮤니티</strong>
-            <span>추천 레크레이션과 인원별 주문량을 확인해 준비 시간을 줄여요.</span>
+            <span>레크레이션과 현장 정보를 나누고 함께 준비해요.</span>
           </button>
           <button class="service-card" data-route="chat">
             <span class="service-icon"><i data-lucide="message-circle"></i></span>
             <strong>채팅 문의</strong>
-            <span>숙소와 공판장 사장님에게 필요한 내용을 바로 물어봐요.</span>
+            <span>예약과 주문 전 궁금한 점을 사장님께 바로 물어봐요.</span>
           </button>
         </section>
 
-        <section class="home-summary-band" aria-label="서비스 지표">
-          <div>
-            <strong>예약</strong>
-            <span>단체 숙소 조건 비교</span>
-          </div>
-          <div>
-            <strong>장보기</strong>
-            <span>공판장 주문 연결</span>
-          </div>
-          <div>
-            <strong>정산</strong>
-            <span>예결산 파일 지원</span>
-          </div>
+        <section class="home-curation" aria-label="추천 숙소">
+          <div class="section-toolbar"><div><p class="eyebrow">지금 많이 찾는 곳</p><h2>단체 여행에 잘 맞는 숙소</h2></div><button class="text-link" data-route="stays">전체 보기 <i data-lucide="arrow-right"></i></button></div>
+          <div class="home-stay-picks" id="homeStayPicks"></div>
         </section>
       </section>
 
@@ -109,7 +110,7 @@
           <label class="range-label">
             1박 예산
             <span id="stayPriceLabel">2,000,000원 이하</span>
-            <input type="range" id="stayPrice" min="400000" max="2000000" step="100000" value="2000000" />
+            <input type="range" id="stayPrice" min="200000" max="2000000" step="100000" value="2000000" />
           </label>
           <button class="detail-filter-trigger" type="button" data-toggle-stay-filters>
             <i data-lucide="sliders-horizontal"></i>세부필터
@@ -125,9 +126,7 @@
           <div class="advanced-filter-grid">
             <fieldset>
               <legend>주변 위치</legend>
-              <label class="check-card"><input type="checkbox" data-stay-filter value="station" />역 500m 근처</label>
-              <label class="check-card"><input type="checkbox" data-stay-filter value="convenience" />편의점 500m 근처</label>
-              <label class="check-card"><input type="checkbox" data-stay-filter value="waterside" />바닷가/강가</label>
+              <label class="check-card"><input type="checkbox" data-stay-filter value="seaside" />바다</label>
               <label class="check-card"><input type="checkbox" data-stay-filter value="valley" />계곡 인접</label>
             </fieldset>
             <fieldset class="space-count-filter">
@@ -137,12 +136,11 @@
             </fieldset>
             <fieldset>
               <legend>필요 옵션</legend>
-              <label class="check-card"><input type="checkbox" data-stay-filter value="barbecue" />바베큐</label>
+              <label class="check-card"><input type="checkbox" data-stay-filter value="barbecue" />야외바베큐</label>
               <label class="check-card"><input type="checkbox" data-stay-filter value="screen" />TV/화면</label>
-              <label class="check-card"><input type="checkbox" data-stay-filter value="karaoke" />노래방기계</label>
-              <label class="check-card"><input type="checkbox" data-stay-filter value="mic" />마이크</label>
-              <label class="check-card"><input type="checkbox" data-stay-filter value="field" />운동장</label>
-              <label class="check-card"><input type="checkbox" data-stay-filter value="outdoor" />야외 바베큐</label>
+              <label class="check-card"><input type="checkbox" data-stay-filter value="karaoke" />노래방/마이크</label>
+              <label class="check-card"><input type="checkbox" data-stay-filter value="field" />야외운동장</label>
+              <label class="check-card"><input type="checkbox" data-stay-filter value="pool" />수영장</label>
             </fieldset>
           </div>
         </section>
@@ -151,7 +149,7 @@
           <aside class="map-panel" data-map-kind="stays" aria-label="숙소 지도">
             <div class="naver-map-canvas" id="stayNaverMap"></div>
             <div class="map-fallback" data-map-fallback></div>
-            <div class="map-badge" data-map-status>네이버 지도 준비 중</div>
+            <div class="map-badge" data-map-status hidden></div>
           </aside>
 
           <section>
@@ -181,7 +179,7 @@
                 <h1>단체 정보와 이용 조건을 확인해주세요</h1>
               </div>
             </div>
-            <label>소속<input required id="bookingOrg" placeholder="예: 한국대 경영학과 학생회" /></label>
+            <label>소속<input required id="bookingOrg" list="affiliationOptions" placeholder="등록한 소속 선택 또는 직접 입력" /><datalist id="affiliationOptions"></datalist></label>
             <label>대표자 이름<input required id="bookingName" placeholder="예: 김모두" /></label>
             <label>대표 연락처<input required id="bookingPhone" placeholder="010-0000-0000" /></label>
             <div class="form-grid">
@@ -252,11 +250,7 @@
             <label>수령 시간<input required type="time" id="pickupTime" value="17:00" /></label>
             <label>요청사항<textarea id="pickupMemo" rows="3"></textarea></label>
             <div id="cartSummary"></div>
-            <div class="toss-ready-card">
-              <strong>포트원 KG이니시스 가상계좌</strong>
-              <span>주문 금액을 확인한 뒤 가상계좌를 발급합니다.</span>
-            </div>
-            <button class="primary-btn" type="submit"><i data-lucide="credit-card"></i>주문 결제 준비하기</button>
+            <button class="primary-btn" type="submit"><i data-lucide="credit-card"></i>결제하기</button>
           </form>
         </div>
       </section>
@@ -312,6 +306,7 @@
           <div>
             <h1>커뮤니티</h1>
           </div>
+          <button class="primary-btn" type="button" data-community-write><i data-lucide="square-pen"></i>글쓰기</button>
         </div>
         <div class="community-grid">
           <section class="tool-panel recommend-tool-panel" id="communityOrderRecommend">
@@ -363,21 +358,20 @@
               <option value="전체">전체</option>
               <option value="indoor">실내</option>
               <option value="outdoor">야외</option>
-              <option value="any">공간 무관</option>
             </select>
           </label>
-          <label>분위기
+          <label>진행
             <select id="activityMood">
               <option value="전체">전체</option>
               <option value="icebreak">아이스브레이킹</option>
-              <option value="team">팀 대항</option>
-              <option value="calm">잔잔한 진행</option>
+              <option value="team">팀전</option>
+              <option value="solo">개인전</option>
             </select>
           </label>
         </form>
-        <div class="recreation-layout">
+        <div class="recreation-layout recreation-directory-only">
           <section class="activity-directory" id="activityDirectory"></section>
-          <form class="tool-panel submit-panel" id="activitySubmitForm">
+          <form class="tool-panel submit-panel" id="activitySubmitForm" hidden>
             <h2>새 레크레이션 추천</h2>
             <label>제목<input id="activitySubmitTitle" placeholder="예: 과잠 색깔 스피드퀴즈" /></label>
             <label>추천 인원<input id="activitySubmitPeople" placeholder="예: 20~60명" /></label>
@@ -390,14 +384,15 @@
             </label>
             <label>사진/영상 첨부<input type="file" multiple accept="image/*,video/*" /></label>
             <label>진행 방법<textarea id="activitySubmitNote" rows="5" placeholder="준비물, 진행 방식, 주의사항을 적어주세요"></textarea></label>
-            <button class="primary-btn" type="submit"><i data-lucide="send"></i>익명 추천 등록</button>
+            <button class="primary-btn" type="submit"><i data-lucide="send"></i>관리자 검토 요청</button>
           </form>
         </div>
+        <button class="community-floating-write" type="button" data-open-recreation-form><i data-lucide="plus"></i><span>레크레이션 추천</span></button>
       </section>
 
       <section id="activityDetail" class="view">
         <button class="ghost-btn back-btn" data-route="recreation"><i data-lucide="chevron-left"></i>레크레이션 목록</button>
-        <div class="post-detail-layout">
+        <div class="post-detail-layout comments-below">
           <article class="post-detail-card" id="activityDetailContent"></article>
           <aside class="comment-panel">
             <h2>댓글</h2>
@@ -417,7 +412,7 @@
             <div class="view-title compact" id="boardDetailHeader"></div>
             <div class="board-post-list" id="boardPostList"></div>
           </section>
-          <form class="board-write-panel" id="boardWriteForm">
+          <form class="board-write-panel" id="boardWriteForm" hidden>
             <div>
               <p class="eyebrow">익명 글쓰기</p>
               <h2>새 글 작성</h2>
@@ -437,11 +432,12 @@
             <button class="primary-btn" type="submit"><i data-lucide="pencil"></i>익명으로 올리기</button>
           </form>
         </div>
+        <button class="community-floating-write" type="button" data-community-write><i data-lucide="square-pen"></i><span>글쓰기</span></button>
       </section>
 
       <section id="postDetail" class="view">
         <button class="ghost-btn back-btn" data-route="boardDetail"><i data-lucide="chevron-left"></i>게시판 목록</button>
-        <div class="post-detail-layout">
+        <div class="post-detail-layout comments-below">
           <article class="post-detail-card" id="postDetailContent"></article>
           <aside class="comment-panel">
             <h2>댓글</h2>
@@ -513,6 +509,12 @@
           </div>
           <button class="secondary-btn" data-route="review"><i data-lucide="star"></i>리뷰 남기기</button>
         </div>
+        <form class="usage-period-filter" id="usagePeriodFilter">
+          <label>조회 시작일<input type="date" id="usageFrom" /></label>
+          <label>조회 종료일<input type="date" id="usageTo" /></label>
+          <button class="secondary-btn" type="submit"><i data-lucide="search"></i>기간 조회</button>
+          <button class="ghost-btn" type="reset">전체 보기</button>
+        </form>
         <div class="mypage-grid">
           <section>
             <h2>숙소 예약</h2>
@@ -523,6 +525,10 @@
             <div id="orderList" class="card-list compact-list"></div>
           </section>
         </div>
+        <section class="my-activity-section">
+          <div class="section-toolbar"><h2>내 활동</h2><span>내가 작성한 게시글과 추천 내역</span></div>
+          <div id="myActivityList" class="card-list compact-list"></div>
+        </section>
       </section>
 
       <section id="budgetPreview" class="view">
@@ -545,10 +551,22 @@
             <h1>로그인 정보</h1>
             <label>아이디<input value="motf_demo_user" /></label>
             <label>비밀번호<input type="password" placeholder="변경할 때만 입력" /></label>
-            <label>학교/소속<input value="한국대 경영학과 학생회" /></label>
+            <label>대표 소속<input value="한국대 경영학과 학생회" /></label>
             <label>대표 연락처<input value="010-0000-0000" /></label>
             <button class="primary-btn" type="button" data-account-save><i data-lucide="save"></i>수정 내용 저장</button>
           </form>
+          <section class="tool-panel affiliation-panel">
+            <p class="eyebrow">소속 관리</p>
+            <h2>여러 소속을 등록해두세요</h2>
+            <p>예약할 때 등록한 소속 중 하나를 선택할 수 있습니다.</p>
+            <div class="affiliation-builder">
+              <select id="affiliationKind"><option>대학/대학원</option><option>교회</option><option>회사</option><option>동아리</option><option>학과</option><option>학생회</option><option>기타</option></select>
+              <input id="affiliationSchool" placeholder="학교·기관명 (예: 고려대학교)" />
+              <input id="affiliationDetail" placeholder="세부 소속 (예: 국제학부, TRUSS)" />
+              <button class="secondary-btn" type="button" data-add-affiliation><i data-lucide="plus"></i>소속 추가</button>
+            </div>
+            <div class="affiliation-list" id="affiliationList"></div>
+          </section>
           <section class="tool-panel danger-panel">
             <p class="eyebrow">회원 관리</p>
             <h2>탈퇴 및 데이터 요청</h2>
@@ -639,6 +657,10 @@
             <p>moTF는 천재지변, 통신 장애, 결제사 또는 외부 서비스 장애 등 회사의 합리적 통제 범위를 벗어난 사유로 발생한 손해에 대해 책임이 제한될 수 있습니다.</p>
             <h2>제9조 문의 및 분쟁 처리</h2>
             <p>거래 관련 분쟁이 발생한 경우 moTF는 예약·주문 정보, 결제내역, 채팅 기록 등을 바탕으로 양 당사자의 원활한 해결을 지원합니다.</p>
+            <h2>제10조 주류 주문 및 성인 확인</h2>
+            <p>주류는 만 19세 이상 회원만 주문할 수 있습니다. 주문 단계와 상품 수령 시 대표자의 성인 여부를 확인하며, 확인이 되지 않으면 주류를 제공하지 않습니다.</p>
+            <h2>제11조 약관 변경 및 고지</h2>
+            <p>관련 법령이나 서비스 변경에 따라 약관이 개정되는 경우 적용일과 주요 변경 내용을 서비스 화면 또는 전자우편으로 사전에 안내합니다.</p>
           </article>
         </div>
       </section>
@@ -666,6 +688,8 @@
             <p>이용자는 개인정보 열람, 정정, 삭제, 처리정지를 요청할 수 있습니다. 요청은 고객 문의 채널 또는 이메일을 통해 접수할 수 있습니다.</p>
             <h2>7. 개인정보 보호책임자 및 문의</h2>
             <p>개인정보 관련 문의는 5millionbrothers@gmail.com으로 접수할 수 있습니다.</p>
+            <h2>8. 안전성 확보 및 파기</h2>
+            <p>접근 권한 통제, 전송 구간 보호, 접속기록 관리 등 합리적인 보호조치를 적용하며, 보유기간이 끝난 정보는 복구하기 어려운 방법으로 파기합니다.</p>
           </article>
         </div>
       </section>
@@ -684,7 +708,7 @@
             <h2>입금 후 승인 대기</h2>
             <p>입금 완료 후 사장님 또는 운영팀이 요청을 확인합니다. 제공자가 요청을 거절하는 경우 결제 취소 또는 환불 절차를 진행합니다.</p>
             <h2>숙소 취소 기준</h2>
-            <p>숙소별 상세 페이지에 고지된 취소·환불 기준이 우선 적용됩니다. 별도 고지가 없는 경우 이용일 7일 전까지 전액 환불, 3일 전까지 50% 환불, 이후 환불 불가를 기본 기준으로 합니다.</p>
+            <p>별도 고지가 없는 동안 모든 숙소에 동일한 기준을 적용합니다. 이용일 14일 전까지 전액 환불, 7일 전까지 50% 환불, 3일 전까지 20% 환불하며 이후 및 당일 취소는 환불되지 않습니다.</p>
             <h2>공판장 주문 취소 기준</h2>
             <p>식재료, 주류, 일회용품 등 상품 준비가 시작된 뒤에는 취소가 제한될 수 있습니다. 신선식품 및 맞춤 준비 상품은 제공자 확인 후 환불 가능 여부를 결정합니다.</p>
             <h2>환불 처리 기간</h2>
@@ -757,7 +781,7 @@
     <footer class="site-footer">
       <div class="footer-brand">
         <strong>모티프 moTF 모두의 TF</strong>
-        <span>대학생 MT 준비를 위한 숙소 예약·공판장 주문 플랫폼</span>
+        <span>MT부터 워크숍, 수련회까지 단체 여행 준비를 위한 통합 플랫폼</span>
       </div>
       <div class="footer-links">
         <button type="button" data-route="businessInfo">사업자 정보</button>
@@ -775,7 +799,9 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
     <script src="config.js?v=20260622-naver1"></script>
-    <script src="app.js?v=20260712-layout-polish3"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ko.js"></script>
+    <script src="app.js?v=20260713-product-refresh1"></script>
     <script src="budget-export.js?v=20260712-budget-template1"></script>
     <script src="auth.js?v=20260712-login-clear1"></script>
     <script src="catalog.js?v=20260621-hardening1"></script>
@@ -783,5 +809,6 @@
     <script src="chat-data.js?v=20260621-chat2"></script>
     <script src="support-data.js?v=20260621-support1"></script>
     <script src="reviews-data.js?v=motf-user-v10"></script>
+    <script src="product-refresh.js?v=20260713-product-refresh1"></script>
   </body>
 </html>

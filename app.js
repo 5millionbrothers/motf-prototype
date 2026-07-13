@@ -37,6 +37,7 @@ const PORTONE_PENDING_PAYMENT_KEY = "motf.pendingPayment";
 const PORTONE_LOCAL_ISSUED_KEY = "motf.localIssuedPayments";
 const DEFAULT_STAY_REGION = "대성리";
 const DEFAULT_STAY_PEOPLE = 10;
+const STANDARD_REFUND_POLICY = ["이용 14일 전까지 전액 환불", "이용 7일 전까지 50% 환불", "이용 3일 전까지 20% 환불", "이후 및 당일 취소는 환불 불가"];
 
 let NAVER_MAP_KEY_ID = window.MOTF_CONFIG?.NAVER_MAP_KEY_ID?.trim() || "";
 const NAVER_MAP_SCRIPT_ID = "motf-naver-map-sdk";
@@ -61,7 +62,7 @@ let stays = [
     reviews: 128,
     distance: "가평역 차량 12분",
     location: { lat: 37.8314, lng: 127.5098 },
-    detailTags: ["waterside", "convenience", "barbecue", "screen", "karaoke", "mic", "outdoor"],
+    detailTags: ["seaside", "convenience", "barbecue", "screen", "karaoke", "pool"],
     roomCount: 5,
     bathCount: 4,
     image: photo("photo-1564013799919-ab600027ffc6"),
@@ -108,7 +109,7 @@ let stays = [
     reviews: 94,
     distance: "양평역 차량 18분",
     location: { lat: 37.4918, lng: 127.4877 },
-    detailTags: ["valley", "barbecue", "screen", "mic", "field", "outdoor", "convenience"],
+    detailTags: ["valley", "barbecue", "screen", "karaoke", "field", "convenience"],
     roomCount: 6,
     bathCount: 4,
     image: photo("photo-1449158743715-0a90ebb6d2d8"),
@@ -433,10 +434,10 @@ let stores = [
 const activities = [
   { id: "bingo", title: "학과 빙고", people: "20~60명", peopleGroup: "medium", space: "indoor", mood: "icebreak", time: "25분", note: "첫 만남 아이스브레이킹", media: "진행지 PDF · 예시 이미지", image: photo("photo-1529156069898-49953e39b3ac"), likes: 42, comments: ["빙고 칸에 교수님 별명 넣으면 반응 좋아요.", "새터 첫날에도 잘 먹혔습니다."], detail: "학과, 동아리, 과잠, 취미 같은 키워드를 빙고판에 넣고 서로 질문하며 칸을 채우는 게임입니다." },
   { id: "auction", title: "팀별 미션 경매", people: "30~80명", peopleGroup: "large", space: "indoor", mood: "team", time: "45분", note: "예산 게임과 장기자랑 조합", media: "룰 설명 영상", image: photo("photo-1517048676732-d65bc937f952"), likes: 58, comments: ["진행자가 가격 조절을 잘해야 재밌어요.", "장기자랑 부담을 줄이기 좋았습니다."], detail: "팀마다 가상 예산을 주고 미션을 경매로 가져가게 한 뒤, 획득한 미션을 수행해 점수를 얻는 방식입니다." },
-  { id: "court", title: "MT 재판소", people: "15~40명", peopleGroup: "medium", space: "indoor", mood: "calm", time: "30분", note: "익명 사연으로 진행", media: "대본 템플릿", image: photo("photo-1556761175-b413da4baf72"), likes: 35, comments: ["익명 사연 검수는 꼭 필요합니다.", "분위기 풀기 좋았어요."], detail: "익명 사연을 받아 판사, 변호인, 증인 역할을 나누고 가볍게 상황극을 하는 레크레이션입니다." },
+  { id: "court", title: "MT 재판소", people: "15~40명", peopleGroup: "medium", space: "indoor", mood: "solo", time: "30분", note: "익명 사연으로 진행", media: "대본 템플릿", image: photo("photo-1556761175-b413da4baf72"), likes: 35, comments: ["익명 사연 검수는 꼭 필요합니다.", "분위기 풀기 좋았어요."], detail: "익명 사연을 받아 판사, 변호인, 증인 역할을 나누고 가볍게 상황극을 하는 레크레이션입니다." },
   { id: "random-quiz", title: "랜덤 조 편성 퀴즈", people: "20~70명", peopleGroup: "large", space: "any", mood: "icebreak", time: "35분", note: "선후배 섞임 유도", media: "문제 예시", image: photo("photo-1523580846011-d3a5bc25702b"), likes: 49, comments: ["조 편성 뒤 바로 하기 좋습니다."], detail: "랜덤으로 섞인 조가 학교, 학과, MT 장소 관련 퀴즈를 풀며 자연스럽게 대화하도록 만드는 게임입니다." },
   { id: "body-relay", title: "몸으로 말해요 릴레이", people: "20~50명", peopleGroup: "medium", space: "outdoor", mood: "team", time: "20분", note: "장비 없이 빠르게 시작", media: "제시어 카드", image: photo("photo-1517457373958-b7bdd4587205"), likes: 31, comments: ["야외에서 하면 사진도 잘 나와요."], detail: "팀원이 차례로 제시어를 몸짓으로 전달하고 마지막 사람이 정답을 맞히는 빠른 팀 대항 게임입니다." },
-  { id: "ban-word", title: "술자리 금지어 게임", people: "10~40명", peopleGroup: "small", space: "indoor", mood: "calm", time: "30분", note: "소규모 뒤풀이용", media: "카드 이미지", image: photo("photo-1543269865-cbf427effbad"), likes: 27, comments: ["술 없이 음료 벌칙으로 해도 됩니다."], detail: "각자 모르는 금지어를 머리 위에 붙이고 대화하면서 상대가 금지어를 말하게 유도하는 게임입니다." },
+  { id: "ban-word", title: "술자리 금지어 게임", people: "10~40명", peopleGroup: "small", space: "indoor", mood: "solo", time: "30분", note: "소규모 뒤풀이용", media: "카드 이미지", image: photo("photo-1543269865-cbf427effbad"), likes: 27, comments: ["술 없이 음료 벌칙으로 해도 됩니다."], detail: "각자 모르는 금지어를 머리 위에 붙이고 대화하면서 상대가 금지어를 말하게 유도하는 게임입니다." },
 ];
 
 const communityBoards = [
@@ -544,7 +545,14 @@ const state = {
 
 window.motfApplyCatalog = function applyCatalog(nextStays, nextStores) {
   if (Array.isArray(nextStays) && nextStays.length) {
-    stays = nextStays.map((stay) => ({ ...stay, region: DEFAULT_STAY_REGION }));
+    stays = nextStays;
+    const regionSelect = qs("#stayRegion");
+    if (regionSelect) {
+      const current = regionSelect.value;
+      const regions = [...new Set(stays.map((stay) => stay.region).filter(Boolean))];
+      regionSelect.innerHTML = ['<option value="전체">전체</option>', ...regions.map((region) => `<option value="${escapeHtml(region)}">${escapeHtml(region)}</option>`)].join("");
+      regionSelect.value = regions.includes(current) ? current : "전체";
+    }
     state.selectedStay = stays[0];
     state.selectedRoom = stays[0].rooms[0];
   }
@@ -555,6 +563,7 @@ window.motfApplyCatalog = function applyCatalog(nextStays, nextStores) {
     state.cart = [];
   }
   const route = currentRoute();
+  if (route === "home") renderHomePicks();
   if (route === "stays") renderStays();
   if (route === "stayDetail") renderStayDetail();
   if (route === "market") renderStores();
@@ -637,6 +646,34 @@ window.motfApplyMyTransactions = function applyMyTransactions(reservations, orde
   state.reservations = reservations;
   state.orders = orders;
   renderMypage();
+};
+
+window.motfAddCommunityPost = function addCommunityPost(post) {
+  const board = communityBoards.find((item) => item.id === post.boardId) || communityBoards[0];
+  board.posts.unshift({ id: post.id, title: post.title, body: post.body, likes: 0, comments: [], media: post.media || "", authorId: post.authorId, createdAt: post.createdAt });
+  state.activeBoardId = board.id;
+  state.activePostId = post.id;
+  renderBoardDetail();
+};
+
+window.motfApplyCommunityData = function applyCommunityData(posts, likes, comments) {
+  if (!Array.isArray(posts) || !posts.length) return;
+  const likeCounts = (likes || []).reduce((map, item) => map.set(item.post_id, (map.get(item.post_id) || 0) + 1), new Map());
+  const commentsByPost = (comments || []).reduce((map, item) => {
+    const list = map.get(item.post_id) || [];
+    list.push({ body: item.body, userId: item.user_id, replyTo: item.parent_user_id || null, createdAt: item.created_at });
+    map.set(item.post_id, list); return map;
+  }, new Map());
+  communityBoards.forEach((board) => {
+    const remote = posts.filter((post) => post.board_key === board.id).map((post) => ({
+      id: post.id, title: post.title, body: post.body, authorId: post.author_id,
+      createdAt: post.created_at, media: post.media_urls?.length ? `첨부 ${post.media_urls.length}` : "",
+      likes: likeCounts.get(post.id) || 0, comments: commentsByPost.get(post.id) || [],
+    }));
+    if (remote.length) board.posts = remote;
+  });
+  if (currentRoute() === "community") renderCommunity();
+  if (currentRoute() === "boardDetail") renderBoardDetail();
 };
 
 window.motfClearUserScopedState = function clearUserScopedState() {
@@ -817,6 +854,7 @@ function goBack(fallbackRoute = "home") {
 }
 
 function renderRoute(route) {
+  if (route === "home") renderHomePicks();
   if (route === "stays") renderStays();
   if (route === "stayDetail") renderStayDetail();
   if (route === "roomDetail") renderRoomDetail();
@@ -837,6 +875,22 @@ function renderRoute(route) {
   if (route === "myUsage") renderMypage();
   if (route === "budgetPreview") window.motfRenderBudgetPreview?.();
   if (route === "review") renderReviews();
+}
+
+function renderHomePicks() {
+  const container = qs("#homeStayPicks");
+  if (!container) return;
+  container.innerHTML = stays.slice(0, 3).map((stay) => `
+    <button class="home-stay-pick" type="button" data-stay-id="${stay.id}">
+      <img src="${stay.image}" alt="${escapeHtml(stay.name)}" />
+      <span class="home-stay-pick-body">
+        <small>${escapeHtml(stay.region)} · 최대 ${stay.maxPeople}명</small>
+        <strong>${escapeHtml(stay.name)}</strong>
+        <span>${money(stayDisplayPrice(stay))}부터</span>
+      </span>
+    </button>
+  `).join("");
+  refreshIcons();
 }
 
 function scrollToCommunitySection(section = "") {
@@ -1092,7 +1146,7 @@ function renderStays() {
   normalizeStaySearchDates();
   ensureStayAvailability();
   const price = Number(qs("#stayPrice").value);
-  qs("#stayPriceLabel").textContent = `${money(price)} 이하`;
+  qs("#stayPriceLabel").textContent = price >= 2000000 ? "2,000,000원 이상" : `${money(price)} 이하`;
   const detailFilters = getStayDetailFilters();
   const activeDetailFilterCount = detailFilters.tags.length + (detailFilters.minRooms > 0 ? 1 : 0) + (detailFilters.minBaths > 0 ? 1 : 0);
   const detailFilterButton = qs("[data-toggle-stay-filters]");
@@ -1164,6 +1218,23 @@ function roomGalleryImages(stay, room) {
 
 function dashList(items) {
   return `<ul class="dash-list">${items.map((item) => `<li>${item}</li>`).join("")}</ul>`;
+}
+
+const STANDARD_AMENITIES = [
+  ["barbecue", "야외바베큐"], ["pool", "수영장"], ["karaoke", "노래방/마이크"],
+  ["screen", "TV/화면"], ["field", "야외운동장"], ["parking", "주차"], ["kitchen", "취사시설"],
+];
+
+function amenityChecklist(stay, room = null) {
+  const details = [...(stay.amenityDetails || []), ...(room?.amenityDetails || [])];
+  const tags = new Set((stay.detailTags || []).map((tag) => ({ outdoor: "barbecue", mic: "karaoke" }[tag] || tag)));
+  const rows = STANDARD_AMENITIES.map(([key, label]) => {
+    const detail = details.find((item) => item.key === key || item.label === label);
+    const available = detail ? detail.available !== false : tags.has(key);
+    return { available, label, description: detail?.detail || (available ? "이용 가능" : "제공되지 않음") };
+  });
+  rows.sort((a, b) => Number(b.available) - Number(a.available));
+  return `<ul class="amenity-checklist">${rows.map((item) => `<li class="${item.available ? "available" : "unavailable"}"><i data-lucide="${item.available ? "check" : "x"}"></i><span><strong>${escapeHtml(item.label)}</strong><small>${escapeHtml(item.description)}</small></span></li>`).join("")}</ul>`;
 }
 
 function roomCapacityMax(room) {
@@ -1268,7 +1339,7 @@ function renderStayDetail() {
     <div class="detail-sections detail-sections-bottom">
       <section class="info-panel">
         <h2>편의시설</h2>
-        ${dashList(stay.amenities)}
+        ${amenityChecklist(stay)}
       </section>
       <section class="info-panel">
         <h2>추가요금</h2>
@@ -1276,7 +1347,7 @@ function renderStayDetail() {
       </section>
       <section class="info-panel">
         <h2>환불 및 규칙</h2>
-        ${dashList(stay.policy)}
+        ${dashList(STANDARD_REFUND_POLICY)}
       </section>
     </div>
   `;
@@ -1295,7 +1366,7 @@ function renderRoomDetail() {
       <div>
         <p class="eyebrow">${stay.name}</p>
         <h1 class="room-detail-title">${room.name}</h1>
-        <p>${room.capacity} 기준으로 운영되는 객실입니다. 예약 전에 사진, 인원 규정, 추가 요금, 시설 조건을 한 번 더 확인해주세요.</p>
+        <p>${room.capacity} · ${room.features.slice(0, 3).join(" · ")}</p>
       </div>
       <aside class="room-reserve-card">
         <span>객실 금액</span>
@@ -1333,11 +1404,11 @@ function renderRoomDetail() {
       </section>
       <section class="info-panel">
         <h2>포함 편의시설</h2>
-        ${dashList([...room.features, ...stay.amenities.slice(0, 4)])}
+        ${amenityChecklist(stay, room)}
       </section>
       <section class="info-panel">
         <h2>추가요금 및 환불</h2>
-        ${dashList([...stay.fees.slice(0, 3), ...stay.policy.slice(0, 3)])}
+        ${dashList([...stay.fees.slice(0, 3), ...STANDARD_REFUND_POLICY])}
       </section>
     </div>
   `;
@@ -1418,6 +1489,12 @@ function renderStores() {
     </section>
   `;
   qs("#marketProducts").innerHTML = `
+    <section class="recommended-set-section">
+      <div class="section-toolbar"><div><p class="eyebrow">단체 주문 추천</p><h2>추천 세트 상품</h2></div><span>인원에 맞춰 빠르게 준비하세요</span></div>
+      <div class="recommended-set-grid">
+        ${marketRecommendedSets(store).map((set) => `<article><span class="pill success">${escapeHtml(set.people)}</span><h3>${escapeHtml(set.name)}</h3><p>${escapeHtml(set.description)}</p><strong>${money(set.price)}</strong><button class="secondary-btn" type="button" data-set-products="${escapeHtml((set.productIds || []).join(","))}">구성 담기</button></article>`).join("")}
+      </div>
+    </section>
     <div class="section-toolbar">
       <h2>상품 둘러보기</h2>
       <span>${products.length}개 상품</span>
@@ -1512,8 +1589,13 @@ function productCard(product) {
   `;
 }
 
+function isAlcoholProduct(product) {
+  return Boolean(product.isAlcohol || /소주|맥주|와인|막걸리|위스키|주류/.test(product.name));
+}
+
 function renderProductDetail() {
   const product = state.selectedProduct;
+  const alcoholProduct = isAlcoholProduct(product);
   qs("#productDetailContent").innerHTML = `
     <div class="product-detail">
       <img src="${product.image}" alt="${product.name} 사진" />
@@ -1524,6 +1606,7 @@ function renderProductDetail() {
           <span class="pill">${product.unit}</span>
           <span class="pill success">${product.origin}</span>
           <span class="pill warning">수령 전 변경 가능</span>
+          ${alcoholProduct ? '<span class="pill danger">성인 인증 필수</span>' : ""}
         </div>
         <p>${product.detail}</p>
         <p class="price">${money(product.price)}</p>
@@ -1533,11 +1616,23 @@ function renderProductDetail() {
           <button type="button" data-qty-change="1">+</button>
         </div>
         <div class="button-row">
-          <button class="secondary-btn" data-add-current><i data-lucide="shopping-cart"></i>장바구니 담기</button>
-          <button class="primary-btn" data-buy-current><i data-lucide="credit-card"></i>바로구매</button>
+          <button class="secondary-btn" data-add-current data-alcohol="${alcoholProduct ? "true" : "false"}"><i data-lucide="shopping-cart"></i>장바구니 담기</button>
+          <button class="primary-btn" data-buy-current data-alcohol="${alcoholProduct ? "true" : "false"}"><i data-lucide="credit-card"></i>바로구매</button>
         </div>
       </section>
     </div>
+    ${alcoholProduct ? '<aside class="adult-purchase-notice"><i data-lucide="badge-alert"></i><div><strong>주류는 성인 인증 후 주문할 수 있습니다.</strong><p>배송 또는 픽업 시 대표자의 신분증을 확인하며, 성인 확인이 되지 않으면 상품을 전달하지 않습니다.</p></div></aside>' : ""}
+    <section class="product-information-section">
+      <h2>상품 상세 정보</h2>
+      <dl class="product-spec-table">
+        <div><dt>상품명</dt><dd>${escapeHtml(product.name)}</dd></div>
+        <div><dt>용량·단위</dt><dd>${escapeHtml(product.unit)}</dd></div>
+        <div><dt>원산지</dt><dd>${escapeHtml(product.origin)}</dd></div>
+        <div><dt>보관 방법</dt><dd>${escapeHtml(product.detailSections?.storage || "상품 표기 및 공판장 안내에 따릅니다.")}</dd></div>
+        <div><dt>영양 정보</dt><dd>${escapeHtml(Object.entries(product.nutritionInfo || {}).map(([key, value]) => `${key} ${value}`).join(" · ") || "상품 포장지의 영양정보를 확인해주세요.")}</dd></div>
+        <div><dt>판매자 안내</dt><dd>${escapeHtml(product.detailSections?.sellerNote || product.detail)}</dd></div>
+      </dl>
+    </section>
   `;
   refreshIcons();
 }
@@ -2480,7 +2575,7 @@ function renderRecreation() {
           <div class="detail-meta">
             <span class="pill">${activity.people}</span>
             <span class="pill">${activity.space === "indoor" ? "실내" : activity.space === "outdoor" ? "야외" : "공간 무관"}</span>
-            <span class="pill">${activity.mood === "icebreak" ? "아이스브레이킹" : activity.mood === "team" ? "팀 대항" : "잔잔한 진행"}</span>
+            <span class="pill">${activity.mood === "icebreak" ? "아이스브레이킹" : activity.mood === "team" ? "팀전" : "개인전"}</span>
           </div>
           <div class="card-reactions">
             <span><i data-lucide="heart"></i>${activity.likes}</span>
@@ -2508,6 +2603,38 @@ function activePost() {
   return board.posts.find((post) => post.id === state.activePostId) || board.posts[0];
 }
 
+function communityActorId() {
+  return window.motfCurrentUserId || "guest";
+}
+
+function relativeTime(value) {
+  if (!value) return "방금 전";
+  const seconds = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 1000));
+  if (seconds < 60) return "방금 전";
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}분 전`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}시간 전`;
+  return new Date(value).toLocaleDateString("ko-KR");
+}
+
+function renderAnonymousComments(comments, authorId = "") {
+  const normalized = comments.map((item, index) => typeof item === "string" ? { body: item, userId: `seed-${index}`, createdAt: null } : item);
+  const aliases = new Map();
+  normalized.forEach((item) => { if (!aliases.has(item.userId)) aliases.set(item.userId, aliases.size + 1); });
+  return normalized.map((item) => {
+    const isAuthor = authorId && item.userId === authorId;
+    const alias = isAuthor ? "익명(작성자)" : `익명${aliases.get(item.userId)}`;
+    const replyAlias = item.replyTo ? `@익명${aliases.get(item.replyTo) || ""}` : "";
+    return `<div class="comment-item ${isAuthor ? "post-author-comment" : ""}"><div class="comment-author-line"><strong>${alias}</strong><span>${relativeTime(item.createdAt)}</span></div><span>${replyAlias ? `<b>${replyAlias}</b> ` : ""}${escapeHtml(item.body)}</span><button type="button" class="comment-reply-button" data-reply-comment="${escapeHtml(item.userId)}" data-reply-comment-id="${escapeHtml(item.id || "")}" data-reply-alias="${alias}">답글</button></div>`;
+  }).join("");
+}
+
+function likeOnce(kind, id) {
+  const key = `motf.like.${communityActorId()}.${kind}.${id}`;
+  if (localStorage.getItem(key)) return false;
+  localStorage.setItem(key, "1");
+  return true;
+}
+
 function renderBoardDetail() {
   const board = activeBoard();
   qs("#boardDetailHeader").innerHTML = `
@@ -2522,7 +2649,7 @@ function renderBoardDetail() {
       <button class="anonymous-post interactive-card" type="button" data-post-id="${post.id}">
         <div class="post-topline">
           <strong>익명</strong>
-          <span>방금 전</span>
+          <span>${relativeTime(post.createdAt)}</span>
         </div>
         <h3>${escapeHtml(post.title)}</h3>
         <p>${escapeHtml(post.body)}</p>
@@ -2546,6 +2673,16 @@ function renderBoardDetail() {
   refreshIcons();
 }
 
+function marketRecommendedSets(store) {
+  if (store.recommendedSets?.length) return store.recommendedSets;
+  const basePrice = store.products.slice(0, 4).reduce((sum, product) => sum + product.price, 0);
+  return [
+    { name: "20명 바베큐 기본 세트", people: "15~20명", description: "고기·쌈채소·소스·일회용품 기본 구성", price: basePrice || 189000, productIds: store.products.slice(0, 4).map((item) => item.id) },
+    { name: "40명 MT 든든 세트", people: "30~40명", description: "넉넉한 식재료와 음료를 함께 준비한 구성", price: Math.max(basePrice * 2, 349000), productIds: store.products.slice(0, 6).map((item) => item.id) },
+    { name: "아침 해장 세트", people: "20~30명", description: "냉동식품·생수·컵라면 중심의 다음 날 구성", price: 99000, productIds: store.products.filter((item) => ["냉동식품", "식재료", "주류/음료"].includes(item.category)).slice(0, 4).map((item) => item.id) },
+  ];
+}
+
 function renderActivityDetail() {
   const activity = activeActivity();
   qs("#activityDetailContent").innerHTML = `
@@ -2558,14 +2695,17 @@ function renderActivityDetail() {
         <span class="pill">${activity.time}</span>
         <span class="pill">${activity.space === "indoor" ? "실내" : activity.space === "outdoor" ? "야외" : "공간 무관"}</span>
       </div>
-      <div class="media-chip activity-media-chip"><i data-lucide="image-plus"></i>${activity.media}</div>
+      <div class="activity-resource-links">
+        <a class="media-chip activity-media-chip" href="https://www.youtube.com/results?search_query=${encodeURIComponent(activity.title + " 레크레이션 진행")}" target="_blank" rel="noopener"><i data-lucide="play-circle"></i>예시 영상 보기</a>
+        <button class="media-chip activity-media-chip" type="button" data-download-activity-script><i data-lucide="file-down"></i>진행 대본 받기</button>
+      </div>
       <div class="post-actions">
         <button class="secondary-btn" type="button" data-like-activity><i data-lucide="heart"></i>공감 ${activity.likes}</button>
         <button class="ghost-btn" type="button" data-focus-activity-comment><i data-lucide="message-square"></i>댓글 ${activity.comments.length}</button>
       </div>
     </div>
   `;
-  qs("#activityCommentList").innerHTML = activity.comments.map((comment) => `<div class="comment-item"><strong>익명</strong><span>${escapeHtml(comment)}</span></div>`).join("");
+  qs("#activityCommentList").innerHTML = renderAnonymousComments(activity.comments);
   refreshIcons();
 }
 
@@ -2584,7 +2724,7 @@ function renderPostDetail() {
       </div>
     </div>
   `;
-  qs("#postCommentList").innerHTML = post.comments.map((comment) => `<div class="comment-item"><strong>익명</strong><span>${escapeHtml(comment)}</span></div>`).join("");
+  qs("#postCommentList").innerHTML = renderAnonymousComments(post.comments, post.authorId);
   refreshIcons();
 }
 
@@ -2598,18 +2738,21 @@ function renderChat() {
   }
   qs("#chatList").innerHTML = state.chats
     .map(
-      (thread) => `
+      (thread) => {
+        const business = [...stays, ...stores].find((item) => item.name === thread.title);
+        return `
       <button class="chat-thread ${thread.id === state.activeChatId ? "active" : ""}" data-chat-id="${thread.id}">
-        <strong>${escapeHtml(thread.title)}</strong>
-        <span>${escapeHtml(thread.subtitle)}</span>
+        ${business?.image ? `<img src="${business.image}" alt="" />` : '<span class="chat-avatar"><i data-lucide="user-round"></i></span>'}
+        <span class="chat-thread-copy"><strong>${escapeHtml(thread.title)}</strong><small>${escapeHtml(business?.distance || business?.region || thread.subtitle)}</small><span>${escapeHtml(thread.subtitle)}</span></span>
       </button>
-    `
+    `; }
     )
     .join("");
   const thread = state.chats.find((item) => item.id === state.activeChatId) || state.chats[0];
+  const chatBusiness = [...stays, ...stores].find((item) => item.name === thread.title);
   qs("#chatRoomHeader").innerHTML = `
-    <h2>${escapeHtml(thread.title)}</h2>
-    <p class="muted">${escapeHtml(thread.subtitle)}</p>
+    ${chatBusiness?.image ? `<img src="${chatBusiness.image}" alt="" />` : ""}
+    <div><h2>${escapeHtml(thread.title)}</h2><p class="muted">${escapeHtml(chatBusiness?.distance || chatBusiness?.region || thread.subtitle)}</p></div>
   `;
   qs("#chatMessages").innerHTML = thread.messages
     .map(
@@ -2635,6 +2778,8 @@ window.motfApplyChats = function applyChats(chats, activeChatId) {
 };
 
 window.motfGetActiveChatId = () => state.activeChatId;
+window.motfGetActiveCommunityPost = () => ({ boardId: state.activeBoardId, post: activePost() });
+window.motfAppendCommunityComment = (comment) => { activePost().comments.push(comment); renderPostDetail(); };
 window.motfFindBusinessByName = (name) => [...stays, ...stores].find((item) => item.name === escapeHtml(name)) || null;
 window.motfNavigate = navigate;
 window.motfGetUsageSnapshot = () => ({
@@ -3156,8 +3301,15 @@ document.addEventListener("click", (event) => {
 
   const communityWriteButton = event.target.closest("[data-community-write]");
   if (communityWriteButton) {
-    state.activeBoardId = communityBoards[0].id;
+    if (!state.activeBoardId) state.activeBoardId = communityBoards[0].id;
     navigate("boardDetail");
+    window.setTimeout(() => {
+      const form = qs("#boardWriteForm");
+      form.hidden = false;
+      form.classList.add("full-page-compose", "compose-open");
+      form.scrollIntoView({ behavior: "smooth", block: "start" });
+      qs("#boardPostTitle")?.focus();
+    }, 0);
     return;
   }
 
@@ -3191,12 +3343,14 @@ document.addEventListener("click", (event) => {
   }
 
   if (event.target.closest("[data-like-activity]")) {
+    if (!likeOnce("activity", activeActivity().id)) { toast("공감은 한 게시물에 한 번만 할 수 있어요."); return; }
     activeActivity().likes += 1;
     renderActivityDetail();
     return;
   }
 
   if (event.target.closest("[data-like-post]")) {
+    if (!likeOnce("post", activePost().id)) { toast("공감은 한 게시물에 한 번만 할 수 있어요."); return; }
     activePost().likes += 1;
     renderPostDetail();
     return;
@@ -3209,6 +3363,26 @@ document.addEventListener("click", (event) => {
 
   if (event.target.closest("[data-focus-post-comment]")) {
     qs("#postCommentInput")?.focus();
+    return;
+  }
+
+  const replyButton = event.target.closest("[data-reply-comment]");
+  if (replyButton) {
+    const input = currentRoute() === "activityDetail" ? qs("#activityCommentInput") : qs("#postCommentInput");
+    input.dataset.replyTo = replyButton.dataset.replyComment;
+    input.dataset.replyCommentId = replyButton.dataset.replyCommentId || "";
+    input.placeholder = `${replyButton.dataset.replyAlias}에게 답글 남기기`;
+    input.focus();
+    return;
+  }
+
+  if (event.target.closest("[data-download-activity-script]")) {
+    const activity = activeActivity();
+    const script = `${activity.title}\n\n추천 인원: ${activity.people}\n진행 시간: ${activity.time}\n\n진행 방법\n${activity.detail}\n\n준비 및 주의사항\n${activity.note}`;
+    const url = URL.createObjectURL(new Blob([script], { type: "text/plain;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url; link.download = `${activity.title}-진행대본.txt`; link.click();
+    URL.revokeObjectURL(url);
     return;
   }
 
@@ -3312,6 +3486,14 @@ document.addEventListener("click", (event) => {
   if (budgetButton) {
     window.motfOpenBudgetPreview?.(budgetButton.dataset.budgetFile);
   }
+
+  const setButton = event.target.closest("[data-set-products]");
+  if (setButton) {
+    const productIds = setButton.dataset.setProducts.split(",").filter(Boolean);
+    productIds.forEach((productId) => addToCart(productId, 1));
+    toast("추천 세트 구성을 장바구니에 담았습니다.");
+    return;
+  }
 });
 
 document.addEventListener("input", (event) => {
@@ -3398,6 +3580,10 @@ qs("#activitySubmitForm").addEventListener("submit", (event) => {
     toast("레크레이션 제목을 입력해주세요.");
     return;
   }
+  if (typeof window.motfSubmitRecreation === "function") {
+    window.motfSubmitRecreation(event.target);
+    return;
+  }
   const spaceText = qs("#activitySubmitSpace").value;
   activities.unshift({
     id: `activity-${Date.now()}`,
@@ -3416,7 +3602,7 @@ qs("#activitySubmitForm").addEventListener("submit", (event) => {
   });
   event.target.reset();
   renderRecreation();
-  toast("익명 레크레이션 추천이 등록되었습니다.");
+  toast("레크레이션 추천이 관리자 검토 대상으로 접수되었습니다.");
 });
 
 qs("#boardWriteForm").addEventListener("submit", (event) => {
@@ -3427,6 +3613,10 @@ qs("#boardWriteForm").addEventListener("submit", (event) => {
   const title = qs("#boardPostTitle").value.trim();
   const body = qs("#boardPostBody").value.trim();
   if (!title || !body) return;
+  if (typeof window.motfSubmitCommunityPost === "function") {
+    window.motfSubmitCommunityPost(event.target, { boardId: selectedBoardId, title, body });
+    return;
+  }
   const post = {
     id: `post-${Date.now()}`,
     title,
@@ -3434,10 +3624,13 @@ qs("#boardWriteForm").addEventListener("submit", (event) => {
     likes: 0,
     comments: [],
     media: "첨부 가능",
+    authorId: communityActorId(),
+    createdAt: new Date().toISOString(),
   };
   board.posts.unshift(post);
   state.activePostId = post.id;
   renderBoardDetail();
+  event.target.hidden = true;
   toast("익명 게시글이 등록되었습니다.");
 });
 
@@ -3446,8 +3639,11 @@ qs("#activityCommentForm").addEventListener("submit", (event) => {
   const input = qs("#activityCommentInput");
   const text = input.value.trim();
   if (!text) return;
-  activeActivity().comments.push(text);
+  activeActivity().comments.push({ body: text, userId: communityActorId(), replyTo: input.dataset.replyTo || null, createdAt: new Date().toISOString() });
   input.value = "";
+  delete input.dataset.replyTo;
+  delete input.dataset.replyCommentId;
+  input.placeholder = "익명 댓글을 입력하세요";
   renderActivityDetail();
 });
 
@@ -3456,8 +3652,11 @@ qs("#postCommentForm").addEventListener("submit", (event) => {
   const input = qs("#postCommentInput");
   const text = input.value.trim();
   if (!text) return;
-  activePost().comments.push(text);
+  activePost().comments.push({ body: text, userId: communityActorId(), replyTo: input.dataset.replyTo || null, createdAt: new Date().toISOString() });
   input.value = "";
+  delete input.dataset.replyTo;
+  delete input.dataset.replyCommentId;
+  input.placeholder = "익명 댓글을 입력하세요";
   renderPostDetail();
 });
 
@@ -3493,7 +3692,6 @@ window.addEventListener("popstate", () => {
 });
 
 (async function boot() {
-  stays = stays.map((stay) => ({ ...stay, region: DEFAULT_STAY_REGION }));
   initializeStaySearchDefaults();
   await loadPaymentConfig();
   const handledRedirect = await handleTossRedirect();
