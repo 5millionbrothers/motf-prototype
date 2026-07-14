@@ -129,7 +129,23 @@ function aligoCredentials() {
   };
 }
 
-function validateAligoCredentials(credentials) {
+function aligoRelayConfig() {
+  return {
+    url: String(process.env.ALIGO_RELAY_URL || "").trim().replace(/\/+$/, ""),
+    secret: String(process.env.ALIGO_RELAY_SECRET || "").trim(),
+  };
+}
+
+function validateAligoConfiguration(credentials) {
+  const relay = aligoRelayConfig();
+  if (relay.url || relay.secret) {
+    const missing = [];
+    if (!relay.url) missing.push("ALIGO_RELAY_URL");
+    if (!relay.secret) missing.push("ALIGO_RELAY_SECRET");
+    if (missing.length) throw new Error(`ALIGO relay environment is missing: ${missing.join(", ")}`);
+    return;
+  }
+
   const missing = Object.entries(credentials)
     .filter(([, value]) => !value)
     .map(([key]) => key);
@@ -139,6 +155,31 @@ function validateAligoCredentials(credentials) {
 }
 
 async function aligoRequest(path, params) {
+  const relay = aligoRelayConfig();
+  if (relay.url && relay.secret) {
+    const relayParams = { ...params };
+    delete relayParams.userid;
+    delete relayParams.apikey;
+    delete relayParams.senderkey;
+    delete relayParams.sender;
+
+    const result = await requestJson(`${relay.url}/v1/aligo/request`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-relay-secret": relay.secret,
+      },
+      body: JSON.stringify({ path, params: relayParams }),
+    }, 15000);
+    if (!result.ok || Number(result.data?.code) !== 0) {
+      const error = new Error(errorMessage(result.data, `Aligo relay request failed (${result.status}).`));
+      error.statusCode = result.status || 502;
+      error.providerResponse = result.data;
+      throw error;
+    }
+    return result.data;
+  }
+
   const body = new URLSearchParams(params).toString();
   const result = await requestJson(`${ALIGO_API_BASE}${path}`, {
     method: "POST",
@@ -360,7 +401,7 @@ async function sendMockAlimtalk(item) {
 
 async function sendAligoAlimtalk(item) {
   const credentials = aligoCredentials();
-  validateAligoCredentials(credentials);
+  validateAligoConfiguration(credentials);
 
   const templateCode = ALIGO_TEMPLATE_CODES[item.template_key];
   if (!templateCode) throw new Error(`알리고 템플릿 코드가 없습니다: ${item.template_key}`);
