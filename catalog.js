@@ -36,11 +36,12 @@
       capacity: item.max_people ? `최대 ${item.max_people}명` : "인원 문의",
       price: Number(item.price) || 0,
       image: imageUrl(item.image_url || business.cover_image_url, roomFallback),
+      images: (item.image_urls || []).map((url) => imageUrl(url, roomFallback)),
       features: item.feature_summary?.length ? item.feature_summary.map(text) : item.description ? [text(item.description)] : [],
       amenityDetails: Array.isArray(item.amenity_details) ? item.amenity_details : [],
       detailSections: item.detail_sections && typeof item.detail_sections === "object" ? item.detail_sections : {},
     }));
-    const image = business.cover_image_url || rooms[0]?.image || stayFallback;
+    const image = business.cover_image_url || business.gallery_image_urls?.[0] || rooms[0]?.image || stayFallback;
     return {
       id: business.id,
       name: text(business.business_name),
@@ -62,10 +63,11 @@
       roomCount: Number(business.room_count) || rooms.length,
       bathCount: Number(business.bath_count) || 0,
       image,
-      images: [image, ...rooms.map((room) => room.image)],
+      images: [...new Set([image, ...(business.gallery_image_urls || []), ...rooms.flatMap((room) => room.images || [room.image])])],
       intro: text(business.description || "단체 행사 이용이 가능한 제휴 숙소입니다."),
       amenities: business.facilities?.length ? business.facilities.map(text) : ["상세 시설은 사장님에게 문의해주세요."],
       amenityDetails: Array.isArray(business.amenity_details) ? business.amenity_details : [],
+      extraFees: Array.isArray(business.extra_fees) ? business.extra_fees : [],
       fees: Array.isArray(business.extra_fees) && business.extra_fees.length
         ? business.extra_fees.map((fee) => text(`${fee.label || "추가요금"}${fee.amount ? ` ${Number(fee.amount).toLocaleString("ko-KR")}원` : ""}${fee.detail ? ` · ${fee.detail}` : ""}`))
         : ["추가요금은 예약 전 사장님에게 확인해주세요."],
@@ -83,6 +85,7 @@
       price: Number(item.price) || 0,
       origin: text(item.origin || "업체 제공 상품"),
       image: imageUrl(item.image_url || business.cover_image_url, productFallback),
+      images: (item.image_urls || []).map((url) => imageUrl(url, productFallback)),
       detail: text(item.description || "상세 내용은 마트에 문의해주세요."),
       detailSections: item.detail_sections && typeof item.detail_sections === "object" ? item.detail_sections : {},
       nutritionInfo: item.nutrition_info && typeof item.nutrition_info === "object" ? item.nutrition_info : {},
@@ -106,16 +109,17 @@
   (async () => {
     const [businessResult, offeringResult] = await Promise.all([
       client.from("businesses")
-        .select("id, business_type, business_name, address, description, region, cover_image_url, facilities, approval_status, latitude, longitude, location_verified_at, station_distance_m, convenience_distance_m, nearby_tags, room_count, bath_count, amenity_details, extra_fees, refund_policy, recommended_sets")
+        .select("id, business_type, business_name, address, description, region, cover_image_url, gallery_image_urls, facilities, approval_status, latitude, longitude, location_verified_at, station_distance_m, convenience_distance_m, nearby_tags, room_count, bath_count, amenity_details, extra_fees, refund_policy, recommended_sets")
         .eq("approval_status", "approved"),
       client.from("offerings")
-        .select("id, business_id, name, description, price, is_active, max_people, min_people, unit, category, image_url, sort_order, feature_summary, amenity_details, detail_sections, origin, nutrition_info, is_alcohol, stock_quantity")
+        .select("id, business_id, name, description, price, is_active, max_people, min_people, unit, category, image_url, image_urls, sort_order, feature_summary, amenity_details, detail_sections, origin, nutrition_info, is_alcohol, stock_quantity")
         .eq("is_active", true)
         .order("sort_order"),
     ]);
 
     if (businessResult.error || offeringResult.error) {
-      console.warn("실제 제휴처 목록을 불러오지 못해 데모 목록을 유지합니다.", businessResult.error || offeringResult.error);
+      console.warn("실제 제휴처 목록을 불러오지 못했습니다.", businessResult.error || offeringResult.error);
+      window.motfApplyCatalog([], [], { error: true });
       return;
     }
 

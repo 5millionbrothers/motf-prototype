@@ -472,16 +472,6 @@ const communityBoards = [
       { id: "info-rain", title: "대성리 비 와서 운동장 젖었어요", body: "야외 게임이면 실내 대안 준비하세요.", likes: 19, comments: ["저희도 실내로 바꿨어요."], media: "사진 2" },
     ],
   },
-  {
-    id: "confession",
-    title: "익명고백",
-    description: "같은 날 같은 지역에서 마주친 다른 학교 MT 팀에게 익명으로 마음을 전해요.",
-    posts: [
-      { id: "confess-blue", title: "6/12 강촌역 파란 과잠 분들", body: "길 알려주셔서 무사히 숙소 도착했습니다.", likes: 45, comments: ["혹시 우리인가", "훈훈하다"], media: "" },
-      { id: "confess-store", title: "가평 편의점에서 도와준 팀 고마워요", body: "박스 옮기는 거 도와주신 분들 복 받으세요.", likes: 38, comments: ["다들 고생했어요"], media: "" },
-      { id: "confess-umbrella", title: "양평 버스정류장 우산 빌려주신 분", body: "우산 꼭 돌려드리고 싶어요.", likes: 41, comments: ["찾으면 후기 부탁"], media: "사진 1" },
-    ],
-  },
 ];
 
 const state = {
@@ -509,6 +499,33 @@ const state = {
   reviews: [],
   reviewScope: "all",
   reviewTargets: [],
+  mtProjects: [],
+  mtProjectMode: "list",
+  mtCandidates: ["station", "river", "pine"],
+  mtCandidateRecords: stays.filter((stay) => ["station", "river", "pine"].includes(String(stay.id))),
+  mtProject: {
+    id: null,
+    title: "고려대학교 국제학부 2026 여름 MT",
+    organization_name: "고려대학교 국제학부",
+    region: "대성리",
+    starts_on: "2026-08-14",
+    ends_on: "2026-08-15",
+    guest_count: 32,
+    status: "planning",
+    estimated_budget: 2500000,
+    items: [
+      { id: "demo-stay-plan", item_kind: "stay", reference_id: "station", title: "대성리 스테이션 하우스", quantity: 1, amount: 1083000, status: "planned" },
+      { id: "demo-shopping-plan", item_kind: "shopping", reference_id: "pork-set", title: "바베큐 세트", quantity: 1, amount: 189000, status: "planned" },
+    ],
+    itinerary: [
+      { starts_at: "2026-08-14T13:00:00+09:00", title: "대성리역 집합", place: "2번 출구" },
+      { starts_at: "2026-08-14T15:00:00+09:00", title: "숙소 체크인", note: "대표자 신분증 지참" },
+      { starts_at: "2026-08-14T16:30:00+09:00", title: "장보기 배송", place: "숙소 주차장" },
+    ],
+    notices: [{ body: "개인 세면도구와 수건을 꼭 챙겨주세요. 방 배정은 출발 전날 공개합니다.", is_pinned: true }],
+  },
+  publicCandidateStays: [],
+  catalogError: "",
   chats: [
     {
       id: "river-chat",
@@ -542,10 +559,11 @@ const state = {
     loadingKey: "",
     unavailableOfferingIds: new Set(),
   },
+  publicStayCalendar: { businessId: "", blocks: [], loading: false },
 };
 
-window.motfApplyCatalog = function applyCatalog(nextStays, nextStores) {
-  if (Array.isArray(nextStays) && nextStays.length) {
+window.motfApplyCatalog = function applyCatalog(nextStays, nextStores, options = {}) {
+  if (Array.isArray(nextStays)) {
     // 1차 숙소 모집은 대성리만 운영합니다. 지역 확장 시 이 정규화만 제거하면 됩니다.
     stays = nextStays.map((stay) => ({ ...stay, region: LAUNCH_STAY_REGION }));
     const regionSelect = qs("#stayRegion");
@@ -553,15 +571,16 @@ window.motfApplyCatalog = function applyCatalog(nextStays, nextStores) {
       regionSelect.innerHTML = '<option value="대성리">대성리</option>';
       regionSelect.value = "대성리";
     }
-    state.selectedStay = stays[0];
-    state.selectedRoom = stays[0].rooms[0];
+    state.selectedStay = stays[0] || null;
+    state.selectedRoom = stays[0]?.rooms?.[0] || null;
   }
-  if (Array.isArray(nextStores) && nextStores.length) {
+  if (Array.isArray(nextStores)) {
     stores = nextStores;
-    state.selectedStore = stores[0];
-    state.selectedProduct = stores[0].products[0];
+    state.selectedStore = stores[0] || null;
+    state.selectedProduct = stores[0]?.products?.[0] || null;
     state.cart = [];
   }
+  state.catalogError = options.error ? "catalog_load_failed" : "";
   const route = currentRoute();
   if (route === "home") renderHome();
   if (route === "stays") renderStays();
@@ -616,7 +635,7 @@ window.motfStartPreparedPayment = function startPreparedPayment(intent, draft) {
   const amount = Number(intent.amount);
   state.pendingPayment = {
     type,
-    title: isStay ? "숙소 예약" : "마트 주문",
+    title: isStay ? "숙소 예약" : "MT 장보기 주문",
     itemName: intent.order_name,
     amount,
     orderId: intent.order_id,
@@ -712,6 +731,7 @@ const routeParents = {
 
 const appRoutes = new Set([
   "home",
+  "myMt",
   "stays",
   "stayDetail",
   "roomDetail",
@@ -743,6 +763,7 @@ const appRoutes = new Set([
 
 const routePaths = {
   home: "/",
+  myMt: "/my-mt",
   stays: "/stays",
   stayDetail: "/stays/detail",
   roomDetail: "/stays/room",
@@ -839,6 +860,7 @@ function navigate(route, options = {}) {
     routeHistory.push(previousRoute);
     if (routeHistory.length > 30) routeHistory.shift();
   }
+  if (route === "myMt" && options.keepMtWorkspace !== true) state.mtProjectMode = "list";
   qsa(".view").forEach((view) => view.classList.toggle("active", view.id === route));
   document.body.dataset.currentRoute = route;
   const activeNav = routeParents[route] ?? route;
@@ -865,6 +887,7 @@ function goBack(fallbackRoute = "home") {
 
 function renderRoute(route) {
   if (route === "home") renderHome();
+  if (route === "myMt") renderMyMt();
   if (route === "stays") renderStays();
   if (route === "stayDetail") renderStayDetail();
   if (route === "roomDetail") renderRoomDetail();
@@ -912,12 +935,14 @@ const homeStories = [
   {
     category: "게시판 모음",
     title: "새로운 경험을 하고 싶다면?",
-    summary: "익명 고백부터 대결 신청까지",
+    summary: "교통 정보부터 현장 나눔까지",
     image: photo("photo-1527529482837-4698179dc6ce", "auto=format&fit=crop&w=900&q=82"),
     route: "community",
     section: "boards",
   },
 ];
+
+const launchCommunityBoards = () => communityBoards;
 
 const marketBundleImages = [
   photo("photo-1544025162-d76694265947", "auto=format&fit=crop&w=1000&q=84"),
@@ -935,17 +960,24 @@ function renderHome() {
 function renderHomePicks() {
   const container = qs("#homeStayPicks");
   if (!container) return;
-  container.innerHTML = stays.map((stay) => `
+  if (state.catalogError) {
+    container.innerHTML = `<div class="empty-state catalog-error"><i data-lucide="cloud-off"></i><strong>숙소 정보를 불러오지 못했습니다.</strong><span>잠시 후 다시 시도해주세요.</span></div>`;
+    refreshIcons();
+    return;
+  }
+  container.innerHTML = stays.map((stay) => {
+    const estimate = estimateMtStayCost(stay);
+    return `
     <button class="home-stay-pick" type="button" data-stay-id="${stay.id}">
       <img src="${stay.image}" alt="${escapeHtml(stay.name)}" />
       <span class="home-stay-pick-body">
         <small>${escapeHtml(stay.region)} · 최대 ${stay.maxPeople}명</small>
         <strong>${escapeHtml(stay.name)}</strong>
         <span class="home-stay-features">${(stay.amenities || []).slice(0, 3).map((amenity) => `<b>${escapeHtml(amenity)}</b>`).join("")}</span>
-        <span>${money(stayDisplayPrice(stay))}부터</span>
+        <span>${estimate.people}명 예상 총액 ${money(estimate.total)}</span>
       </span>
     </button>
-  `).join("");
+  `}).join("");
   window.requestAnimationFrame(() => {
     const canScroll = container.scrollWidth > container.clientWidth + 2;
     qsa("[data-home-stay-scroll]").forEach((button) => { button.hidden = !canScroll; });
@@ -1063,8 +1095,8 @@ function mapItems(kind, matches) {
     name: item.name,
     region: item.region,
     line: kind === "stays" ? `최대 ${item.maxPeople}명` : item.type,
-    amount: kind === "stays" ? money(item.price) : `상품 ${item.products.length}개`,
-    markerLabel: kind === "stays" ? money(item.price).replace("원", "원~") : item.name,
+    amount: kind === "stays" ? `예상 총액 ${money(estimateMtStayCost(item).total)}` : `상품 ${item.products.length}개`,
+    markerLabel: kind === "stays" ? money(estimateMtStayCost(item).total) : item.name,
     markerSubLabel: kind === "stays" ? item.name : item.type,
     location: item.location,
   }));
@@ -1088,7 +1120,7 @@ function renderFallbackMap(kind, matches, statusMessage) {
     ${
       items.length
         ? items.map((item, index) => fallbackMarker(item, kind, index)).join("")
-        : `<div class="map-empty">조건에 맞는 ${kind === "stays" ? "숙소" : "마트"}이 없습니다.</div>`
+        : `<div class="map-empty">조건에 맞는 ${kind === "stays" ? "숙소" : "장보기 제휴처"}가 없습니다.</div>`
     }
   `;
   setMapStatus(kind, statusMessage);
@@ -1123,7 +1155,7 @@ function markerContent(item, kind) {
 }
 
 function infoContent(item, kind) {
-  const action = kind === "stays" ? "숙소 상세로 이동" : "마트 상품 보기";
+  const action = kind === "stays" ? "숙소 상세로 이동" : "장보기 상품 보기";
   return `
     <div class="naver-map-info">
       <strong>${item.name}</strong>
@@ -1260,7 +1292,9 @@ function renderStays() {
   }
   const matches = getStayMatches();
   qs("#stayCount").textContent = `${matches.length}개 숙소`;
-  qs("#stayList").innerHTML = matches.length
+  qs("#stayList").innerHTML = state.catalogError
+    ? `<div class="empty-state catalog-error"><i data-lucide="cloud-off"></i><strong>숙소 정보를 불러오지 못했습니다.</strong><span>잠시 후 다시 시도해주세요.</span></div>`
+    : matches.length
     ? matches.map(stayCard).join("")
     : `<div class="empty-state">조건에 맞는 숙소가 없습니다. 인원이나 예산을 넓혀보세요.</div>`;
   renderListingMap("stays", matches);
@@ -1270,6 +1304,8 @@ function renderStays() {
 
 function stayCard(stay) {
   const availableCount = availableRoomsForStay(stay).length;
+  const estimate = estimateMtStayCost(stay);
+  const selected = state.mtCandidates.includes(String(stay.id));
   return `
     <article class="listing-card stay-listing-card">
       <img src="${stay.image}" alt="${stay.name} 사진" />
@@ -1282,11 +1318,14 @@ function stayCard(stay) {
           </div>
           <h3>${stay.name}</h3>
           <p>${stay.intro}</p>
-          <p class="muted">${stay.distance}</p>
+          <p class="muted">${stay.distance} · 화장실 ${stay.bathCount || "확인 필요"}개</p>
         </div>
         <div class="listing-actions">
-          <span class="price">${money(stayDisplayPrice(stay))}부터</span>
+          <span class="price">예상 총액 ${money(estimate.total)}</span>
+          <strong class="per-person-price">${estimate.people}명 기준 1인당 ${money(estimate.perPerson)}</strong>
+          <span class="cost-summary">객실 ${money(estimate.confirmed)}${estimate.optional ? ` + 선택 ${money(estimate.optional)}` : ""}${estimate.onSite ? ` + 현장 확인 ${money(estimate.onSite)}` : ""}</span>
           <span class="muted">${availableCount}/${stay.rooms.length} 객실 가능</span>
+          <button class="secondary-btn candidate-button ${selected ? "active" : ""}" data-add-mt-candidate="${stay.id}"><i data-lucide="${selected ? "check" : "plus"}"></i>${selected ? "후보에 담김" : "후보에 담기"}</button>
           <button class="primary-btn" data-stay-id="${stay.id}"><i data-lucide="search"></i>상세 보기</button>
           <button class="ghost-btn" data-open-chat="${stay.name}"><i data-lucide="message-circle"></i>문의</button>
         </div>
@@ -1303,7 +1342,7 @@ function stayGalleryImages(stay) {
   return uniqueImages([
     stay.image,
     ...stay.images,
-    ...stay.rooms.map((room) => room.image),
+    ...stay.rooms.flatMap((room) => room.images?.length ? room.images : [room.image]),
     photo("photo-1600566753190-17f0baa2a6c3"),
     photo("photo-1596394516093-501ba68a0ba6"),
     photo("photo-1523217582562-09d0def993a6"),
@@ -1313,8 +1352,9 @@ function stayGalleryImages(stay) {
 function roomGalleryImages(stay, room) {
   return uniqueImages([
     room.image,
+    ...(room.images || []),
     ...stay.images,
-    ...stay.rooms.map((item) => item.image),
+    ...stay.rooms.flatMap((item) => item.images?.length ? item.images : [item.image]),
     photo("photo-1600607688969-a5bfcd646154"),
     photo("photo-1493809842364-78817add7ffb"),
   ]).slice(0, 8);
@@ -1403,6 +1443,7 @@ function renderStayDetail() {
   ensureStayAvailability();
   const stay = state.selectedStay;
   const gallery = stayGalleryImages(stay);
+  const insight = stayReviewInsight(stay);
   qs("#stayDetailContent").innerHTML = `
     <section class="stay-detail-top">
       <div>
@@ -1426,8 +1467,15 @@ function renderStayDetail() {
       ${renderStayGallery(gallery, stay.name)}
     </section>
 
+    ${insight ? `<section class="stay-review-insight"><i data-lucide="users-round"></i><div><small>실제 이용팀 리뷰 기준</small><strong>등록 정원은 최대 ${stay.maxPeople}명이지만, 쾌적 인원은 ${insight.min}~${insight.max}명입니다.</strong><span>${insight.count}개 검증 후기에서 계산한 MT 전용 정보입니다.</span></div></section>` : ""}
+
     <section>
       ${renderStaySearchPanel("이 숙소 예약 조건")}
+    </section>
+
+    <section class="public-availability-section">
+      <div class="section-toolbar"><div><p class="eyebrow">예약 현황</p><h2>앞으로 30일 객실 달력</h2></div><span>예약자 정보 없이 가능 여부만 표시합니다</span></div>
+      <div id="publicStayCalendar" class="public-stay-calendar"><div class="empty-state">예약 현황을 확인하는 중입니다.</div></div>
     </section>
 
     <section>
@@ -1455,7 +1503,58 @@ function renderStayDetail() {
       </section>
     </div>
   `;
+  loadPublicStayCalendar(stay);
   refreshIcons();
+}
+
+function stayReviewInsight(stay) {
+  const matching = state.reviews.filter((review) => String(review.businessId || "") === String(stay.id) && review.comfortablePeopleMin && review.comfortablePeopleMax);
+  if (!matching.length) return null;
+  const average = (key) => Math.round(matching.reduce((sum, review) => sum + Number(review[key] || 0), 0) / matching.length);
+  return { min: average("comfortablePeopleMin"), max: average("comfortablePeopleMax"), count: matching.length };
+}
+
+function renderPublicStayCalendar(stay) {
+  const container = qs("#publicStayCalendar");
+  if (!container || state.selectedStay?.id !== stay.id) return;
+  const blocks = state.publicStayCalendar.blocks || [];
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  container.innerHTML = Array.from({ length: 30 }, (_, index) => {
+    const date = new Date(today);
+    date.setDate(today.getDate() + index);
+    const key = localDateKey(date);
+    const blockedRooms = new Set(blocks.filter((block) => key >= block.start_date && key < block.end_date).map((block) => String(block.offering_id))).size;
+    const totalRooms = Math.max(1, stay.rooms?.length || 1);
+    const soldOut = blockedRooms >= totalRooms;
+    const limited = blockedRooms > 0 && !soldOut;
+    return `<button type="button" class="availability-day ${soldOut ? "sold-out" : limited ? "limited" : "available"}" data-calendar-date="${key}" ${soldOut ? "disabled" : ""}><small>${date.toLocaleDateString("ko-KR", { weekday: "short" })}</small><strong>${date.getDate()}</strong><span>${soldOut ? "마감" : limited ? `${totalRooms - blockedRooms}객실` : "예약 가능"}</span></button>`;
+  }).join("");
+}
+
+function localDateKey(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+async function loadPublicStayCalendar(stay) {
+  const client = window.motfSupabase;
+  if (!client || !stay?.id || String(stay.id).length < 20) {
+    state.publicStayCalendar = { businessId: String(stay?.id || ""), blocks: [], loading: false };
+    renderPublicStayCalendar(stay);
+    return;
+  }
+  if (state.publicStayCalendar.loading && state.publicStayCalendar.businessId === String(stay.id)) return;
+  state.publicStayCalendar = { businessId: String(stay.id), blocks: [], loading: true };
+  const start = new Date();
+  const end = new Date();
+  end.setDate(end.getDate() + 31);
+  const { data, error } = await client.rpc("get_public_stay_calendar", {
+    target_business_id: stay.id,
+    range_start: localDateKey(start),
+    range_end: localDateKey(end),
+  });
+  state.publicStayCalendar = { businessId: String(stay.id), blocks: error ? [] : (data || []), loading: false };
+  renderPublicStayCalendar(stay);
 }
 
 function renderRoomDetail() {
@@ -1586,8 +1685,8 @@ function renderStores() {
         </div>
         <div class="button-row">
           <button class="secondary-btn" type="button" data-open-order-recommend><i data-lucide="calculator"></i>추천 주문량 보기</button>
-          <button class="secondary-btn" data-open-chat="${store.name}"><i data-lucide="messages-square"></i>마트 문의</button>
-          <button class="ghost-btn" data-route="review" data-review-scope="market"><i data-lucide="star"></i>마트 리뷰</button>
+          <button class="secondary-btn" data-open-chat="${store.name}"><i data-lucide="messages-square"></i>장보기 문의</button>
+          <button class="ghost-btn" data-route="review" data-review-scope="market"><i data-lucide="star"></i>장보기 리뷰</button>
           <button class="ghost-btn" data-route="cart"><i data-lucide="shopping-cart"></i>장바구니 보기</button>
         </div>
       </div>
@@ -1628,7 +1727,7 @@ function storeCard(store) {
         </div>
         <div class="listing-actions">
           <span class="price">상품 ${store.products.length}개</span>
-          <button class="primary-btn" data-store-id="${store.id}"><i data-lucide="shopping-bag"></i>마트 보기</button>
+          <button class="primary-btn" data-store-id="${store.id}"><i data-lucide="shopping-bag"></i>상품 보기</button>
           <button class="ghost-btn" data-open-chat="${store.name}"><i data-lucide="message-circle"></i>문의</button>
         </div>
       </div>
@@ -1656,7 +1755,7 @@ function renderStoreDetail() {
           <span class="pill warning">주류 성인 인증</span>
         </div>
         <div class="button-row">
-          <button class="secondary-btn" data-open-chat="${store.name}"><i data-lucide="messages-square"></i>마트 문의</button>
+          <button class="secondary-btn" data-open-chat="${store.name}"><i data-lucide="messages-square"></i>장보기 문의</button>
           <button class="ghost-btn" data-route="cart"><i data-lucide="shopping-cart"></i>장바구니 보기</button>
         </div>
       </div>
@@ -1683,6 +1782,7 @@ function productCard(product) {
         <div class="button-row">
           <button class="primary-btn" data-product-id="${product.id}"><i data-lucide="search"></i>상세</button>
           <button class="ghost-btn" data-add-product="${product.id}"><i data-lucide="plus"></i>담기</button>
+          <button class="ghost-btn" data-add-mt-shopping="${product.id}"><i data-lucide="folder-plus"></i>내 MT에 담기</button>
         </div>
       </div>
     </article>
@@ -1718,6 +1818,7 @@ function renderProductDetail() {
         </div>
         <div class="button-row">
           <button class="secondary-btn" data-add-current data-alcohol="${alcoholProduct ? "true" : "false"}"><i data-lucide="shopping-cart"></i>장바구니 담기</button>
+          <button class="secondary-btn" data-add-current-to-mt><i data-lucide="folder-plus"></i>내 MT에 담기</button>
           <button class="primary-btn" data-buy-current data-alcohol="${alcoholProduct ? "true" : "false"}"><i data-lucide="credit-card"></i>바로구매</button>
         </div>
       </section>
@@ -1799,7 +1900,7 @@ function renderCart() {
           `;
         })
         .join("")
-    : `<div class="empty-state">장바구니가 비어 있습니다. 마트에서 상품을 담아보세요.</div>`;
+    : `<div class="empty-state">장바구니가 비어 있습니다. 장보기에서 상품을 담아보세요.</div>`;
   const total = cartTotal();
   qs("#cartSummary").innerHTML = `
     <div class="summary-line"><span>상품 금액</span><strong>${money(total)}</strong></div>
@@ -1893,8 +1994,7 @@ function stayHasAvailableRoom(stay) {
 }
 
 function stayDisplayPrice(stay) {
-  const prices = availableRoomsForStay(stay).map((room) => Number(room.price || 0)).filter((price) => price > 0);
-  return prices.length ? Math.min(...prices) : Number(stay.price || 0);
+  return estimateMtStayCost(stay, selectedStayPeople()).total;
 }
 
 function rerenderStayAvailabilityViews() {
@@ -1950,6 +2050,210 @@ function syncStaySearchPanel(container = document) {
     if (field === "people") input.value = values.people;
   });
 }
+
+function selectedStayPeople() {
+  return Math.max(1, Number(qs("#stayPeople")?.value || DEFAULT_STAY_PEOPLE));
+}
+
+function parseCapacityMax(room) {
+  const values = String(room?.capacity || "").match(/\d+/g)?.map(Number) || [];
+  return values.length ? Math.max(...values) : 0;
+}
+
+function normalizedExtraFees(stay) {
+  if (Array.isArray(stay.extraFees)) return stay.extraFees;
+  return (stay.fees || []).map((textValue) => {
+    const text = String(textValue || "");
+    const amount = Number(text.match(/([\d,]+)원/)?.[1]?.replaceAll(",", "") || 0);
+    const category = /보증금/.test(text) ? "deposit" : /현장|문의/.test(text) ? "onsite" : /바베큐|숯|그릴|강당|침구|픽업|수영장/.test(text) ? "optional" : "confirmed";
+    return { label: text.split(/\d/)[0].trim() || "추가요금", amount, category };
+  });
+}
+
+function estimateMtStayCost(stay, people = selectedStayPeople()) {
+  if (stay?._estimatedCost && Object.keys(stay._estimatedCost).length) {
+    const source = stay._estimatedCost;
+    const confirmed = Number(source.confirmed ?? source.fixed ?? source.room_total ?? 0);
+    const optional = Number(source.optional ?? 0);
+    const onSite = Number(source.on_site ?? source.onsite ?? 0);
+    const deposit = Number(source.deposit ?? 0);
+    const total = Number(source.total ?? confirmed + optional + onSite);
+    return { people, room: null, rooms: [], confirmed, optional, onSite, deposit, total, perPerson: Number(source.per_person ?? Math.ceil(total / people / 100) * 100) };
+  }
+  const rooms = availableRoomsForStay(stay);
+  let selectedRooms = [];
+  if (rooms.length && rooms.length <= 15) {
+    let best = null;
+    for (let mask = 1; mask < (1 << rooms.length); mask += 1) {
+      const choice = rooms.filter((_, index) => mask & (1 << index));
+      const capacity = choice.reduce((sum, room) => sum + parseCapacityMax(room), 0);
+      const price = choice.reduce((sum, room) => sum + Number(room.price || 0), 0);
+      if (capacity >= people && (!best || price < best.price || (price === best.price && choice.length < best.rooms.length))) best = { rooms: choice, price };
+    }
+    selectedRooms = best?.rooms || [...rooms].sort((a, b) => parseCapacityMax(b) - parseCapacityMax(a));
+  } else {
+    selectedRooms = [...rooms].sort((a, b) => (Number(a.price || 0) / Math.max(1, parseCapacityMax(a))) - (Number(b.price || 0) / Math.max(1, parseCapacityMax(b))));
+    let capacity = 0;
+    selectedRooms = selectedRooms.filter((room) => {
+      if (capacity >= people) return false;
+      capacity += parseCapacityMax(room);
+      return true;
+    });
+  }
+  const roomTotal = selectedRooms.reduce((sum, room) => sum + Number(room.price || 0), 0) || Number(stay.price || 0);
+  const fees = normalizedExtraFees(stay);
+  const fixedFees = fees.filter((fee) => fee.category === "confirmed").reduce((sum, fee) => sum + Number(fee.amount || 0), 0);
+  const optional = fees.filter((fee) => fee.category === "optional").reduce((sum, fee) => sum + Number(fee.amount || 0), 0);
+  const onSite = fees.filter((fee) => fee.category === "onsite").reduce((sum, fee) => sum + Number(fee.amount || 0), 0);
+  const deposit = fees.filter((fee) => fee.category === "deposit").reduce((sum, fee) => sum + Number(fee.amount || 0), 0);
+  const confirmed = roomTotal + fixedFees;
+  const total = confirmed + optional + onSite;
+  return { people, room: selectedRooms[0] || null, rooms: selectedRooms, roomTotal, fixedFees, confirmed, optional, onSite, deposit, total, perPerson: Math.ceil(total / people / 100) * 100 };
+}
+
+window.motfGetMtCandidateEstimate = function getMtCandidateEstimate(businessId) {
+  const stay = stays.find((item) => String(item.id) === String(businessId));
+  if (!stay) return {};
+  const estimate = estimateMtStayCost(stay, mtProjectPeople());
+  return {
+    total: estimate.total,
+    per_person: estimate.perPerson,
+    confirmed: estimate.confirmed,
+    room_total: estimate.roomTotal || estimate.confirmed,
+    optional: estimate.optional,
+    on_site: estimate.onSite,
+    deposit: estimate.deposit,
+    room_names: (estimate.rooms || []).map((room) => room.name),
+  };
+};
+
+function mtCandidateStays() {
+  return state.mtCandidates.map((id) => stays.find((stay) => String(stay.id) === String(id)) || state.mtCandidateRecords.find((stay) => String(stay.id) === String(id))).filter(Boolean);
+}
+
+function mtProjectPeople() {
+  return Math.max(1, Number(state.mtProject?.guest_count || selectedStayPeople()));
+}
+
+function formatMtDate(value, includeYear = false) {
+  if (!value) return "미정";
+  const date = new Date(`${String(value).slice(0, 10)}T00:00:00`);
+  return new Intl.DateTimeFormat("ko-KR", { ...(includeYear ? { year: "numeric" } : {}), month: "long", day: "numeric" }).format(date);
+}
+
+function mtProjectSpend(project = state.mtProject) {
+  return (project.items || [])
+    .filter((item) => !["cancelled"].includes(item.status))
+    .reduce((sum, item) => sum + Number(item.amount || 0) * Number(item.quantity || 1), 0);
+}
+
+function mtProjectList() {
+  if (state.mtProjects.length) return state.mtProjects.map((project) => String(project.id) === String(state.mtProject?.id) ? { ...project, ...state.mtProject } : project);
+  const isLocalPreview = ["localhost", "127.0.0.1", ""].includes(location.hostname);
+  return isLocalPreview ? [state.mtProject] : [];
+}
+
+function renderMtDirectory() {
+  const cards = qs("#mtProjectCards");
+  const projects = mtProjectList();
+  if (!cards) return;
+  cards.innerHTML = projects.length ? projects.map((project) => {
+    const budget = Number(project.estimated_budget || 0);
+    const spent = mtProjectSpend(project);
+    const remaining = budget - spent;
+    const progress = budget > 0 ? Math.min(100, Math.round(spent / budget * 100)) : 0;
+    return `<button class="mt-project-card" type="button" data-open-mt-project="${project.id || "demo"}">
+      <span class="mt-project-card-icon"><i data-lucide="folder-kanban"></i></span>
+      <span class="mt-project-card-copy"><small>${escapeHtml(project.organization_name || "단체 여행")}</small><strong>${escapeHtml(project.title || "이름 없는 MT")}</strong><span>${formatMtDate(project.starts_on)}~${formatMtDate(project.ends_on)} · ${Number(project.guest_count || 0)}명 · ${escapeHtml(project.region || "지역 미정")}</span></span>
+      <span class="mt-project-card-budget"><small>예산 사용</small><strong>${money(spent)}</strong><span>${budget ? `${progress}% · ${remaining >= 0 ? `${money(remaining)} 남음` : `${money(Math.abs(remaining))} 초과`}` : "총예산 미설정"}</span></span>
+      <i data-lucide="chevron-right"></i>
+    </button>`;
+  }).join("") : `<div class="mt-directory-empty"><i data-lucide="folder-plus"></i><h2>아직 만든 MT가 없습니다</h2><p>새 MT를 만들고 숙소와 장보기 후보를 모아보세요.</p><button class="primary-btn" type="button" data-create-mt-project><i data-lucide="plus"></i>첫 MT 만들기</button></div>`;
+}
+
+function renderMtProjectSummary() {
+  const project = state.mtProject;
+  const people = mtProjectPeople();
+  const title = qs("#mtProjectTitle");
+  if (title) title.textContent = project.title || "우리 MT";
+  const meta = qs("#myMt .mt-project-meta");
+  if (meta) meta.innerHTML = `<span><i data-lucide="calendar-days"></i>${formatMtDate(project.starts_on)}~${formatMtDate(project.ends_on)}</span><span><i data-lucide="users"></i>${people}명</span><span><i data-lucide="map-pin"></i>${escapeHtml(project.region || "지역 미정")}</span>`;
+  const budget = Number(project.estimated_budget || 0);
+  const spent = mtProjectSpend(project);
+  const remaining = budget - spent;
+  const percent = budget > 0 ? Math.round(spent / budget * 100) : 0;
+  qs("#mtBudgetTotal").textContent = budget ? money(budget) : "미설정";
+  qs("#mtBudgetSpent").textContent = money(spent);
+  qs("#mtBudgetRemaining").textContent = budget ? (remaining >= 0 ? money(remaining) : `-${money(Math.abs(remaining))}`) : "-";
+  qs("#mtBudgetRemaining").classList.toggle("over", remaining < 0);
+  qs("#mtBudgetBar").style.width = `${Math.min(100, Math.max(0, percent))}%`;
+  qs("#mtBudgetBar").classList.toggle("over", remaining < 0);
+  qs("#mtBudgetCaption").textContent = budget ? `${people}명 기준 1인당 ${money(Math.ceil(budget / people / 100) * 100)} · 현재 ${percent}% 사용 예정` : "총예산을 입력하면 남은 금액을 자동으로 계산해드려요.";
+  const timeline = qs("#mtTimeline");
+  if (timeline) timeline.innerHTML = (project.itinerary || []).length ? project.itinerary.map((item) => { const when = new Date(item.starts_at); return `<li><time>${when.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: false })}</time><span><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.place || item.note || "")}</small></span></li>`; }).join("") : `<li><span><strong>아직 등록된 일정이 없습니다.</strong><small>집합부터 귀가까지 한곳에 정리하세요.</small></span></li>`;
+  const notice = qs("#mtNoticeList");
+  if (notice) notice.innerHTML = (project.notices || []).length ? project.notices.map((item) => `<p class="mt-notice">${escapeHtml(item.body)}</p>`).join("") : `<p class="mt-notice muted">아직 공지가 없습니다.</p>`;
+}
+
+function renderMyMt() {
+  const directory = qs("#mtProjectDirectory");
+  const workspace = qs("#mtProjectWorkspace");
+  const isDetail = state.mtProjectMode === "detail";
+  directory.hidden = isDetail;
+  workspace.hidden = !isDetail;
+  if (!isDetail) {
+    renderMtDirectory();
+    refreshIcons();
+    return;
+  }
+  renderMtProjectSummary();
+  const candidates = mtCandidateStays();
+  const people = mtProjectPeople();
+  const comparison = qs("#mtCandidateComparison");
+  if (comparison) {
+    comparison.innerHTML = candidates.length ? `
+      <div class="mt-compare-grid" style="--candidate-count:${candidates.length}">
+        ${candidates.map((stay, index) => {
+          const cost = estimateMtStayCost(stay, people);
+          const planned = (state.mtProject.items || []).some((item) => item.item_kind === "stay" && String(item.reference_id) === String(stay.id) && item.status !== "cancelled");
+          return `<article class="mt-candidate-card ${planned ? "selected" : ""}"><div class="mt-candidate-rank">후보 ${String.fromCharCode(65 + index)}</div><img src="${stay.image}" alt="${escapeHtml(stay.name)}"><h3>${escapeHtml(stay.name)}</h3><dl><div><dt>예상 총액</dt><dd>${money(cost.total)}</dd></div><div><dt>1인당</dt><dd>${money(cost.perPerson)}</dd></div><div><dt>객실·기본</dt><dd>${money(cost.confirmed)}</dd></div><div><dt>선택 비용</dt><dd>${cost.optional ? money(cost.optional) : "없음"}</dd></div><div><dt>현장 확인</dt><dd>${cost.onSite ? money(cost.onSite) : "없음"}</dd></div><div><dt>환급 보증금</dt><dd>${cost.deposit ? money(cost.deposit) : "없음"}</dd></div><div><dt>화장실</dt><dd>${stay.bathCount ? `${stay.bathCount}개` : "확인 필요"}</dd></div><div><dt>위치</dt><dd>${escapeHtml(stay.distance)}</dd></div></dl><div class="button-row"><button class="ghost-btn" data-stay-id="${stay.id}">상세</button><button class="secondary-btn ${planned ? "active" : ""}" data-use-mt-stay="${stay.id}"><i data-lucide="${planned ? "check" : "wallet-cards"}"></i>${planned ? "예산 반영 중" : "예산에 반영"}</button><button class="icon-action" data-remove-mt-candidate="${stay.id}" aria-label="후보 삭제"><i data-lucide="x"></i></button></div></article>`;
+        }).join("")}
+      </div>
+      <p class="mt-comparison-note"><i data-lucide="info"></i>후보는 최대 3곳까지 비교할 수 있고, 예산에는 한 곳만 반영됩니다.</p>` : `<div class="empty-state">아직 담은 숙소 후보가 없습니다. 숙소 목록에서 최대 3곳을 담아보세요.</div>`;
+  }
+  const shopping = (state.mtProject.items || []).filter((item) => item.item_kind === "shopping" && item.status !== "cancelled");
+  const shoppingList = qs("#mtShoppingItems");
+  if (shoppingList) shoppingList.innerHTML = shopping.length ? shopping.map((item) => `<article><span class="mt-shopping-icon"><i data-lucide="shopping-basket"></i></span><div><strong>${escapeHtml(item.title)}</strong><span>${Number(item.quantity || 1)}개 · ${money(Number(item.amount || 0) * Number(item.quantity || 1))}</span></div><button class="icon-action" type="button" data-remove-mt-item="${item.id}" aria-label="장보기 후보 삭제"><i data-lucide="x"></i></button></article>`).join("") : `<div class="empty-state compact">장보기에서 필요한 상품을 ` + "`내 MT에 담기`" + `로 추가해보세요.</div>`;
+  refreshIcons();
+}
+
+window.motfApplyMtProject = function applyMtProject(project, candidates = []) {
+  if (!project) return;
+  state.mtProject = { ...state.mtProject, ...project };
+  if (Array.isArray(project.itinerary)) state.mtProject.itinerary = project.itinerary;
+  if (Array.isArray(project.notices)) state.mtProject.notices = project.notices;
+  if (Array.isArray(candidates)) {
+    const mapped = candidates.map((candidate) => ({
+      id: candidate.business_id || candidate.id,
+      _candidateId: candidate.id,
+      _estimatedCost: candidate.estimated_cost || {},
+      name: candidate.name || candidate.business?.business_name || "숙소 후보",
+      image: candidate.cover_image_url || candidate.business?.cover_image_url || photo("photo-1564013799919-ab600027ffc6"),
+      distance: candidate.address || candidate.business?.address || "위치 확인 필요",
+      bathCount: Number(candidate.bath_count ?? candidate.business?.bath_count ?? 0),
+      stationDistanceM: candidate.station_distance_m ?? candidate.business?.station_distance_m,
+      detailTags: [], rooms: [], images: [], amenities: [], fees: [], extraFees: [], maxPeople: mtProjectPeople(),
+    }));
+    state.mtCandidateRecords = mapped;
+    state.mtCandidates = mapped.map((item) => String(item.id));
+  }
+  if (currentRoute() === "myMt") renderMyMt();
+};
+
+window.motfApplyMtProjects = function applyMtProjects(projects = []) {
+  state.mtProjects = Array.isArray(projects) ? projects : [];
+  if (currentRoute() === "myMt" && state.mtProjectMode === "list") renderMyMt();
+};
 
 function setDateInputValue(input, value) {
   if (!input) return;
@@ -2478,7 +2782,7 @@ function setPaymentResult(status) {
   const resultText = {
     success: {
       eyebrow: "토스페이먼츠 승인 완료",
-      title: payment.type === "stay" ? "결제 완료, 숙소 예약 요청이 접수되었습니다" : "결제 완료, 마트 주문 요청이 접수되었습니다",
+      title: payment.type === "stay" ? "결제 완료, 숙소 예약 요청이 접수되었습니다" : "결제 완료, MT 장보기 주문이 접수되었습니다",
       text: payment.type === "stay"
         ? "사장님이 예약 가능 여부를 확인한 뒤 확정합니다. 거절 시 결제 취소·환불 처리가 필요합니다."
         : "사장님이 주문 가능 여부를 확인한 뒤 확정합니다. 거절 시 결제 취소·환불 처리가 필요합니다.",
@@ -2636,7 +2940,7 @@ function renderCommunity() {
     `
     )
     .join("");
-  qs("#communityBoards").innerHTML = communityBoards
+  qs("#communityBoards").innerHTML = launchCommunityBoards()
     .map(
       (board) => `
       <button class="board-card" type="button" data-board-id="${board.id}">
@@ -2701,7 +3005,7 @@ function renderRecreation() {
 }
 
 function activeBoard() {
-  return communityBoards.find((board) => board.id === state.activeBoardId) || communityBoards[0];
+  return launchCommunityBoards().find((board) => board.id === state.activeBoardId) || launchCommunityBoards()[0];
 }
 
 function activeActivity() {
@@ -2870,7 +3174,7 @@ function renderPostDetail() {
 function renderChat() {
   if (!state.chats.length) {
     qs("#chatList").innerHTML = `<div class="empty-state">아직 시작한 대화가 없습니다.</div>`;
-    qs("#chatRoomHeader").innerHTML = `<h2>채팅</h2><p class="muted">숙소 또는 마트에서 문의를 시작해보세요.</p>`;
+    qs("#chatRoomHeader").innerHTML = `<h2>채팅</h2><p class="muted">숙소 또는 장보기 제휴처에 문의를 시작해보세요.</p>`;
     qs("#chatMessages").innerHTML = `<div class="empty-state">대화를 선택하면 메시지가 표시됩니다.</div>`;
     refreshIcons();
     return;
@@ -2939,7 +3243,7 @@ function renderMypage() {
     : `<div class="empty-state">아직 예약한 숙소가 없습니다.</div>`;
   orderList.innerHTML = state.orders.length
     ? state.orders.map(orderCard).join("")
-    : `<div class="empty-state">아직 마트 주문이 없습니다.</div>`;
+    : `<div class="empty-state">아직 장보기 주문이 없습니다.</div>`;
   refreshIcons();
 }
 
@@ -3226,7 +3530,7 @@ function renderReviews() {
   if (helper) {
     helper.textContent = state.reviewTargets.length
       ? "이용 완료된 예약이나 주문만 리뷰를 작성할 수 있어요."
-      : "리뷰는 실제 이용 완료된 예약이나 마트 주문이 있을 때 작성할 수 있어요.";
+      : "리뷰는 실제 이용 완료된 예약이나 장보기 주문이 있을 때 작성할 수 있어요.";
   }
   renderReviewKeywords();
   const visibleReviews = state.reviewScope === "market"
@@ -3236,7 +3540,7 @@ function renderReviews() {
       : state.reviews;
   qs("#reviewList").innerHTML = visibleReviews.length
     ? visibleReviews.map(reviewCard).join("")
-    : `<div class="empty-state">${state.reviewScope === "market" ? "아직 등록된 마트 후기가 없습니다." : "아직 등록된 후기가 없습니다."}</div>`;
+    : `<div class="empty-state">${state.reviewScope === "market" ? "아직 등록된 장보기 후기가 없습니다." : "아직 등록된 후기가 없습니다."}</div>`;
   const ratingRange = qs("#reviewRatingRange");
   const ratingLabel = qs("#reviewRatingLabel");
   if (ratingRange) ratingRange.value = String(state.rating);
@@ -3268,7 +3572,7 @@ function renderReviewKeywords() {
   `).join("");
   if (label) {
     label.textContent = target?.type === "market_order"
-      ? "마트 주문에 맞는 키워드예요"
+      ? "장보기 주문에 맞는 키워드예요"
       : "숙소 이용에 맞는 키워드예요";
   }
 }
@@ -3308,6 +3612,7 @@ function reviewCard(review) {
 window.motfApplyReviews = function applyReviews(nextReviews = []) {
   state.reviews = Array.isArray(nextReviews) ? nextReviews : [];
   if (currentRoute() === "review") renderReviews();
+  if (currentRoute() === "stayDetail") renderStayDetail();
 };
 
 window.motfApplyReviewTargets = function applyReviewTargets(nextTargets = []) {
@@ -3331,6 +3636,11 @@ window.motfGetReviewDraft = function getReviewDraft() {
     body: qs("#reviewText")?.value.trim() || "",
     tags: qsa(".tag-chip.active").map((tag) => tag.textContent.trim()).filter(Boolean),
     files: qs("#reviewImages")?.files ? [...qs("#reviewImages").files] : [],
+    structuredScores: Object.fromEntries(qsa("[data-review-score]").map((input) => [input.dataset.reviewScore, Number(input.value)])),
+    comfortablePeopleMin: Number(qs("#reviewComfortMin")?.value || 0) || null,
+    comfortablePeopleMax: Number(qs("#reviewComfortMax")?.value || 0) || null,
+    recommend30Plus: qs("#reviewRecommendLarge")?.value === "" ? null : qs("#reviewRecommendLarge")?.value === "true",
+    organizerDifficulty: Number(qs("#reviewOrganizerDifficulty")?.value || 0) || null,
   };
 };
 
@@ -3357,7 +3667,7 @@ function ensureChat(title) {
   navigate("chat");
 }
 
-document.addEventListener("click", (event) => {
+document.addEventListener("click", async (event) => {
   const historyBackButton = event.target.closest("[data-history-back]");
   if (historyBackButton) {
     goBack(historyBackButton.dataset.fallbackRoute || "home");
@@ -3380,6 +3690,66 @@ document.addEventListener("click", (event) => {
     return;
   }
 
+  if (event.target.closest("[data-create-mt-project]")) {
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    qs("#mtProjectForm").dataset.mode = "create";
+    qs("#mtProjectForm").reset();
+    qs("#mtEditStart").value = localDateKey(today);
+    qs("#mtEditEnd").value = localDateKey(tomorrow);
+    qs("#mtEditPeople").value = 10;
+    qs("#mtEditRegion").value = "대성리";
+    qs("#mtProjectDialog").showModal();
+    refreshIcons();
+    return;
+  }
+
+  const openMtProjectButton = event.target.closest("[data-open-mt-project]");
+  if (openMtProjectButton) {
+    const projectId = openMtProjectButton.dataset.openMtProject;
+    try {
+      if (projectId !== "demo") await window.motfSelectMtProject?.(projectId);
+      state.mtProjectMode = "detail";
+      renderMyMt();
+    } catch (error) { toast(error.message || "MT 정보를 불러오지 못했습니다."); }
+    return;
+  }
+
+  if (event.target.closest("[data-mt-directory]")) {
+    state.mtProjectMode = "list";
+    renderMyMt();
+    return;
+  }
+
+  if (event.target.closest("[data-edit-mt-project]")) {
+    const project = state.mtProject;
+    qs("#mtProjectForm").dataset.mode = "edit";
+    qs("#mtEditTitle").value = project.title || "";
+    qs("#mtEditOrganization").value = project.organization_name || "";
+    qs("#mtEditStart").value = String(project.starts_on || "").slice(0, 10);
+    qs("#mtEditEnd").value = String(project.ends_on || "").slice(0, 10);
+    qs("#mtEditPeople").value = project.guest_count || 10;
+    qs("#mtEditRegion").value = project.region || "대성리";
+    qs("#mtEditBudget").value = Number(project.estimated_budget || 0) || "";
+    qs("#mtProjectDialog").showModal();
+    refreshIcons();
+    return;
+  }
+
+  if (event.target.closest("[data-add-mt-itinerary]")) {
+    qs("#mtItineraryTime").value = `${String(state.mtProject.starts_on || "").slice(0, 10)}T13:00`;
+    qs("#mtItineraryDialog").showModal();
+    refreshIcons();
+    return;
+  }
+
+  if (event.target.closest("[data-add-mt-notice]")) {
+    qs("#mtNoticeDialog").showModal();
+    refreshIcons();
+    return;
+  }
+
   const routeButton = event.target.closest("[data-route]");
   if (routeButton) {
     if (routeButton.dataset.route === "review") window.motfSetReviewScope?.(routeButton.dataset.reviewScope || "all");
@@ -3387,6 +3757,86 @@ document.addEventListener("click", (event) => {
     if (routeButton.dataset.route === "community" && routeButton.dataset.communitySection) {
       scrollToCommunitySection(routeButton.dataset.communitySection);
     }
+    return;
+  }
+
+  const addCandidateButton = event.target.closest("[data-add-mt-candidate]");
+  if (addCandidateButton) {
+    if (state.mtProjectMode !== "detail") {
+      toast("먼저 내 MT에서 사용할 여행을 선택해주세요.");
+      navigate("myMt");
+      return;
+    }
+    const id = String(addCandidateButton.dataset.addMtCandidate);
+    const removing = state.mtCandidates.includes(id);
+    if (state.mtCandidates.includes(id)) {
+      state.mtCandidates = state.mtCandidates.filter((candidateId) => candidateId !== id);
+      toast("숙소 후보에서 제외했습니다.");
+    } else if (state.mtCandidates.length >= 3) {
+      toast("비교 후보는 최대 3곳까지 담을 수 있어요.");
+      return;
+    } else {
+      state.mtCandidates.push(id);
+      toast("우리 MT 숙소 후보에 담았습니다.");
+    }
+    try {
+      await window.motfSaveMtCandidate?.(id, !removing);
+    } catch (error) {
+      console.warn("MT 후보 DB 저장 실패", error);
+      toast("화면에는 반영됐지만 로그인 후 MT 방에 저장할 수 있어요.");
+    }
+    renderStays();
+    return;
+  }
+
+  const removeCandidateButton = event.target.closest("[data-remove-mt-candidate]");
+  if (removeCandidateButton) {
+    const id = String(removeCandidateButton.dataset.removeMtCandidate);
+    state.mtCandidates = state.mtCandidates.filter((candidateId) => candidateId !== id);
+    const plannedItem = (state.mtProject.items || []).find((item) => item.item_kind === "stay" && String(item.reference_id) === id);
+    if (plannedItem) {
+      state.mtProject.items = state.mtProject.items.filter((item) => item !== plannedItem);
+      try { await window.motfRemoveMtItem?.(plannedItem.id); } catch (error) { console.warn("MT 숙소 예산 항목 삭제 실패", error); }
+    }
+    try { await window.motfSaveMtCandidate?.(id, false); } catch (error) { console.warn("MT 후보 DB 삭제 실패", error); }
+    renderMyMt();
+    return;
+  }
+
+  const useMtStayButton = event.target.closest("[data-use-mt-stay]");
+  if (useMtStayButton) {
+    const stay = stays.find((item) => String(item.id) === String(useMtStayButton.dataset.useMtStay)) || state.mtCandidateRecords.find((item) => String(item.id) === String(useMtStayButton.dataset.useMtStay));
+    if (!stay) return;
+    const estimate = estimateMtStayCost(stay, mtProjectPeople());
+    const localItem = { id: `stay-${stay.id}`, item_kind: "stay", reference_id: stay.id, title: stay.name, quantity: 1, amount: estimate.total, status: "planned" };
+    state.mtProject.items = [...(state.mtProject.items || []).filter((item) => item.item_kind !== "stay"), localItem];
+    try {
+      const saved = await window.motfSetMtStayItem?.({ business_id: stay.id, title: stay.name, amount: estimate.total });
+      if (saved) state.mtProject.items = [...state.mtProject.items.filter((item) => item.item_kind !== "stay"), saved];
+    } catch (error) { console.warn("MT 숙소 예산 저장 실패", error); }
+    renderMyMt();
+    toast("이 숙소를 예산에 반영했습니다.");
+    return;
+  }
+
+  const removeMtItemButton = event.target.closest("[data-remove-mt-item]");
+  if (removeMtItemButton) {
+    const itemId = removeMtItemButton.dataset.removeMtItem;
+    state.mtProject.items = (state.mtProject.items || []).filter((item) => String(item.id) !== String(itemId));
+    try { await window.motfRemoveMtItem?.(itemId); } catch (error) { console.warn("MT 준비 항목 삭제 실패", error); }
+    renderMyMt();
+    return;
+  }
+
+  const calendarDateButton = event.target.closest("[data-calendar-date]");
+  if (calendarDateButton) {
+    const checkIn = new Date(`${calendarDateButton.dataset.calendarDate}T00:00:00`);
+    const checkOut = new Date(checkIn);
+    checkOut.setDate(checkOut.getDate() + 1);
+    qsa('[data-stay-search-field="checkIn"]').forEach((input) => { input.value = localDateKey(checkIn); });
+    qsa('[data-stay-search-field="checkOut"]').forEach((input) => { input.value = localDateKey(checkOut); });
+    refreshStayAvailability();
+    toast("선택한 날짜로 예약 가능 객실을 확인합니다.");
     return;
   }
 
@@ -3565,6 +4015,34 @@ document.addEventListener("click", (event) => {
     return;
   }
 
+  const addMtShoppingButton = event.target.closest("[data-add-mt-shopping]");
+  if (addMtShoppingButton || event.target.closest("[data-add-current-to-mt]")) {
+    if (state.mtProjectMode !== "detail") {
+      toast("먼저 내 MT에서 사용할 여행을 선택해주세요.");
+      navigate("myMt");
+      return;
+    }
+    const productId = addMtShoppingButton?.dataset.addMtShopping || state.selectedProduct?.id;
+    const product = findProduct(productId)?.product || state.selectedProduct;
+    if (!product) return;
+    const qty = event.target.closest("[data-add-current-to-mt]") ? Math.max(1, Number(qs("#productQty")?.value || 1)) : 1;
+    const existing = (state.mtProject.items || []).find((item) => item.item_kind === "shopping" && String(item.reference_id) === String(product.id));
+    let saved = null;
+    try {
+      saved = await window.motfAddMtShoppingItem?.({ product_id: product.id, title: product.name, quantity: qty, amount: Number(product.price || 0) });
+    } catch (error) { console.warn("MT 장보기 항목 저장 실패", error); }
+    if (saved) {
+      state.mtProject.items = (state.mtProject.items || []).filter((item) => !(item.item_kind === "shopping" && String(item.reference_id) === String(product.id)));
+      state.mtProject.items.push(saved);
+    } else if (existing) {
+      state.mtProject.items = state.mtProject.items.map((item) => item === existing ? { ...item, quantity: Number(item.quantity || 1) + qty } : item);
+    } else {
+      state.mtProject.items = [...(state.mtProject.items || []), { id: `shopping-${product.id}-${Date.now()}`, item_kind: "shopping", reference_id: product.id, title: product.name, quantity: qty, amount: Number(product.price || 0), status: "planned" }];
+    }
+    toast("선택한 MT의 장보기 후보에 담았습니다.");
+    return;
+  }
+
   if (event.target.closest("[data-add-current]")) {
     const qty = Math.max(1, Number(qs("#productQty").value || 1));
     addToCart(state.selectedProduct.id, qty);
@@ -3704,6 +4182,63 @@ document.addEventListener("submit", (event) => {
   event.preventDefault();
   syncStaySearchPanel();
   navigate("stays");
+});
+
+document.addEventListener("click", (event) => {
+  const closeButton = event.target.closest("[data-close-motf-dialog]");
+  if (closeButton) closeButton.closest("dialog")?.close();
+});
+
+qs("#mtProjectForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const payload = {
+    title: qs("#mtEditTitle").value.trim(),
+    organization_name: qs("#mtEditOrganization").value.trim() || null,
+    starts_on: qs("#mtEditStart").value,
+    ends_on: qs("#mtEditEnd").value,
+    guest_count: Number(qs("#mtEditPeople").value),
+    region: qs("#mtEditRegion").value.trim(),
+    estimated_budget: Math.max(0, Number(qs("#mtEditBudget").value || 0)),
+  };
+  if (payload.ends_on <= payload.starts_on) return toast("종료일은 시작일보다 뒤여야 합니다.");
+  try {
+    const creating = event.target.dataset.mode === "create";
+    const saved = creating ? await window.motfCreateMtProject?.(payload) : await window.motfSaveMtProject?.(payload);
+    state.mtProject = { ...(creating ? { items: [], itinerary: [], notices: [] } : state.mtProject), ...(saved || payload) };
+    const existingIndex = state.mtProjects.findIndex((project) => String(project.id) === String(state.mtProject.id));
+    if (existingIndex >= 0) state.mtProjects[existingIndex] = state.mtProject;
+    else state.mtProjects.unshift(state.mtProject);
+    state.mtProjectMode = "detail";
+    qs("#mtProjectDialog").close();
+    renderMyMt();
+    toast(creating ? "새 MT가 만들어졌습니다." : "MT 정보가 저장되었습니다.");
+  } catch (error) { toast(error.message || "MT 정보를 저장하지 못했습니다."); }
+});
+
+qs("#mtItineraryForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const payload = { starts_at: new Date(qs("#mtItineraryTime").value).toISOString(), title: qs("#mtItineraryTitle").value.trim(), place: qs("#mtItineraryPlace").value.trim() || null, note: qs("#mtItineraryNote").value.trim() || null };
+  try {
+    const saved = await window.motfAddMtItinerary?.(payload) || payload;
+    state.mtProject.itinerary = [...(state.mtProject.itinerary || []), saved].sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
+    event.target.reset();
+    qs("#mtItineraryDialog").close();
+    renderMyMt();
+    toast("일정이 추가되었습니다.");
+  } catch (error) { toast(error.message || "일정을 추가하지 못했습니다."); }
+});
+
+qs("#mtNoticeForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const payload = { body: qs("#mtNoticeBody").value.trim(), is_pinned: qs("#mtNoticePinned").checked };
+  try {
+    const saved = await window.motfAddMtNotice?.(payload) || payload;
+    state.mtProject.notices = [saved, ...(state.mtProject.notices || [])];
+    event.target.reset();
+    qs("#mtNoticeDialog").close();
+    renderMyMt();
+    toast("공지가 등록되었습니다.");
+  } catch (error) { toast(error.message || "공지를 등록하지 못했습니다."); }
 });
 
 qs("#bookingForm").addEventListener("submit", (event) => {

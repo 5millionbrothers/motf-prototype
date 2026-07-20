@@ -34,7 +34,7 @@
   async function loadReviews() {
     const { data, error } = await client
       .from("reviews")
-      .select("id, reservation_id, market_order_id, author_name, rating, body, tags, image_urls, created_at, businesses(business_name)")
+      .select("id, business_id, reservation_id, market_order_id, author_name, rating, body, tags, image_urls, structured_scores, comfortable_people_min, comfortable_people_max, recommend_30_plus, organizer_difficulty, created_at, businesses(business_name)")
       .eq("is_hidden", false)
       .order("created_at", { ascending: false })
       .limit(40);
@@ -46,6 +46,7 @@
 
     window.motfApplyReviews?.((data || []).map((review) => ({
       id: review.id,
+      businessId: review.business_id,
       type: review.market_order_id ? "market" : "stay",
       target: escapeHtml(review.businesses?.business_name || "이용 후기"),
       score: Number(review.rating) || 5,
@@ -54,6 +55,11 @@
       text: escapeHtml(review.body || ""),
       author: escapeHtml(authorLabel(review)),
       createdAt: review.created_at,
+      structuredScores: review.structured_scores || {},
+      comfortablePeopleMin: review.comfortable_people_min,
+      comfortablePeopleMax: review.comfortable_people_max,
+      recommend30Plus: review.recommend_30_plus,
+      organizerDifficulty: review.organizer_difficulty,
     })));
   }
 
@@ -107,7 +113,7 @@
         id: `market_order:${item.id}`,
         type: "market_order",
         transactionId: item.id,
-        label: `${item.businesses?.business_name || "마트"} · 마트 주문 · ${formatDate(item.pickup_time)} · ${statusText[item.status] || item.status}`,
+        label: `${item.businesses?.business_name || "장보기 제휴처"} · MT 장보기 주문 · ${formatDate(item.pickup_time)} · ${statusText[item.status] || item.status}`,
       }));
 
     window.motfApplyReviewTargets?.([...reservationTargets, ...orderTargets]);
@@ -180,13 +186,18 @@
     }
 
     if (button) button.textContent = "후기 저장 중...";
-    const { error } = await client.rpc("submit_verified_review", {
+    const { error } = await client.rpc("submit_verified_mt_review", {
       target_type: draft.targetType,
       target_transaction_id: draft.transactionId,
       review_rating: draft.rating,
       review_body: draft.body,
       review_tags: draft.tags,
       review_image_urls: imageUrls,
+      review_structured_scores: draft.structuredScores || {},
+      review_comfortable_people_min: draft.comfortablePeopleMin,
+      review_comfortable_people_max: draft.comfortablePeopleMax,
+      review_recommend_30_plus: draft.recommend30Plus,
+      review_organizer_difficulty: draft.organizerDifficulty,
     });
 
     if (button) {

@@ -30,6 +30,14 @@
       "destination": "/index.html"
     },
     {
+      "source": "/my-mt",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/my-mt/:path*",
+      "destination": "/index.html"
+    },
+    {
       "source": "/market",
       "destination": "/index.html"
     },
