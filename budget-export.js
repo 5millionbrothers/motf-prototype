@@ -1,6 +1,6 @@
 (function connectBudgetExport() {
   const state = {
-    selectedId: "",
+    selectedIds: [],
     report: null,
   };
 
@@ -32,7 +32,7 @@
     return type === "마트 주문" || type === "공판장 주문";
   }
 
-  function normalizeRows(selectedId = "") {
+  function normalizeRows(selectedIds = []) {
     const snapshot = window.motfGetUsageSnapshot?.() || { reservations: [], orders: [] };
     const reservations = (snapshot.reservations || []).map((item) => ({
       id: item.id,
@@ -63,13 +63,13 @@
       note: item.isPendingVirtualAccount ? "가상계좌 입금 대기" : "주문/결제 증빙",
     }));
     const allRows = [...reservations, ...orders];
-    if (!selectedId) return allRows;
-    const selected = allRows.find((row) => String(row.id) === String(selectedId));
-    return selected ? [selected] : allRows;
+    const ids = new Set((Array.isArray(selectedIds) ? selectedIds : [selectedIds]).filter(Boolean).map(String));
+    if (!ids.size) return allRows;
+    return allRows.filter((row) => ids.has(String(row.id)));
   }
 
-  function buildReport(selectedId = "") {
-    const rows = normalizeRows(selectedId);
+  function buildReport(selectedIds = []) {
+    const rows = normalizeRows(selectedIds);
     const total = rows.reduce((sum, row) => sum + row.amount, 0);
     const refundTotal = rows.reduce((sum, row) => sum + row.refundAmount, 0);
     const payableTotal = total - refundTotal;
@@ -96,7 +96,7 @@
   function renderPreview() {
     const area = document.querySelector("#budgetPreviewArea");
     if (!area) return;
-    const report = state.report || buildReport(state.selectedId);
+    const report = state.report || buildReport(state.selectedIds);
     state.report = report;
     if (!report.rows.length) {
       renderEmpty(area);
@@ -233,7 +233,7 @@
   }
 
   function downloadExcel() {
-    const report = state.report || buildReport(state.selectedId);
+    const report = state.report || buildReport(state.selectedIds);
     if (!report.rows.length) {
       window.toast?.("다운로드할 이용 내역이 없습니다.");
       return;
@@ -277,9 +277,9 @@
     window.XLSX.writeFile(workbook, report.fileName);
   }
 
-  window.motfOpenBudgetPreview = function openBudgetPreview(selectedId = "") {
-    state.selectedId = selectedId;
-    state.report = buildReport(selectedId);
+  window.motfOpenBudgetPreview = function openBudgetPreview(selectedIds = []) {
+    state.selectedIds = (Array.isArray(selectedIds) ? selectedIds : [selectedIds]).filter(Boolean);
+    state.report = buildReport(state.selectedIds);
     window.motfNavigate?.("budgetPreview");
   };
 

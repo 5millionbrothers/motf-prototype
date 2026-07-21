@@ -13,7 +13,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;500;600&amp;display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" />
-    <link rel="stylesheet" href="styles.css?v=20260721-mt7" />
+    <link rel="stylesheet" href="styles.css?v=20260721-batch2" />
     <link rel="stylesheet" href="auth.css?v=20260712-policy-links1" />
     <script async src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" onload="window.__motfRefreshIcons && window.__motfRefreshIcons()"></script>
     <script async src="https://cdn.portone.io/v2/browser-sdk.js"></script>
@@ -49,7 +49,7 @@
         </section>
 
         <form class="home-search-panel" data-home-stay-search>
-          <label>지역<select data-stay-search-field="region"><option value="대성리">대성리</option></select></label>
+          <label>지역<select data-stay-search-field="region"><option value="가평">가평</option></select></label>
           <label>체크인<input type="date" data-stay-search-field="checkIn" /></label>
           <label>체크아웃<input type="date" data-stay-search-field="checkOut" /></label>
           <label>인원<input type="number" min="10" max="120" data-stay-search-field="people" /></label>
@@ -93,7 +93,7 @@
           <button class="text-link mt-directory-back" type="button" data-mt-directory><i data-lucide="arrow-left"></i>내 MT 목록</button>
           <div class="mt-project-hero">
             <div><p class="eyebrow">준비 중인 여행</p><h1 id="mtProjectTitle"></h1><p class="mt-project-meta"></p></div>
-            <button class="ghost-btn" type="button" data-edit-mt-project><i data-lucide="settings-2"></i>기본 정보 수정</button>
+            <div class="button-row"><button class="ghost-btn" type="button" data-edit-mt-project><i data-lucide="settings-2"></i>기본 정보 수정</button><button class="secondary-btn" type="button" data-complete-mt-project><i data-lucide="check-circle-2"></i>MT 완료</button></div>
           </div>
 
           <section class="mt-budget-panel" aria-label="MT 예산 현황">
@@ -115,7 +115,7 @@
             <aside class="mt-project-side">
               <section class="mt-side-section"><div class="section-toolbar"><h2>일정</h2><button class="icon-action" type="button" data-add-mt-itinerary aria-label="일정 추가"><i data-lucide="plus"></i></button></div><ol class="mt-timeline" id="mtTimeline"></ol></section>
               <section class="mt-side-section"><div class="section-toolbar"><h2>공지 메모</h2><button class="icon-action" type="button" data-add-mt-notice aria-label="공지 작성"><i data-lucide="square-pen"></i></button></div><div id="mtNoticeList"></div></section>
-              <nav class="mt-side-links" aria-label="MT 도구"><button data-route="chat"><i data-lucide="messages-square"></i><span><strong>문의 채팅</strong><small>숙소·장보기 문의 모아보기</small></span><i data-lucide="chevron-right"></i></button><button data-route="budgetPreview"><i data-lucide="file-spreadsheet"></i><span><strong>예결산 파일</strong><small>준비 내역으로 생성</small></span><i data-lucide="chevron-right"></i></button></nav>
+              <nav class="mt-side-links" aria-label="MT 도구"><button data-route="chat"><i data-lucide="messages-square"></i><span><strong>문의 채팅</strong><small>숙소·장보기 문의 모아보기</small></span><i data-lucide="chevron-right"></i></button><button type="button" data-mt-budget-export><i data-lucide="file-spreadsheet"></i><span><strong>예결산 파일</strong><small>실제 이용 내역으로 생성</small></span><i data-lucide="chevron-right"></i></button></nav>
             </aside>
           </div>
         </div>
@@ -127,7 +127,7 @@
           <label>MT 이름<input id="mtEditTitle" required maxlength="120" /></label>
           <label>소속<input id="mtEditOrganization" maxlength="100" /></label>
           <div class="form-grid"><label>시작일<input id="mtEditStart" type="date" required /></label><label>종료일<input id="mtEditEnd" type="date" required /></label><label>인원<input id="mtEditPeople" type="number" min="1" max="500" required /></label><label>지역<input id="mtEditRegion" maxlength="50" required /></label></div>
-          <label>총예산<input id="mtEditBudget" type="number" min="0" step="10000" placeholder="예: 2500000" /></label>
+          <label>총예산<span class="money-input"><input id="mtEditBudget" type="text" inputmode="numeric" data-money-input placeholder="예: 2,500,000" /><b>원</b></span></label>
           <button class="primary-btn" type="submit"><i data-lucide="save"></i>저장</button>
         </form>
       </dialog>
@@ -146,9 +146,18 @@
       <dialog id="mtNoticeDialog" class="motf-dialog">
         <form method="dialog" id="mtNoticeForm">
           <div class="section-toolbar"><h2>공지 작성</h2><button class="icon-action" type="button" data-close-motf-dialog aria-label="닫기"><i data-lucide="x"></i></button></div>
+          <label>제목<input id="mtNoticeTitle" maxlength="120" required /></label>
+          <label>기록 날짜<input id="mtNoticeDate" type="date" required /></label>
           <label>공지 내용<textarea id="mtNoticeBody" rows="6" maxlength="2000" required></textarea></label>
           <label class="checkbox-row"><input id="mtNoticePinned" type="checkbox" />상단 고정</label>
           <button class="primary-btn" type="submit"><i data-lucide="send"></i>공지 등록</button>
+        </form>
+      </dialog>
+
+      <dialog id="mtCandidateProjectDialog" class="motf-dialog mt-project-picker-dialog">
+        <form method="dialog">
+          <div class="section-toolbar"><div><p class="eyebrow">숙소 후보 저장</p><h2>어느 MT에 담을까요?</h2></div><button class="icon-action" type="button" data-close-motf-dialog aria-label="닫기"><i data-lucide="x"></i></button></div>
+          <div id="mtCandidateProjectChoices" class="mt-project-choice-list"></div>
         </form>
       </dialog>
 
@@ -172,7 +181,7 @@
           <label>
             지역
             <select id="stayRegion">
-              <option value="대성리">대성리</option>
+              <option value="가평">가평</option>
             </select>
           </label>
           <label>
@@ -253,7 +262,7 @@
             </div>
             <label>소속<input required id="bookingOrg" list="affiliationOptions" placeholder="등록한 소속 선택 또는 직접 입력" /><datalist id="affiliationOptions"></datalist></label>
             <label>대표자 이름<input required id="bookingName" placeholder="예: 김모두" /></label>
-            <label>대표 연락처<input required id="bookingPhone" placeholder="010-0000-0000" /></label>
+            <label>대표 연락처<input required id="bookingPhone" type="tel" autocomplete="tel" placeholder="010-0000-0000" /></label>
             <div class="form-grid">
               <label>체크인 날짜<input required type="date" data-stay-search-field="checkIn" /></label>
               <label>체크아웃 날짜<input required type="date" data-stay-search-field="checkOut" /></label>
@@ -579,7 +588,7 @@
           <div>
             <h1>우리 MT 이용 내역 관리</h1>
           </div>
-          <button class="secondary-btn" data-route="review"><i data-lucide="star"></i>리뷰 남기기</button>
+          <div class="button-row"><button class="secondary-btn" data-route="review"><i data-lucide="star"></i>리뷰 남기기</button><button class="primary-btn" type="button" data-selected-budget-file disabled><i data-lucide="file-spreadsheet"></i>선택 내역 예결산</button></div>
         </div>
         <form class="usage-period-filter" id="usagePeriodFilter">
           <label>조회 시작일<input type="date" id="usageFrom" /></label>
@@ -625,7 +634,7 @@
             <label>비밀번호<input type="password" placeholder="비밀번호는 보안상 표시하지 않습니다" readonly /></label>
             <button class="secondary-btn account-password-button" type="button" data-open-password-change><i data-lucide="key-round"></i>비밀번호 변경</button>
             <label>대표 소속<input value="한국대 경영학과 학생회" /></label>
-            <label>대표 연락처<input value="010-0000-0000" /></label>
+            <label>대표 연락처<input id="accountPhone" type="tel" autocomplete="tel" value="010-0000-0000" /></label>
             <button class="primary-btn" type="button" data-account-save><i data-lucide="save"></i>수정 내용 저장</button>
           </form>
           <section class="tool-panel affiliation-panel">
@@ -893,15 +902,15 @@
     <script src="config.js?v=20260622-naver1"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ko.js"></script>
-    <script src="app.js?v=20260721-mt7"></script>
-    <script src="budget-export.js?v=20260713-market1"></script>
+    <script src="app.js?v=20260721-batch2"></script>
+    <script src="budget-export.js?v=20260721-batch2"></script>
     <script src="auth.js?v=20260712-login-clear1"></script>
-    <script src="catalog.js?v=20260719-mt1"></script>
-    <script src="transactions.js?v=20260713-market1"></script>
-    <script src="chat-data.js?v=20260713-presence1"></script>
+    <script src="catalog.js?v=20260721-batch2"></script>
+    <script src="transactions.js?v=20260721-batch2"></script>
+    <script src="chat-data.js?v=20260721-batch2"></script>
     <script src="support-data.js?v=20260621-support1"></script>
-    <script src="reviews-data.js?v=20260719-mt1"></script>
+    <script src="reviews-data.js?v=20260721-batch2"></script>
     <script src="product-refresh.js?v=20260713-home-editorial7"></script>
-    <script src="mt-project-data.js?v=20260721-mt7"></script>
+    <script src="mt-project-data.js?v=20260721-batch2"></script>
   </body>
 </html>

@@ -211,6 +211,10 @@ function paymentStatus(payment) {
   return payment?.status || payment?.paymentStatus || "";
 }
 
+function paymentAmount(payment) {
+  return Number(payment?.amount?.total ?? payment?.amount ?? payment?.totalAmount ?? 0);
+}
+
 function isVirtualAccountIssuedStatus(status) {
   return [
     "VIRTUAL_ACCOUNT_ISSUED",
@@ -451,27 +455,29 @@ module.exports = async function handler(req, res) {
 
     const ledgerOrderId = intent.order_id;
     let rawPayment = null;
-    let lookupWarning = "";
     try {
       rawPayment = await getPortOnePayment(providerPaymentId);
     } catch (error) {
-      lookupWarning = error.message || "PortOne lookup failed.";
-      rawPayment = {
-        ...(body && typeof body === "object" ? body : {}),
-        id: ledgerOrderId,
-        paymentId: ledgerOrderId,
-        orderId: ledgerOrderId,
-        portonePaymentId: providerPaymentId,
-        motfProviderPaymentId: providerPaymentId,
-        status: inferWebhookStatus(body),
-      };
+      console.error("portone-webhook verified lookup failed", { providerPaymentId, message: error.message });
+      return json(res, 503, {
+        ok: false,
+        accepted: false,
+        retryable: true,
+        code: "PORTONE_LOOKUP_UNAVAILABLE",
+        message: "PortOne payment lookup failed. Retry the webhook.",
+      });
     }
     const payment = paymentForLedger(rawPayment, ledgerOrderId, providerPaymentId);
     const status = paymentStatus(payment);
     const refundStatus = cancellationSignal(payment, body);
+    const verifiedAmount = paymentAmount(payment);
+    if (verifiedAmount <= 0 || verifiedAmount !== Number(intent.amount)) {
+      console.error("portone-webhook amount mismatch", { providerPaymentId, verifiedAmount, intentAmount: intent.amount });
+      return json(res, 400, { ok: false, accepted: false, message: "Verified payment amount mismatch." });
+    }
     if (refundStatus) {
       await markRefundResult(intent, payment, refundStatus);
-      return json(res, 200, { ok: true, accepted: true, status: refundStatus, kind: intent.kind, lookupWarning });
+      return json(res, 200, { ok: true, accepted: true, status: refundStatus, kind: intent.kind });
     }
     if (intent.status === "confirmed") {
       return json(res, 200, { ok: true, accepted: true, alreadyConfirmed: true });
@@ -489,7 +495,6 @@ module.exports = async function handler(req, res) {
           accepted: true,
           status: "virtual_account_issued",
           message: "Virtual account was issued but account info was not available yet.",
-          lookupWarning,
         });
       }
       await supabaseRequest(
@@ -504,11 +509,11 @@ module.exports = async function handler(req, res) {
           }),
         },
       );
-      return json(res, 200, { ok: true, accepted: true, status: "virtual_account_issued", lookupWarning });
+      return json(res, 200, { ok: true, accepted: true, status: "virtual_account_issued" });
     }
 
     if (status !== "PAID") {
-      return json(res, 200, { ok: true, accepted: true, ignored: true, status, lookupWarning });
+      return json(res, 200, { ok: true, accepted: true, ignored: true, status });
     }
 
     const finalized = await supabaseRequest(
@@ -525,12 +530,13 @@ module.exports = async function handler(req, res) {
       },
     );
     const result = Array.isArray(finalized) ? finalized[0] : finalized;
-    return json(res, 200, { ok: true, accepted: true, transactionId: result?.transaction_id, kind: result?.kind, lookupWarning });
+    return json(res, 200, { ok: true, accepted: true, transactionId: result?.transaction_id, kind: result?.kind });
   } catch (error) {
     console.error("portone-webhook", error);
-    return json(res, 200, {
+    return json(res, 500, {
       ok: false,
-      accepted: true,
+      accepted: false,
+      retryable: true,
       code: "PORTONE_WEBHOOK_ERROR",
       message: error.message || "Webhook handling failed.",
     });

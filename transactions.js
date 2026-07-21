@@ -85,11 +85,11 @@
     }
     const [reservationResult, orderResult, intentResult] = await Promise.all([
       client.from("reservations")
-        .select("id, event_date, guest_count, offering_name, total_amount, status, refund_status, refund_amount, businesses(business_name)")
+        .select("id, business_id, event_date, check_out_date, guest_count, offering_name, total_amount, status, refund_status, refund_amount, businesses(business_name)")
         .eq("customer_id", userId)
         .order("created_at", { ascending: false }),
       client.from("market_orders")
-        .select("id, pickup_time, total_amount, status, refund_status, refund_amount, businesses(business_name), market_order_items(id)")
+        .select("id, business_id, pickup_time, total_amount, status, refund_status, refund_amount, businesses(business_name), market_order_items(id)")
         .eq("customer_id", userId)
         .order("created_at", { ascending: false }),
       client.from("payment_intents")
@@ -101,9 +101,11 @@
     if (reservationResult.error || orderResult.error || intentResult.error) return;
     const reservations = (reservationResult.data || []).map((item) => ({
       id: item.id,
+      businessId: item.business_id,
       stayName: item.businesses?.business_name || "숙소",
       roomName: item.offering_name,
       date: item.event_date,
+      checkOutDate: item.check_out_date || "",
       people: item.guest_count,
       amount: item.total_amount,
       status: displayStatus(item),
@@ -111,6 +113,7 @@
     }));
     const orders = (orderResult.data || []).map((item) => ({
       id: item.id,
+      businessId: item.business_id,
       storeName: item.businesses?.business_name || "마트",
       pickupTime: String(item.pickup_time || "").slice(0, 5),
       amount: item.total_amount,

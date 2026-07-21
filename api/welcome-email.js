@@ -3,6 +3,8 @@ const { json } = require("./_utils");
 module.exports = async function handler(req, res) {
   if (req.method !== "POST") return json(res, 405, { ok: false, message: "Method not allowed" });
 
+  let claim = null;
+  let claimContext = null;
   try {
     const supabaseUrl = required("SUPABASE_URL");
     const anonKey = required("SUPABASE_PUBLISHABLE_KEY");
@@ -27,6 +29,22 @@ module.exports = async function handler(req, res) {
     if (!profileResponse.ok) throw new Error(profiles?.message || "가입 완료 메일 상태를 확인하지 못했습니다.");
     if (profiles[0]?.welcome_email_sent_at) return json(res, 200, { ok: true, skipped: true });
 
+    claim = new Date().toISOString();
+    claimContext = { supabaseUrl, serviceKey, userId: user.id };
+    const claimResponse = await fetch(`${supabaseUrl}/rest/v1/profiles?id=eq.${encodeURIComponent(user.id)}&welcome_email_sent_at=is.null&select=id`, {
+      method: "PATCH",
+      headers: {
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
+        "Content-Type": "application/json",
+        Prefer: "return=representation",
+      },
+      body: JSON.stringify({ welcome_email_sent_at: claim, updated_at: claim }),
+    });
+    const claimedRows = await claimResponse.json().catch(() => []);
+    if (!claimResponse.ok) throw new Error(claimedRows?.message || "가입 완료 메일 발송권을 확인하지 못했습니다.");
+    if (!claimedRows.length) return json(res, 200, { ok: true, skipped: true });
+
     const body = await readBody(req).catch(() => ({}));
     const displayName = String(body?.name || user.user_metadata?.full_name || "이용자").slice(0, 40);
     const sender = process.env.WELCOME_EMAIL_FROM || "모티프 <hello@motf.co.kr>";
@@ -43,7 +61,7 @@ module.exports = async function handler(req, res) {
     const result = await response.json().catch(() => null);
     if (!response.ok) throw new Error(result?.message || "가입 완료 메일 발송에 실패했습니다.");
 
-    await fetch(`${supabaseUrl}/rest/v1/profiles?id=eq.${encodeURIComponent(user.id)}`, {
+    await fetch(`${supabaseUrl}/rest/v1/profiles?id=eq.${encodeURIComponent(user.id)}&welcome_email_sent_at=eq.${encodeURIComponent(claim)}`, {
       method: "PATCH",
       headers: {
         apikey: serviceKey,
@@ -55,6 +73,18 @@ module.exports = async function handler(req, res) {
     });
     return json(res, 200, { ok: true });
   } catch (error) {
+    if (claim && claimContext) {
+      await fetch(`${claimContext.supabaseUrl}/rest/v1/profiles?id=eq.${encodeURIComponent(claimContext.userId)}&welcome_email_sent_at=eq.${encodeURIComponent(claim)}`, {
+        method: "PATCH",
+        headers: {
+          apikey: claimContext.serviceKey,
+          Authorization: `Bearer ${claimContext.serviceKey}`,
+          "Content-Type": "application/json",
+          Prefer: "return=minimal",
+        },
+        body: JSON.stringify({ welcome_email_sent_at: null }),
+      }).catch(() => {});
+    }
     return json(res, 500, { ok: false, message: error.message || "가입 완료 메일 발송에 실패했습니다." });
   }
 };

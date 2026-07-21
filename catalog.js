@@ -6,6 +6,17 @@
   const marketFallback = "https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=1200&q=82";
   const roomFallback = "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=82";
   const productFallback = "https://images.unsplash.com/photo-1606787366850-de6330128bfc?auto=format&fit=crop&w=1200&q=82";
+  const facilityLabels = {
+    barbecue: "야외바베큐",
+    outdoor: "야외바베큐",
+    pool: "수영장",
+    parking: "주차장",
+    karaoke: "노래방/마이크",
+    mic: "노래방/마이크",
+    screen: "TV/화면",
+    field: "야외운동장",
+    kitchen: "취사시설",
+  };
   const text = (value) => window.motfEscapeHtml?.(value) ?? String(value ?? "");
   const imageUrl = (value, fallback) => {
     try {
@@ -34,14 +45,20 @@
       id: item.id,
       name: text(item.name),
       capacity: item.max_people ? `최대 ${item.max_people}명` : "인원 문의",
+      basePeople: Number(item.base_people ?? item.min_people) || 0,
+      maxPeople: Number(item.max_people) || 0,
+      extraPersonFee: Number(item.extra_person_fee) || 0,
       price: Number(item.price) || 0,
       image: imageUrl(item.image_url || business.cover_image_url, roomFallback),
       images: (item.image_urls || []).map((url) => imageUrl(url, roomFallback)),
-      features: item.feature_summary?.length ? item.feature_summary.map(text) : item.description ? [text(item.description)] : [],
+      features: item.feature_summary?.length ? item.feature_summary.slice(0, 3).map(text) : [],
       amenityDetails: Array.isArray(item.amenity_details) ? item.amenity_details : [],
       detailSections: item.detail_sections && typeof item.detail_sections === "object" ? item.detail_sections : {},
     }));
     const image = business.cover_image_url || business.gallery_image_urls?.[0] || rooms[0]?.image || stayFallback;
+    const amenities = (business.facilities || []).map((key) => facilityLabels[key] || text(key));
+    const fullIntro = text(business.description || "단체 행사 이용이 가능한 제휴 숙소입니다.");
+    const shortIntro = text(business.short_description || String(business.description || "").slice(0, 140) || "단체 행사 이용이 가능한 제휴 숙소입니다.");
     return {
       id: business.id,
       name: text(business.business_name),
@@ -64,8 +81,10 @@
       bathCount: Number(business.bath_count) || 0,
       image,
       images: [...new Set([image, ...(business.gallery_image_urls || []), ...rooms.flatMap((room) => room.images || [room.image])])],
-      intro: text(business.description || "단체 행사 이용이 가능한 제휴 숙소입니다."),
-      amenities: business.facilities?.length ? business.facilities.map(text) : ["상세 시설은 사장님에게 문의해주세요."],
+      intro: shortIntro,
+      fullIntro,
+      highlights: Array.isArray(business.highlight_summary) ? business.highlight_summary.slice(0, 3).map(text) : amenities.slice(0, 3),
+      amenities: amenities.length ? amenities : ["상세 시설은 사장님에게 문의해주세요."],
       amenityDetails: Array.isArray(business.amenity_details) ? business.amenity_details : [],
       extraFees: Array.isArray(business.extra_fees) ? business.extra_fees : [],
       fees: Array.isArray(business.extra_fees) && business.extra_fees.length
@@ -107,15 +126,29 @@
   }
 
   (async () => {
-    const [businessResult, offeringResult] = await Promise.all([
+    let [businessResult, offeringResult] = await Promise.all([
       client.from("businesses")
-        .select("id, business_type, business_name, address, description, region, cover_image_url, gallery_image_urls, facilities, approval_status, latitude, longitude, location_verified_at, station_distance_m, convenience_distance_m, nearby_tags, room_count, bath_count, amenity_details, extra_fees, refund_policy, recommended_sets")
+        .select("id, business_type, business_name, address, description, short_description, highlight_summary, region, cover_image_url, gallery_image_urls, facilities, approval_status, latitude, longitude, location_verified_at, station_distance_m, convenience_distance_m, nearby_tags, room_count, bath_count, amenity_details, extra_fees, refund_policy, recommended_sets")
         .eq("approval_status", "approved"),
       client.from("offerings")
-        .select("id, business_id, name, description, price, is_active, max_people, min_people, unit, category, image_url, image_urls, sort_order, feature_summary, amenity_details, detail_sections, origin, nutrition_info, is_alcohol, stock_quantity")
+        .select("id, business_id, name, description, price, is_active, max_people, min_people, base_people, extra_person_fee, unit, category, image_url, image_urls, sort_order, feature_summary, amenity_details, detail_sections, origin, nutrition_info, is_alcohol, stock_quantity")
         .eq("is_active", true)
         .order("sort_order"),
     ]);
+
+    // 새 DB 열과 프론트 배포 순서가 잠시 엇갈려도 전체 카탈로그가 사라지지 않도록
+    // 직전 스키마로 한 번만 폴백한다. 새 기능은 migration 50 적용 후 자동 활성화된다.
+    if (businessResult.error) {
+      businessResult = await client.from("businesses")
+        .select("id, business_type, business_name, address, description, region, cover_image_url, gallery_image_urls, facilities, approval_status, latitude, longitude, location_verified_at, station_distance_m, convenience_distance_m, nearby_tags, room_count, bath_count, amenity_details, extra_fees, refund_policy, recommended_sets")
+        .eq("approval_status", "approved");
+    }
+    if (offeringResult.error) {
+      offeringResult = await client.from("offerings")
+        .select("id, business_id, name, description, price, is_active, max_people, min_people, unit, category, image_url, image_urls, sort_order, feature_summary, amenity_details, detail_sections, origin, nutrition_info, is_alcohol, stock_quantity")
+        .eq("is_active", true)
+        .order("sort_order");
+    }
 
     if (businessResult.error || offeringResult.error) {
       console.warn("실제 제휴처 목록을 불러오지 못했습니다.", businessResult.error || offeringResult.error);

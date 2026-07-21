@@ -32,12 +32,7 @@
   }
 
   async function loadReviews() {
-    const { data, error } = await client
-      .from("reviews")
-      .select("id, business_id, reservation_id, market_order_id, author_name, rating, body, tags, image_urls, structured_scores, comfortable_people_min, comfortable_people_max, recommend_30_plus, organizer_difficulty, created_at, businesses(business_name)")
-      .eq("is_hidden", false)
-      .order("created_at", { ascending: false })
-      .limit(40);
+    const { data, error } = await client.rpc("get_public_reviews", { limit_count: 40 });
 
     if (error) {
       console.error("리뷰를 불러오지 못했습니다.", error);
@@ -47,8 +42,8 @@
     window.motfApplyReviews?.((data || []).map((review) => ({
       id: review.id,
       businessId: review.business_id,
-      type: review.market_order_id ? "market" : "stay",
-      target: escapeHtml(review.businesses?.business_name || "이용 후기"),
+      type: review.transaction_type === "market" ? "market" : "stay",
+      target: escapeHtml(review.business_name || "이용 후기"),
       score: Number(review.rating) || 5,
       tags: Array.isArray(review.tags) ? review.tags.map(escapeHtml) : [],
       images: Array.isArray(review.image_urls) ? review.image_urls : [],

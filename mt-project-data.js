@@ -32,7 +32,7 @@
   async function projectChildren(projectId) {
     const [itineraryResult, noticeResult, itemResult] = await Promise.all([
       client.from("mt_itinerary_items").select("id, starts_at, title, place, note, sort_order").eq("project_id", projectId).order("starts_at").order("sort_order"),
-      client.from("mt_notices").select("id, body, is_pinned, created_at").eq("project_id", projectId).order("is_pinned", { ascending: false }).order("created_at", { ascending: false }),
+      client.from("mt_notices").select("id, title, notice_date, body, is_pinned, created_at").eq("project_id", projectId).order("is_pinned", { ascending: false }).order("notice_date", { ascending: false }).order("created_at", { ascending: false }),
       client.from("mt_project_items").select(itemFields).eq("project_id", projectId).neq("status", "cancelled").order("created_at"),
     ]);
     if (itineraryResult.error) throw itineraryResult.error;
@@ -134,6 +134,31 @@
     }
   };
 
+  window.motfSaveCandidateToProject = async function saveCandidateToProject(projectId, businessId) {
+    const user = requireUser();
+    const project = (await loadProjects()).find((item) => String(item.id) === String(projectId));
+    if (!project || project.owner_id !== user.id) throw new Error("선택한 내 MT를 찾을 수 없습니다.");
+    const { count, error: countError } = await client.from("mt_project_candidates")
+      .select("id", { count: "exact", head: true })
+      .eq("project_id", projectId);
+    if (countError) throw countError;
+    const { data: existing } = await client.from("mt_project_candidates")
+      .select("id")
+      .eq("project_id", projectId)
+      .eq("business_id", businessId)
+      .maybeSingle();
+    if (!existing && Number(count || 0) >= 3) throw new Error("이 MT에는 숙소 후보가 이미 3곳 등록되어 있습니다.");
+    const estimate = window.motfGetMtCandidateEstimate?.(businessId) || {};
+    const { error } = await client.from("mt_project_candidates").upsert({
+      project_id: projectId,
+      business_id: businessId,
+      estimated_cost: estimate,
+      sort_order: Date.now() % 1000000,
+    }, { onConflict: "project_id,business_id" });
+    if (error) throw error;
+    await loadProjects();
+  };
+
   window.motfSetMtStayItem = async function setMtStayItem({ business_id, title, amount }) {
     const project = ensureProject();
     const oldIds = (currentProject.items || []).filter((item) => item.item_kind === "stay").map((item) => item.id).filter((id) => uuidPattern.test(String(id)));
@@ -146,6 +171,31 @@
     const { data, error } = await client.from("mt_project_items").insert(payload).select(itemFields).single();
     if (error) throw error;
     currentProject.items = [...(currentProject.items || []).filter((item) => item.item_kind !== "stay"), data];
+    return data;
+  };
+
+  window.motfClearMtStayItem = async function clearMtStayItem() {
+    const project = ensureProject();
+    const oldIds = (currentProject.items || []).filter((item) => item.item_kind === "stay").map((item) => item.id).filter((id) => uuidPattern.test(String(id)));
+    if (oldIds.length) {
+      const { error } = await client.from("mt_project_items").delete().in("id", oldIds).eq("project_id", project.id);
+      if (error) throw error;
+    }
+    currentProject.items = (currentProject.items || []).filter((item) => item.item_kind !== "stay");
+  };
+
+  window.motfCompleteMtProject = async function completeMtProject() {
+    const project = ensureProject();
+    const { data, error } = await client.from("mt_projects")
+      .update({ status: "completed" })
+      .eq("id", project.id)
+      .eq("owner_id", currentUser.id)
+      .select(projectFields)
+      .single();
+    if (error) throw error;
+    currentProject = { ...currentProject, ...data };
+    await loadProjects();
+    window.motfApplyMtProject(currentProject, null);
     return data;
   };
 
@@ -193,7 +243,7 @@
     const project = ensureProject();
     const { data, error } = await client.from("mt_notices")
       .insert({ ...payload, project_id: project.id, author_id: currentUser.id })
-      .select("id, body, is_pinned, created_at")
+      .select("id, title, notice_date, body, is_pinned, created_at")
       .single();
     if (error) throw error;
     currentProject.notices = [data, ...(currentProject.notices || [])];

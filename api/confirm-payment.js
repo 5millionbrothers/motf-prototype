@@ -360,47 +360,6 @@ function hasVirtualAccountInfo(account = {}) {
   return Boolean(account.bankName || account.accountNumber || account.holderName || account.dueDate);
 }
 
-function mergePaymentLookupWithClient(lookupPayment, clientPayment) {
-  if (!clientPayment || typeof clientPayment !== "object") return lookupPayment;
-  if (!lookupPayment || typeof lookupPayment !== "object") return clientPayment;
-  const lookupAccount = pickVirtualAccount(lookupPayment);
-  const clientAccount = pickVirtualAccount(clientPayment);
-  const merged = {
-    ...clientPayment,
-    ...lookupPayment,
-  };
-  if (!hasVirtualAccountInfo(lookupAccount) && hasVirtualAccountInfo(clientAccount)) {
-    merged.virtualAccount = clientAccount;
-  }
-  if (!paymentStatus(merged) && paymentStatus(clientPayment)) {
-    merged.status = paymentStatus(clientPayment);
-  }
-  return merged;
-}
-
-function safePaymentFromClient(ledgerOrderId, providerPaymentId, payment, allowClientIssuedFallback = false) {
-  if (!payment || typeof payment !== "object") return null;
-  if (!allowClientIssuedFallback) return null;
-  const allowedIds = new Set([ledgerOrderId, providerPaymentId].filter(Boolean));
-  const candidateIds = [
-    payment.paymentId,
-    payment.orderId,
-    payment.merchantUid,
-    payment.merchant_uid,
-    payment.id,
-  ].filter(Boolean).map(String);
-  const hasMatchingId = candidateIds.some((id) => allowedIds.has(id));
-  const virtualAccount = pickVirtualAccount(payment);
-  const hasVirtualAccount = hasVirtualAccountInfo(virtualAccount);
-  return {
-    ...payment,
-    virtualAccount: hasVirtualAccount ? virtualAccount : payment.virtualAccount,
-    status: paymentStatus(payment) || (payment.code ? "FAILED" : "VIRTUAL_ACCOUNT_ISSUED"),
-    clientPaymentWindowCompleted: true,
-    id: hasMatchingId ? candidateIds.find((id) => allowedIds.has(id)) : (providerPaymentId || ledgerOrderId),
-  };
-}
-
 function paymentForLedger(payment, ledgerOrderId, providerPaymentId) {
   const virtualAccount = pickVirtualAccount(payment);
   return {
@@ -554,27 +513,23 @@ module.exports = async function handler(req, res) {
     }
 
     let payment;
-    let lookupWarning = "";
     try {
       diagnostics.stage = "portone_lookup";
-      payment = mergePaymentLookupWithClient(await getPortOnePayment(providerPaymentId, diagnostics), body.portoneResponse);
+      payment = await getPortOnePayment(providerPaymentId, diagnostics);
     } catch (error) {
-      diagnostics.stage = "client_fallback";
+      diagnostics.stage = "portone_lookup_failed";
       diagnostics.lookupError = {
         message: error.message || "",
         statusCode: error.statusCode || null,
         stage: error.stage || "portone_lookup",
       };
-      const fallback = safePaymentFromClient(
-        ledgerOrderId,
-        providerPaymentId,
-        body.portoneResponse,
-        body.clientPaymentWindowCompleted === true || Boolean(body.portoneResponse && !body.portoneResponse.code),
-      );
-      if (!fallback) throw error;
-      payment = fallback;
-      diagnostics.usedClientFallback = true;
-      lookupWarning = error.message || "PortOne lookup failed; stored client response.";
+      return json(res, 502, {
+        ok: false,
+        code: "PORTONE_LOOKUP_UNAVAILABLE",
+        retryable: true,
+        message: "포트원 결제 확인이 지연되고 있습니다. 잠시 후 다시 확인해주세요.",
+        diagnostics,
+      });
     }
     const ledgerPayment = paymentForLedger(payment, ledgerOrderId, providerPaymentId);
     diagnostics.portoneStatus = paymentStatus(ledgerPayment);
@@ -583,10 +538,10 @@ module.exports = async function handler(req, res) {
     diagnostics.forceVirtualAccountIssued = forceVirtualAccountIssued;
 
     const checkedAmount = paymentAmount(ledgerPayment);
-    if (checkedAmount > 0 && checkedAmount !== Number(intent.amount)) {
+    if (checkedAmount <= 0 || checkedAmount !== Number(intent.amount)) {
       return json(res, 400, {
         ok: false,
-        message: "Payment amount does not match the server ledger.",
+        message: "포트원에서 확인한 결제 금액이 주문 원장과 일치하지 않습니다.",
         diagnostics: { ...diagnostics, stage: "portone_amount_match", checkedAmount },
       });
     }
@@ -594,7 +549,7 @@ module.exports = async function handler(req, res) {
     diagnostics.stage = "apply_payment";
     const applied = await applyPortOnePayment(user.id, ledgerOrderId, ledgerPayment, providerPaymentId, forceVirtualAccountIssued);
     diagnostics.stage = "done";
-    return json(res, 200, { ok: true, ...applied, lookupWarning, diagnostics });
+    return json(res, 200, { ok: true, ...applied, diagnostics });
   } catch (error) {
     console.error("confirm-payment", error);
     const errorDiagnostics = {

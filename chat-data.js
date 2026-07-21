@@ -72,25 +72,30 @@
       window.motfApplyChats?.([], "");
       return;
     }
+    const { data: supportConversationId } = await client.rpc("start_support_conversation");
     const { data, error } = await client
       .from("conversations")
-      .select("id, business_id, customer_name, group_name, last_message_at, businesses(business_name), messages(id, sender_role, body, read_at, created_at)")
+      .select("id, business_id, customer_name, group_name, last_message_at, businesses(business_name, business_type, address, cover_image_url), messages(id, sender_role, body, read_at, created_at)")
       .eq("customer_id", authData.session.user.id)
       .order("last_message_at", { ascending: false });
     if (error) return console.error(error);
     const chats = (data || []).map((conversation) => {
       const messages = [...(conversation.messages || [])].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+      const isSupport = conversation.businesses?.business_type === "support" || conversation.id === supportConversationId;
       return {
         id: conversation.id,
         title: conversation.businesses?.business_name || "업장 채팅",
         subtitle: messages.at(-1)?.body || "대화를 시작해보세요.",
+        isSupport,
+        address: conversation.businesses?.address || "",
+        image: conversation.businesses?.cover_image_url || "",
         messages: messages.map((message) => ({
           from: message.sender_role === "user" ? "user" : message.sender_role === "partner" ? "owner" : "admin",
           text: message.body,
           read: Boolean(message.read_at) || message.sender_role !== "user",
         })),
       };
-    });
+    }).sort((a, b) => Number(b.isSupport) - Number(a.isSupport));
     activeConversationId = chats.some((item) => item.id === preferredId) ? preferredId : chats[0]?.id || "";
     window.motfApplyChats?.(chats, activeConversationId);
     await syncActiveConversation({ markRead: true });

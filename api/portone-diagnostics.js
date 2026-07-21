@@ -1,6 +1,7 @@
 const { json } = require("./_utils");
 const dns = require("dns");
 const https = require("https");
+const crypto = require("crypto");
 
 const PORTONE_HOST = "api.portone.io";
 const KNOWN_SUPABASE_URL = "https://izbwcqnvwsdijoognoag.supabase.co";
@@ -253,6 +254,12 @@ function httpsProbe(path) {
 module.exports = async function handler(req, res) {
   if (req.method !== "GET") {
     return json(res, 405, { ok: false, message: "GET only." });
+  }
+  const expectedSecret = String(process.env.PORTONE_DIAGNOSTICS_SECRET || "").trim();
+  const providedSecret = String(req.headers["x-motf-diagnostics-secret"] || "").trim();
+  if (!expectedSecret || !providedSecret || expectedSecret.length !== providedSecret.length
+    || !crypto.timingSafeEqual(Buffer.from(expectedSecret), Buffer.from(providedSecret))) {
+    return json(res, 404, { ok: false, message: "Not found." });
   }
 
   const url = new URL(req.url || "/api/portone-diagnostics", "https://motf.co.kr");
