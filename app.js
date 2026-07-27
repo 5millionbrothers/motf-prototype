@@ -503,7 +503,7 @@ const state = {
   reviewScope: "all",
   reviewTargets: [],
   stayPage: 1,
-  staysPerPage: 4,
+  staysPerPage: 5,
   mtProjects: [],
   mtProjectMode: "list",
   mtCandidates: ["station", "river", "pine"],
@@ -1351,7 +1351,7 @@ function renderStays() {
   }
   if (state.catalogLoading) {
     qs("#stayCount").textContent = "";
-    qs("#stayList").innerHTML = Array.from({ length: 4 }, () => `<article class="listing-card stay-listing-card catalog-skeleton" aria-hidden="true"><span></span><div><i></i><i></i><i></i></div></article>`).join("");
+    qs("#stayList").innerHTML = Array.from({ length: state.staysPerPage || 5 }, () => `<article class="listing-card stay-listing-card catalog-skeleton" aria-hidden="true"><span></span><div><i></i><i></i><i></i></div></article>`).join("");
     qs("#stayPagination").innerHTML = "";
     renderListingMap("stays", []);
     syncStaySearchPanel();
@@ -1383,8 +1383,8 @@ function stayCard(stay) {
   return `
     <article class="listing-card stay-listing-card">
       <img src="${stay.image}" alt="${stay.name} 사진" />
-      <div class="listing-body">
-        <div>
+      <div class="listing-body stay-listing-body">
+        <div class="stay-card-copy">
           <div class="listing-meta">
             <span class="pill">${stay.region}</span>
             <span class="pill success">최대 ${stay.maxPeople}명</span>
@@ -1392,16 +1392,23 @@ function stayCard(stay) {
           </div>
           <h3>${stay.name}</h3>
           <p class="stay-card-intro">${stay.intro}</p>
-          <div class="stay-card-highlights">${(stay.highlights || []).slice(0, 3).map((item) => `<span>${escapeHtml(item)}</span>`).join("")}</div>
-          <p class="muted">${stay.distance} · ${bathLabel}</p>
+          <div class="stay-card-facts">
+            <span>${stay.distance}</span>
+            <span>${bathLabel}</span>
+            ${(stay.highlights || []).slice(0, 1).map((item) => `<span>${escapeHtml(item)}</span>`).join("")}
+          </div>
         </div>
-        <div class="listing-actions">
-          <span class="price">예상 총액 ${money(estimate.total)}</span>
-          <span class="cost-summary">${estimate.people}명 선택 기준</span>
-          <span class="muted">${availableCount}/${stay.rooms.length} 객실 가능</span>
-          <button class="secondary-btn candidate-button ${selected ? "active" : ""}" data-add-mt-candidate="${stay.id}"><i data-lucide="${selected ? "check" : "plus"}"></i>${selected ? "객실 후보 추가" : "객실 후보 담기"}</button>
-          <button class="primary-btn" data-stay-id="${stay.id}"><i data-lucide="search"></i>상세 보기</button>
-          <button class="ghost-btn" data-open-chat="${stay.name}"><i data-lucide="message-circle"></i>문의</button>
+        <div class="listing-actions stay-card-actions">
+          <div class="stay-card-price-block">
+            <span class="price">${money(estimate.total)}</span>
+            <small>${estimate.people}명 예상 총액</small>
+          </div>
+          <span class="stay-card-availability">${availableCount}/${stay.rooms.length} 객실 가능</span>
+          <div class="stay-card-action-buttons">
+            <button class="secondary-btn candidate-button ${selected ? "active" : ""}" data-add-mt-candidate="${stay.id}" aria-label="${selected ? "담은 객실 후보 확인" : "객실 후보 담기"}"><i data-lucide="${selected ? "check" : "plus"}"></i>${selected ? "담김" : "후보"}</button>
+            <button class="primary-btn" data-stay-id="${stay.id}"><i data-lucide="search"></i>상세</button>
+            <button class="ghost-btn stay-chat-icon" data-open-chat="${stay.name}" aria-label="${stay.name}에 문의" title="채팅 문의"><i data-lucide="message-circle"></i></button>
+          </div>
         </div>
       </div>
     </article>
