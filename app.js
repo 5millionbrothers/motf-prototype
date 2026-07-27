@@ -248,7 +248,7 @@ let stays = [
   },
 ];
 
-let stores = [
+const legacyDemoStores = [
   {
     id: "gapyeong",
     name: "할인마트",
@@ -479,24 +479,16 @@ const communityBoards = [
   },
 ];
 
-// 제휴 계약 전에도 공판장 흐름을 확인할 수 있는 베타 진열 데이터입니다.
-// 실제 공판장 데이터가 한 곳이라도 등록되면 DB 카탈로그가 우선합니다.
-const betaStores = stores.slice(0, 1).map((store) => ({
-  ...store,
-  products: (store.products || []).map((product) => ({ ...product })),
-}));
-stores = betaStores;
+// 실제 승인된 마트와 공개 상품만 catalog.js에서 채웁니다.
+let stores = [];
 
 const state = {
   selectedStay: stays[0],
   selectedRoom: stays[0].rooms[0],
-  selectedStore: stores[0],
-  selectedProduct: stores[0].products[0],
+  selectedStore: null,
+  selectedProduct: null,
   activeCategory: "전체",
-  cart: [
-    { productId: "pork-set", storeId: "gapyeong", qty: 8 },
-    { productId: "paper-set", storeId: "gapyeong", qty: 1 },
-  ],
+  cart: [],
   reservations: [],
   orders: [],
   reviews: [],
@@ -583,7 +575,7 @@ window.motfApplyCatalog = function applyCatalog(nextStays, nextStores, options =
     state.selectedRoom = stays[0]?.rooms?.[0] || null;
   }
   if (Array.isArray(nextStores)) {
-    stores = nextStores.length ? nextStores : betaStores;
+    stores = nextStores;
     state.selectedStore = stores[0] || null;
     state.selectedProduct = stores[0]?.products?.[0] || null;
     state.cart = [];
@@ -1059,17 +1051,24 @@ function renderHomeStories() {
 function renderHomeMarketPicks() {
   const container = qs("#homeMarketPicks");
   if (!container) return;
-  const products = ensureMarketBundleProducts(stores[0]);
-  container.innerHTML = products.map((product) => `
+  const picks = stores.flatMap((store) => {
+    ensureMarketBundleProducts(store);
+    return store.products.map((product) => ({ product, store }));
+  }).slice(0, 8);
+  if (!picks.length) {
+    container.innerHTML = `<div class="empty-state compact catalog-error"><strong>제휴 마트 상품을 준비하고 있어요.</strong><span>상품이 공개되면 이곳에서 바로 확인할 수 있습니다.</span></div>`;
+    return;
+  }
+  container.innerHTML = picks.map(({ product, store }) => `
     <button class="home-stay-pick home-market-pick" type="button" data-product-id="${product.id}">
       <img src="${product.image}" alt="${escapeHtml(product.name)}" />
       <span class="home-stay-pick-body home-market-pick-body">
-        <small>${escapeHtml(stores[0]?.name || "할인마트")} · ${escapeHtml(product.unit)}</small>
+        <small>${escapeHtml(store.name)} · ${escapeHtml(product.unit || "상품")}</small>
         <strong>${escapeHtml(product.name)}</strong>
         <span class="home-stay-features">
-          <b>moTF 전용</b>
-          <b>${product.bundleProductIds?.length || 1}종 구성</b>
-          <b>단체 패키지</b>
+          <b>${escapeHtml(product.category || "기타")}</b>
+          <b>${product.isBundle ? `${product.bundleProductIds?.length || 1}종 구성` : escapeHtml(product.origin || "원산지 상세 확인")}</b>
+          <b>${product.isAlcohol ? "성인 인증 필요" : "장바구니 주문"}</b>
         </span>
         <span>${money(product.price)}</span>
       </span>
@@ -1853,7 +1852,18 @@ function renderBooking() {
 }
 
 function renderStores() {
-  const store = stores[0];
+  const intro = qs("#marketIntro");
+  const productSection = qs("#marketProducts");
+  if (!stores.length) {
+    state.selectedStore = null;
+    state.selectedProduct = null;
+    intro.innerHTML = `<div class="empty-state catalog-error"><i data-lucide="store"></i><strong>현재 공개된 제휴 마트가 없습니다.</strong><span>입점 승인과 상품 등록이 완료되면 이곳에 표시됩니다.</span></div>`;
+    productSection.innerHTML = "";
+    updateCartBadge();
+    refreshIcons();
+    return;
+  }
+  const store = stores.find((item) => item.id === state.selectedStore?.id) || stores[0];
   state.selectedStore = store;
   ensureMarketBundleProducts(store);
   const categories = ["전체", "MT 세트", "식재료", "주류/음료", "일회용품", "냉동식품", "기타"];
@@ -1863,7 +1873,8 @@ function renderStores() {
     : store.products.filter((product) => product.category === state.activeCategory);
   const people = Number(qs("#marketPeople")?.value || 32);
   const porkKg = Math.ceil(people * 0.35);
-  qs("#marketIntro").innerHTML = `
+  intro.innerHTML = `
+    ${stores.length > 1 ? `<nav class="market-store-tabs" aria-label="제휴 마트 선택">${stores.map((item) => `<button type="button" class="category-tab ${item.id === store.id ? "active" : ""}" data-market-select="${item.id}">${escapeHtml(item.name)}</button>`).join("")}</nav>` : ""}
     <section class="market-intro">
       <img src="${store.image}" alt="${store.name} 매장 사진" />
       <div class="market-intro-body">
@@ -1871,7 +1882,7 @@ function renderStores() {
         <h2>${store.name}</h2>
         <p>${store.intro}<br />숙소 일정에 맞춰 수령 또는 배송 요청을 남길 수 있습니다.</p>
         <div class="detail-meta">
-          <span class="pill">★ ${store.rating}</span>
+          ${store.rating > 0 ? `<span class="pill">★ ${store.rating}</span>` : '<span class="pill">신규 제휴</span>'}
           <span class="pill success">${store.type}</span>
           <span class="pill warning">주류 성인 인증</span>
         </div>
@@ -1884,16 +1895,16 @@ function renderStores() {
       </div>
     </section>
   `;
-  qs("#marketProducts").innerHTML = `
+  productSection.innerHTML = `
     <div class="section-toolbar">
-      <div><p class="eyebrow">moTF 전용 패키지부터 일반 상품까지</p><h2>상품 둘러보기</h2></div>
+      <div><p class="eyebrow">제휴 마트 등록 상품</p><h2>상품 둘러보기</h2></div>
       <span>${products.length}개 상품</span>
     </div>
     <div class="category-tabs">
       ${categories.map((cat) => `<button class="category-tab ${cat === state.activeCategory ? "active" : ""}" data-category="${cat}">${cat}</button>`).join("")}
     </div>
     <div class="product-grid">
-      ${products.map(productCard).join("")}
+      ${products.length ? products.map(productCard).join("") : `<div class="empty-state catalog-error"><strong>${state.activeCategory === "전체" ? "등록된 상품이 아직 없습니다." : "이 분류에 등록된 상품이 없습니다."}</strong><span>마트 사장님이 상품을 공개하면 바로 주문할 수 있습니다.</span></div>`}
     </div>
   `;
   updateCartBadge();
@@ -1911,7 +1922,7 @@ function storeCard(store) {
           <div class="listing-meta">
             <span class="pill">${store.region}</span>
             <span class="pill success">${store.type}</span>
-            <span class="pill">★ ${store.rating}</span>
+            ${store.rating > 0 ? `<span class="pill">★ ${store.rating}</span>` : '<span class="pill">신규 제휴</span>'}
           </div>
           <h3>${store.name}</h3>
           <p>${store.intro}</p>
@@ -1929,6 +1940,11 @@ function storeCard(store) {
 
 function renderStoreDetail() {
   const store = state.selectedStore;
+  if (!store) {
+    qs("#storeDetailContent").innerHTML = `<div class="empty-state catalog-error"><strong>마트 정보를 찾을 수 없습니다.</strong><button class="primary-btn" type="button" data-route="market">마트 목록으로</button></div>`;
+    refreshIcons();
+    return;
+  }
   ensureMarketBundleProducts(store);
   const categories = ["전체", "MT 세트", "식재료", "주류/음료", "일회용품", "냉동식품", "기타"];
   const products = state.activeCategory === "전체"
@@ -1942,7 +1958,7 @@ function renderStoreDetail() {
         <h1>${store.name}</h1>
         <p>${store.intro}</p>
         <div class="detail-meta">
-          <span class="pill">★ ${store.rating}</span>
+          ${store.rating > 0 ? `<span class="pill">★ ${store.rating}</span>` : '<span class="pill">신규 제휴</span>'}
           <span class="pill success">장바구니/바로구매</span>
           <span class="pill warning">주류 성인 인증</span>
         </div>
@@ -1956,7 +1972,7 @@ function renderStoreDetail() {
       ${categories.map((cat) => `<button class="category-tab ${cat === state.activeCategory ? "active" : ""}" data-category="${cat}">${cat}</button>`).join("")}
     </div>
     <div class="product-grid">
-      ${products.map(productCard).join("")}
+      ${products.length ? products.map(productCard).join("") : `<div class="empty-state catalog-error"><strong>등록된 상품이 아직 없습니다.</strong><span>상품이 공개되면 바로 주문할 수 있습니다.</span></div>`}
     </div>
   `;
   refreshIcons();
@@ -1987,6 +2003,11 @@ function isAlcoholProduct(product) {
 
 function renderProductDetail() {
   const product = state.selectedProduct;
+  if (!product) {
+    qs("#productDetailContent").innerHTML = `<div class="empty-state catalog-error"><strong>상품 정보를 찾을 수 없습니다.</strong><button class="primary-btn" type="button" data-route="market">마트로 돌아가기</button></div>`;
+    refreshIcons();
+    return;
+  }
   const alcoholProduct = isAlcoholProduct(product);
   qs("#productDetailContent").innerHTML = `
     <div class="product-detail">
@@ -3176,13 +3197,7 @@ function renderBoardDetail() {
 }
 
 function marketRecommendedSets(store) {
-  if (store.recommendedSets?.length) return store.recommendedSets;
-  const basePrice = store.products.slice(0, 4).reduce((sum, product) => sum + product.price, 0);
-  return [
-    { name: "20명 바베큐 기본 세트", people: "15~20명", description: "고기·쌈채소·소스·일회용품 기본 구성", price: basePrice || 189000, productIds: store.products.slice(0, 4).map((item) => item.id) },
-    { name: "40명 MT 든든 세트", people: "30~40명", description: "넉넉한 식재료와 음료를 함께 준비한 구성", price: Math.max(basePrice * 2, 349000), productIds: store.products.slice(0, 6).map((item) => item.id) },
-    { name: "아침 해장 세트", people: "20~30명", description: "냉동식품·생수·컵라면 중심의 다음 날 구성", price: 99000, productIds: store.products.filter((item) => ["냉동식품", "식재료", "주류/음료"].includes(item.category)).slice(0, 4).map((item) => item.id) },
-  ];
+  return Array.isArray(store?.recommendedSets) ? store.recommendedSets : [];
 }
 
 function ensureMarketBundleProducts(store) {
@@ -3196,7 +3211,7 @@ function ensureMarketBundleProducts(store) {
     name: set.name,
     unit: set.people || "단체 구성",
     price: Number(set.price || 0),
-    origin: "할인마트 moTF 베타 구성",
+    origin: `${store.name} 추천 구성`,
     image: set.image || marketBundleImages[index % marketBundleImages.length],
     detail: `${set.description} 필요한 품목을 한 번에 준비할 수 있도록 묶은 moTF 전용 할인가 패키지입니다.`,
     detailSections: {
@@ -4051,6 +4066,15 @@ document.addEventListener("click", async (event) => {
     state.selectedStore = stores.find((store) => store.id === storeButton.dataset.storeId) || stores[0];
     state.activeCategory = "전체";
     navigate("storeDetail");
+    return;
+  }
+
+  const marketSelectButton = event.target.closest("[data-market-select]");
+  if (marketSelectButton) {
+    state.selectedStore = stores.find((store) => store.id === marketSelectButton.dataset.marketSelect) || stores[0] || null;
+    state.selectedProduct = state.selectedStore?.products?.[0] || null;
+    state.activeCategory = "전체";
+    renderStores();
     return;
   }
 

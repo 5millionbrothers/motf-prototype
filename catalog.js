@@ -180,8 +180,7 @@
       .filter((business) => business.rooms.length);
     const stores = businesses
       .filter((business) => business.business_type === "market")
-      .map((business) => buildStore(business, offerings.filter((item) => item.business_id === business.id)))
-      .filter((business) => business.products.length);
+      .map((business) => buildStore(business, offerings.filter((item) => item.business_id === business.id)));
 
     window.motfApplyCatalog(stays, stores);
   })();
