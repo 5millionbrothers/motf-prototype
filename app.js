@@ -502,6 +502,8 @@ const state = {
   reviews: [],
   reviewScope: "all",
   reviewTargets: [],
+  stayPage: 1,
+  staysPerPage: 4,
   mtProjects: [],
   mtProjectMode: "list",
   mtCandidates: ["station", "river", "pine"],
@@ -1350,17 +1352,24 @@ function renderStays() {
   if (state.catalogLoading) {
     qs("#stayCount").textContent = "";
     qs("#stayList").innerHTML = Array.from({ length: 4 }, () => `<article class="listing-card stay-listing-card catalog-skeleton" aria-hidden="true"><span></span><div><i></i><i></i><i></i></div></article>`).join("");
+    qs("#stayPagination").innerHTML = "";
     renderListingMap("stays", []);
     syncStaySearchPanel();
     return;
   }
   const matches = getStayMatches();
+  const pageSize = Math.max(1, Number(state.staysPerPage || 4));
+  const pageCount = Math.max(1, Math.ceil(matches.length / pageSize));
+  state.stayPage = Math.min(Math.max(1, Number(state.stayPage || 1)), pageCount);
+  const pageStart = (state.stayPage - 1) * pageSize;
+  const visibleMatches = matches.slice(pageStart, pageStart + pageSize);
   qs("#stayCount").textContent = `${matches.length}개 숙소`;
   qs("#stayList").innerHTML = state.catalogError
     ? `<div class="empty-state catalog-error"><i data-lucide="cloud-off"></i><strong>숙소 정보를 불러오지 못했습니다.</strong><span>잠시 후 다시 시도해주세요.</span></div>`
     : matches.length
-    ? matches.map(stayCard).join("")
+    ? visibleMatches.map(stayCard).join("")
     : `<div class="empty-state">조건에 맞는 숙소가 없습니다. 인원이나 예산을 넓혀보세요.</div>`;
+  renderStayPagination(matches.length, pageCount);
   renderListingMap("stays", matches);
   syncStaySearchPanel();
   refreshIcons();
@@ -1429,6 +1438,32 @@ function dashList(items) {
   return `<ul class="dash-list">${items.map((item) => `<li>${item}</li>`).join("")}</ul>`;
 }
 
+function renderStayPagination(total, pageCount) {
+  const container = qs("#stayPagination");
+  if (!container) return;
+  if (!total || pageCount <= 1) {
+    container.innerHTML = "";
+    container.hidden = true;
+    return;
+  }
+  container.hidden = false;
+  const pages = [];
+  for (let page = 1; page <= pageCount; page += 1) {
+    const nearCurrent = Math.abs(page - state.stayPage) <= 1;
+    if (page === 1 || page === pageCount || nearCurrent) pages.push(page);
+  }
+  const pageTokens = pages.flatMap((page, index) => {
+    const previous = pages[index - 1];
+    return index > 0 && page - previous > 1 ? ["ellipsis", page] : [page];
+  });
+  container.innerHTML = `
+    <button type="button" data-stay-page="${state.stayPage - 1}" aria-label="이전 페이지" ${state.stayPage <= 1 ? "disabled" : ""}><i data-lucide="chevron-left"></i></button>
+    ${pageTokens.map((page) => page === "ellipsis"
+      ? '<span class="stay-pagination-ellipsis" aria-hidden="true">...</span>'
+      : `<button type="button" data-stay-page="${page}" class="${page === state.stayPage ? "active" : ""}" aria-label="${page}페이지" ${page === state.stayPage ? 'aria-current="page"' : ""}>${page}</button>`).join("")}
+    <button type="button" data-stay-page="${state.stayPage + 1}" aria-label="다음 페이지" ${state.stayPage >= pageCount ? "disabled" : ""}><i data-lucide="chevron-right"></i></button>`;
+}
+
 const STANDARD_AMENITIES = [
   ["barbecue", "야외바베큐"], ["pool", "수영장"], ["karaoke", "노래방/마이크"],
   ["screen", "TV/화면"], ["field", "야외운동장"], ["parking", "주차"],
@@ -1438,13 +1473,17 @@ const STANDARD_AMENITIES = [
 function amenityDescription(detail, available) {
   if (!detail) return available ? "이용 가능" : "제공되지 않음";
   const p = detail.params || {};
-  const equipment = { soccer: "축구 골대", basketball: "농구 골대", footvolley: "족구장" };
+  const includedRooms = Array.isArray(p.included_rooms) ? p.included_rooms.join(", ") : p.included_rooms;
+  const equipment = {
+    soccer: "축구 골대", basketball: "농구 골대", footvolley: "족구장",
+    soccer_ball: "축구공", basketball_ball: "농구공", footvolley_ball: "족구공",
+  };
   const parts = {
     barbecue: [p.capacity && `최대 ${p.capacity}명`, p.setup, p.price && `${money(p.price)}`],
-    karaoke: [p.available_until && `${p.available_until}까지`, p.mic_count && `마이크 ${p.mic_count}개`, p.included_rooms],
+    karaoke: [p.available_until && `${p.available_until}까지`, p.mic_count && `마이크 ${p.mic_count}개`, includedRooms],
     field: [(p.equipment || []).map((key) => equipment[key] || key).join(", ")],
     pool: [p.open_start && p.open_end && `${p.open_start}~${p.open_end}`, p.capacity && `최대 ${p.capacity}명`, p.price && money(p.price)],
-    screen: [p.included_rooms, p.ports, p.price && money(p.price)],
+    screen: [includedRooms, p.ports, p.price && money(p.price)],
     wifi: [p.note],
     parking: [p.spaces != null && `승용차 ${p.spaces}대`, p.bus_allowed && "대형버스 진입 가능"],
     pickup: [p.place, p.hours, p.price && money(p.price)],
@@ -3744,8 +3783,8 @@ document.addEventListener("click", async (event) => {
     tomorrow.setDate(tomorrow.getDate() + 1);
     qs("#mtProjectForm").dataset.mode = "create";
     qs("#mtProjectForm").reset();
-    qs("#mtEditStart").value = localDateKey(today);
-    qs("#mtEditEnd").value = localDateKey(tomorrow);
+    setDateInputValue(qs("#mtEditStart"), localDateKey(today));
+    setDateInputValue(qs("#mtEditEnd"), localDateKey(tomorrow));
     qs("#mtEditPeople").value = 10;
     qs("#mtEditRegion").value = DEFAULT_STAY_REGION;
     qs("#mtProjectDialog").showModal();
@@ -3775,8 +3814,8 @@ document.addEventListener("click", async (event) => {
     qs("#mtProjectForm").dataset.mode = "edit";
     qs("#mtEditTitle").value = project.title || "";
     qs("#mtEditOrganization").value = project.organization_name || "";
-    qs("#mtEditStart").value = String(project.starts_on || "").slice(0, 10);
-    qs("#mtEditEnd").value = String(project.ends_on || "").slice(0, 10);
+    setDateInputValue(qs("#mtEditStart"), String(project.starts_on || "").slice(0, 10));
+    setDateInputValue(qs("#mtEditEnd"), String(project.ends_on || "").slice(0, 10));
     qs("#mtEditPeople").value = project.guest_count || 10;
     qs("#mtEditRegion").value = project.region || "가평";
     qs("#mtEditBudget").value = Number(project.estimated_budget || 0) ? Number(project.estimated_budget).toLocaleString("ko-KR") : "";
@@ -3940,6 +3979,14 @@ document.addEventListener("click", async (event) => {
   const calendarDateButton = event.target.closest("[data-inspect-calendar-date]");
   if (calendarDateButton) {
     showPublicCalendarDay(state.selectedStay, calendarDateButton.dataset.inspectCalendarDate);
+    return;
+  }
+
+  const stayPageButton = event.target.closest("[data-stay-page]");
+  if (stayPageButton && !stayPageButton.disabled) {
+    state.stayPage = Number(stayPageButton.dataset.stayPage || 1);
+    renderStays();
+    qs("#stayList")?.closest("section")?.scrollIntoView({ behavior: "smooth", block: "start" });
     return;
   }
 
