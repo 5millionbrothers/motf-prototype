@@ -21,12 +21,25 @@
     if (error) throw error;
     const businessIds = [...new Set((candidates || []).map((item) => item.business_id).filter(Boolean))];
     if (!businessIds.length) return [];
-    const { data: businesses, error: businessError } = await client.from("businesses")
-      .select("id, business_name, address, cover_image_url, bath_count, station_distance_m")
-      .in("id", businessIds);
+    const offeringIds = [...new Set((candidates || []).map((item) => item.offering_id).filter(Boolean))];
+    const [businessResult, offeringResult] = await Promise.all([
+      client.from("businesses")
+        .select("id, business_name, address, cover_image_url, bath_count, station_distance_m")
+        .in("id", businessIds),
+      client.from("offerings")
+        .select("id, business_id, name, price, max_people, base_people, min_people, extra_person_fee, image_url, image_urls, bathroom_count, bathroom_gender_separated, bathroom_note")
+        .in("id", offeringIds),
+    ]);
+    const { data: businesses, error: businessError } = businessResult;
     if (businessError) throw businessError;
+    if (offeringResult.error) throw offeringResult.error;
     const byId = new Map((businesses || []).map((business) => [business.id, business]));
-    return (candidates || []).map((candidate) => ({ ...candidate, business: byId.get(candidate.business_id) || null }));
+    const offeringById = new Map((offeringResult.data || []).map((offering) => [offering.id, offering]));
+    return (candidates || []).map((candidate) => ({
+      ...candidate,
+      business: byId.get(candidate.business_id) || null,
+      offering: offeringById.get(candidate.offering_id) || null,
+    }));
   }
 
   async function projectChildren(projectId) {
@@ -117,49 +130,55 @@
     return data;
   };
 
-  window.motfSaveMtCandidate = async function saveMtCandidate(businessId, shouldAdd) {
+  window.motfSaveMtCandidate = async function saveMtCandidate(businessId, offeringId, shouldAdd) {
     const project = ensureProject();
     if (shouldAdd) {
-      const estimate = window.motfGetMtCandidateEstimate?.(businessId) || {};
-      const { error } = await client.from("mt_project_candidates").upsert({
-        project_id: project.id,
-        business_id: businessId,
-        estimated_cost: estimate,
-        sort_order: Date.now() % 1000000,
-      }, { onConflict: "project_id,business_id" });
+      const { error } = await client.rpc("save_mt_room_candidate", {
+        target_project_id: project.id,
+        target_business_id: businessId,
+        target_offering_id: offeringId,
+      });
       if (error) throw error;
     } else {
-      const { error } = await client.from("mt_project_candidates").delete().eq("project_id", project.id).eq("business_id", businessId);
+      const { error } = await client.from("mt_project_candidates").delete().eq("project_id", project.id).eq("offering_id", offeringId);
       if (error) throw error;
     }
   };
 
-  window.motfSaveCandidateToProject = async function saveCandidateToProject(projectId, businessId) {
+  window.motfGetCandidateRoomAvailability = async function getCandidateRoomAvailability(projectId, businessId) {
+    const user = requireUser();
+    const { data: project, error: projectError } = await client.from("mt_projects")
+      .select(projectFields)
+      .eq("id", projectId)
+      .eq("owner_id", user.id)
+      .single();
+    if (projectError) throw projectError;
+    const { data: blocks, error: blockError } = await client.rpc("get_public_stay_calendar", {
+      target_business_id: businessId,
+      range_start: project.starts_on,
+      range_end: project.ends_on,
+    });
+    if (blockError) throw blockError;
+    return {
+      project,
+      unavailableOfferingIds: [...new Set((blocks || []).map((block) => String(block.offering_id)))],
+    };
+  };
+
+  window.motfSaveCandidateToProject = async function saveCandidateToProject(projectId, businessId, offeringId) {
     const user = requireUser();
     const project = (await loadProjects()).find((item) => String(item.id) === String(projectId));
     if (!project || project.owner_id !== user.id) throw new Error("선택한 내 MT를 찾을 수 없습니다.");
-    const { count, error: countError } = await client.from("mt_project_candidates")
-      .select("id", { count: "exact", head: true })
-      .eq("project_id", projectId);
-    if (countError) throw countError;
-    const { data: existing } = await client.from("mt_project_candidates")
-      .select("id")
-      .eq("project_id", projectId)
-      .eq("business_id", businessId)
-      .maybeSingle();
-    if (!existing && Number(count || 0) >= 3) throw new Error("이 MT에는 숙소 후보가 이미 3곳 등록되어 있습니다.");
-    const estimate = window.motfGetMtCandidateEstimate?.(businessId) || {};
-    const { error } = await client.from("mt_project_candidates").upsert({
-      project_id: projectId,
-      business_id: businessId,
-      estimated_cost: estimate,
-      sort_order: Date.now() % 1000000,
-    }, { onConflict: "project_id,business_id" });
+    const { error } = await client.rpc("save_mt_room_candidate", {
+      target_project_id: projectId,
+      target_business_id: businessId,
+      target_offering_id: offeringId,
+    });
     if (error) throw error;
     await loadProjects();
   };
 
-  window.motfSetMtStayItem = async function setMtStayItem({ business_id, title, amount }) {
+  window.motfSetMtStayItem = async function setMtStayItem({ business_id, offering_id, title, amount }) {
     const project = ensureProject();
     const oldIds = (currentProject.items || []).filter((item) => item.item_kind === "stay").map((item) => item.id).filter((id) => uuidPattern.test(String(id)));
     if (oldIds.length) {
@@ -167,7 +186,8 @@
       if (deleteError) throw deleteError;
     }
     const payload = { project_id: project.id, item_kind: "stay", title, quantity: 1, amount, status: "planned" };
-    if (uuidPattern.test(String(business_id))) payload.reference_id = business_id;
+    if (uuidPattern.test(String(offering_id))) payload.reference_id = offering_id;
+    else if (uuidPattern.test(String(business_id))) payload.reference_id = business_id;
     const { data, error } = await client.from("mt_project_items").insert(payload).select(itemFields).single();
     if (error) throw error;
     currentProject.items = [...(currentProject.items || []).filter((item) => item.item_kind !== "stay"), data];

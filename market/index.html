@@ -13,7 +13,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;500;600&amp;display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" />
-    <link rel="stylesheet" href="styles.css?v=20260721-batch2" />
+    <link rel="stylesheet" href="styles.css?v=20260728-pay2" />
     <link rel="stylesheet" href="auth.css?v=20260712-policy-links1" />
     <script async src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" onload="window.__motfRefreshIcons && window.__motfRefreshIcons()"></script>
     <script async src="https://cdn.portone.io/v2/browser-sdk.js"></script>
@@ -156,7 +156,7 @@
 
       <dialog id="mtCandidateProjectDialog" class="motf-dialog mt-project-picker-dialog">
         <form method="dialog">
-          <div class="section-toolbar"><div><p class="eyebrow">숙소 후보 저장</p><h2>어느 MT에 담을까요?</h2></div><button class="icon-action" type="button" data-close-motf-dialog aria-label="닫기"><i data-lucide="x"></i></button></div>
+          <div class="section-toolbar"><div><p class="eyebrow">객실 후보 저장</p><h2>MT 일정과 객실을 골라주세요</h2></div><button class="icon-action" type="button" data-close-motf-dialog aria-label="닫기"><i data-lucide="x"></i></button></div>
           <div id="mtCandidateProjectChoices" class="mt-project-choice-list"></div>
         </form>
       </dialog>
@@ -279,6 +279,27 @@
               </label>
             </div>
             <label>숙소에 전달할 요청사항<textarea id="bookingMemo" rows="8" maxlength="2000" placeholder="예: 이용할 시설과 시간, 바비큐 인원, 숯·그릴 수량, 픽업 요청, 방 배정 방식, 늦은 체크인, 침구 추가 등 사장님이 확인해야 할 내용을 자세히 적어주세요."></textarea></label>
+            <fieldset class="refund-account-fields">
+              <legend>환불계좌 <span>가상계좌 결제 취소 시 필요</span></legend>
+              <p>예약이 거절되거나 취소 규정에 따라 환불될 때 이 계좌로 자동 환불을 요청합니다.</p>
+              <div class="refund-account-grid">
+                <label>은행
+                  <select id="bookingRefundBank" required>
+                    <option value="">은행 선택</option>
+                    <option value="KOOKMIN">KB국민은행</option><option value="SHINHAN">신한은행</option><option value="WOORI">우리은행</option>
+                    <option value="HANA">하나은행</option><option value="NONGHYUP">NH농협은행</option><option value="IBK">IBK기업은행</option>
+                    <option value="KAKAO">카카오뱅크</option><option value="K_BANK">케이뱅크</option><option value="TOSS">토스뱅크</option>
+                    <option value="BUSAN">부산은행</option><option value="DAEGU">대구은행</option><option value="KYONGNAM">경남은행</option>
+                    <option value="KWANGJU">광주은행</option><option value="JEONBUK">전북은행</option><option value="SUHYUP">수협은행</option>
+                    <option value="STANDARD_CHARTERED">SC제일은행</option><option value="CITI">한국씨티은행</option><option value="POST">우체국</option>
+                    <option value="KFCC">새마을금고</option><option value="SHINHYUP">신협</option><option value="SAVINGS_BANK">저축은행</option>
+                  </select>
+                </label>
+                <label>계좌번호<input id="bookingRefundAccount" required inputmode="numeric" autocomplete="off" maxlength="24" placeholder="숫자만 입력" /></label>
+                <label>예금주<input id="bookingRefundHolder" required maxlength="50" placeholder="예금주명" /></label>
+              </div>
+              <label class="checkbox-row"><input required type="checkbox" id="bookingRefundConsent" />환불 처리 목적의 계좌정보 저장 및 이용에 동의합니다.</label>
+            </fieldset>
             <label class="checkbox-row"><input required type="checkbox" id="bookingTerms" />환불·취소 정책과 시설 이용 규칙에 동의합니다.</label>
             <button class="primary-btn" type="submit"><i data-lucide="credit-card"></i>예약 결제 준비하기</button>
           </form>
@@ -286,10 +307,6 @@
           <aside class="summary-panel">
             <h2>최종 금액</h2>
             <div id="bookingSummary"></div>
-            <div class="toss-ready-card">
-              <strong>포트원 KG이니시스 가상계좌</strong>
-              <span>가상계좌 발급 후 입금이 확인되면 요청이 접수됩니다.</span>
-            </div>
           </aside>
         </div>
       </section>
@@ -759,13 +776,13 @@
             <h2>1. 개인정보의 처리 목적</h2>
             <p>moTF는 회원 식별, 예약·주문 처리, 결제 확인, 고객 상담, 분쟁 대응, 부정 이용 방지, 공지 전달, 예결산 파일 제공을 위해 개인정보를 처리합니다.</p>
             <h2>2. 처리하는 개인정보 항목</h2>
-            <p>필수 항목은 이메일, 이름, 휴대전화번호, 학교·소속, 예약·주문 정보, 결제 상태, 문의 및 채팅 내역입니다. 서비스 이용 과정에서 접속 기록, 기기 정보, 쿠키, 결제 승인 정보가 자동으로 생성될 수 있습니다.</p>
+            <p>필수 항목은 이메일, 이름, 휴대전화번호, 학교·소속, 예약·주문 정보, 결제 상태, 문의 및 채팅 내역입니다. 가상계좌 환불을 신청하는 경우 환불계좌의 은행, 계좌번호, 예금주 정보를 처리합니다. 서비스 이용 과정에서 접속 기록, 기기 정보, 쿠키, 결제 승인 정보가 자동으로 생성될 수 있습니다.</p>
             <h2>3. 개인정보의 보유 및 이용기간</h2>
             <p>회원 탈퇴 또는 처리 목적 달성 시 지체 없이 파기합니다. 단, 전자상거래 등 관계 법령에 따라 계약·청약철회·결제·분쟁 처리 기록은 법정 기간 동안 보관할 수 있습니다.</p>
             <h2>4. 개인정보의 제3자 제공</h2>
             <p>예약·주문 이행을 위해 필요한 범위에서 숙소 및 마트 제공자에게 대표자명, 연락처, 이용 일정, 주문 정보가 제공될 수 있습니다. 법령에 근거가 있거나 이용자가 동의한 경우를 제외하고 목적 외로 제공하지 않습니다.</p>
             <h2>5. 개인정보 처리의 위탁</h2>
-            <p>서비스 운영을 위해 결제 처리, 데이터 보관, 알림 발송 등 일부 업무를 외부 서비스에 위탁할 수 있으며, 위탁 시 개인정보가 안전하게 처리되도록 관리합니다.</p>
+            <p>서비스 운영을 위해 결제·환불 처리, 데이터 보관, 알림 발송 등 일부 업무를 포트원, KG이니시스, Supabase 등 외부 서비스에 위탁할 수 있으며, 위탁 시 개인정보가 안전하게 처리되도록 관리합니다.</p>
             <h2>6. 이용자의 권리</h2>
             <p>이용자는 개인정보 열람, 정정, 삭제, 처리정지를 요청할 수 있습니다. 요청은 고객 문의 채널 또는 이메일을 통해 접수할 수 있습니다.</p>
             <h2>7. 개인정보 보호책임자 및 문의</h2>
@@ -902,15 +919,15 @@
     <script src="config.js?v=20260622-naver1"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ko.js"></script>
-    <script src="app.js?v=20260721-batch2"></script>
+    <script src="app.js?v=20260728-pay2"></script>
     <script src="budget-export.js?v=20260721-batch2"></script>
     <script src="auth.js?v=20260712-login-clear1"></script>
-    <script src="catalog.js?v=20260721-batch2"></script>
-    <script src="transactions.js?v=20260721-batch2"></script>
+    <script src="catalog.js?v=20260728-pay2"></script>
+    <script src="transactions.js?v=20260728-pay2"></script>
     <script src="chat-data.js?v=20260721-batch2"></script>
     <script src="support-data.js?v=20260621-support1"></script>
     <script src="reviews-data.js?v=20260721-batch2"></script>
-    <script src="product-refresh.js?v=20260713-home-editorial7"></script>
-    <script src="mt-project-data.js?v=20260721-batch2"></script>
+    <script src="product-refresh.js?v=20260728-pay2"></script>
+    <script src="mt-project-data.js?v=20260728-pay2"></script>
   </body>
 </html>

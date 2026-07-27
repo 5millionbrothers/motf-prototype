@@ -8,7 +8,17 @@
     qsa('input[type="date"]').forEach((input) => {
       if (input._flatpickr) return;
       const initialValue = input.value;
-      flatpickr(input, { dateFormat: "Y-m-d", altInput: true, altFormat: "Y년 m월 d일", minDate: input.id?.includes("usage") ? null : "today", disableMobile: true, monthSelectorType: "static", position: "below left" });
+      const dialog = input.closest("dialog");
+      flatpickr(input, {
+        dateFormat: "Y-m-d",
+        altInput: true,
+        altFormat: "Y년 m월 d일",
+        minDate: input.id?.includes("usage") ? null : "today",
+        disableMobile: true,
+        monthSelectorType: "static",
+        position: dialog ? "above left" : "below left",
+        ...(dialog ? { appendTo: dialog } : {}),
+      });
       if (initialValue) input._flatpickr.setDate(initialValue, false);
     });
     qsa('input[type="time"]').forEach((input) => {

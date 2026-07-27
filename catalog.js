@@ -48,6 +48,17 @@
       basePeople: Number(item.base_people ?? item.min_people) || 0,
       maxPeople: Number(item.max_people) || 0,
       extraPersonFee: Number(item.extra_person_fee) || 0,
+      seasonalPrices: {
+        offseasonWeekday: Number(item.offseason_weekday_price ?? item.price) || 0,
+        offseasonWeekend: Number(item.offseason_weekend_price ?? item.price) || 0,
+        shoulderWeekday: Number(item.shoulder_weekday_price ?? item.price) || 0,
+        shoulderWeekend: Number(item.shoulder_weekend_price ?? item.price) || 0,
+        peakWeekday: Number(item.peak_weekday_price ?? item.price) || 0,
+        peakWeekend: Number(item.peak_weekend_price ?? item.price) || 0,
+      },
+      bathroomCount: Number(item.bathroom_count) || 0,
+      bathroomGenderSeparated: Boolean(item.bathroom_gender_separated),
+      bathroomNote: text(item.bathroom_note || ""),
       price: Number(item.price) || 0,
       image: imageUrl(item.image_url || business.cover_image_url, roomFallback),
       images: (item.image_urls || []).map((url) => imageUrl(url, roomFallback)),
@@ -86,6 +97,11 @@
       highlights: Array.isArray(business.highlight_summary) ? business.highlight_summary.slice(0, 3).map(text) : amenities.slice(0, 3),
       amenities: amenities.length ? amenities : ["상세 시설은 사장님에게 문의해주세요."],
       amenityDetails: Array.isArray(business.amenity_details) ? business.amenity_details : [],
+      shoulderSeasonRanges: Array.isArray(business.shoulder_season_ranges) ? business.shoulder_season_ranges : [],
+      peakSeasonRanges: Array.isArray(business.peak_season_ranges) ? business.peak_season_ranges : [],
+      sharedBathroomCount: Number(business.shared_bathroom_count) || 0,
+      sharedBathroomGenderSeparated: Boolean(business.shared_bathroom_gender_separated),
+      sharedBathroomNote: text(business.shared_bathroom_note || ""),
       extraFees: Array.isArray(business.extra_fees) ? business.extra_fees : [],
       fees: Array.isArray(business.extra_fees) && business.extra_fees.length
         ? business.extra_fees.map((fee) => text(`${fee.label || "추가요금"}${fee.amount ? ` ${Number(fee.amount).toLocaleString("ko-KR")}원` : ""}${fee.detail ? ` · ${fee.detail}` : ""}`))
@@ -128,10 +144,10 @@
   (async () => {
     let [businessResult, offeringResult] = await Promise.all([
       client.from("businesses")
-        .select("id, business_type, business_name, address, description, short_description, highlight_summary, region, cover_image_url, gallery_image_urls, facilities, approval_status, latitude, longitude, location_verified_at, station_distance_m, convenience_distance_m, nearby_tags, room_count, bath_count, amenity_details, extra_fees, refund_policy, recommended_sets")
+        .select("id, business_type, business_name, address, description, short_description, highlight_summary, highlight_keys, region, cover_image_url, gallery_image_urls, facilities, approval_status, latitude, longitude, location_verified_at, station_distance_m, convenience_distance_m, nearby_tags, room_count, bath_count, shared_bathroom_count, shared_bathroom_gender_separated, shared_bathroom_note, shoulder_season_ranges, peak_season_ranges, amenity_details, extra_fees, refund_policy, recommended_sets")
         .eq("approval_status", "approved"),
       client.from("offerings")
-        .select("id, business_id, name, description, price, is_active, max_people, min_people, base_people, extra_person_fee, unit, category, image_url, image_urls, sort_order, feature_summary, amenity_details, detail_sections, origin, nutrition_info, is_alcohol, stock_quantity")
+        .select("id, business_id, name, description, price, is_active, max_people, min_people, base_people, extra_person_fee, unit, category, image_url, image_urls, sort_order, feature_summary, amenity_details, detail_sections, origin, nutrition_info, is_alcohol, stock_quantity, offseason_weekday_price, offseason_weekend_price, shoulder_weekday_price, shoulder_weekend_price, peak_weekday_price, peak_weekend_price, bathroom_count, bathroom_gender_separated, bathroom_note")
         .eq("is_active", true)
         .order("sort_order"),
     ]);

@@ -305,6 +305,10 @@ async function markRefundResult(intent, payment, refundStatus) {
     { method: "PATCH", body: JSON.stringify(payload) },
   );
 
+  // Extra-charge refunds are tracked on the payment intent itself. They must
+  // never be written to reservations using the extra-charge request UUID.
+  if (intent.kind === "extra_charge") return;
+
   const table = intent.kind === "market" ? "market_orders" : "reservations";
   await supabaseRequest(
     `/rest/v1/${table}?id=eq.${encodeURIComponent(intent.transaction_id)}`,
