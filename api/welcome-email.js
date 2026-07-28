@@ -9,7 +9,6 @@ module.exports = async function handler(req, res) {
     const supabaseUrl = required("SUPABASE_URL");
     const anonKey = required("SUPABASE_PUBLISHABLE_KEY");
     const serviceKey = required("SUPABASE_SERVICE_ROLE_KEY");
-    const resendKey = required("RESEND_API_KEY");
     const authorization = String(req.headers.authorization || "");
     if (!authorization.startsWith("Bearer ")) return json(res, 401, { ok: false, message: "로그인이 필요합니다." });
 
@@ -20,6 +19,16 @@ module.exports = async function handler(req, res) {
     const user = await userResponse.json().catch(() => null);
     if (!userResponse.ok || !user?.id || !user?.email || !user?.email_confirmed_at) {
       return json(res, 401, { ok: false, message: "이메일 인증이 완료된 계정만 이용할 수 있습니다." });
+    }
+
+    const resendKey = String(process.env.RESEND_API_KEY || "").trim();
+    if (!resendKey) {
+      console.warn("welcome-email skipped: RESEND_API_KEY is not configured");
+      return json(res, 200, {
+        ok: false,
+        skipped: true,
+        code: "EMAIL_PROVIDER_NOT_CONFIGURED",
+      });
     }
 
     const profileResponse = await fetch(`${supabaseUrl}/rest/v1/profiles?id=eq.${encodeURIComponent(user.id)}&select=welcome_email_sent_at&limit=1`, {
@@ -85,7 +94,12 @@ module.exports = async function handler(req, res) {
         body: JSON.stringify({ welcome_email_sent_at: null }),
       }).catch(() => {});
     }
-    return json(res, 500, { ok: false, message: error.message || "가입 완료 메일 발송에 실패했습니다." });
+    console.error("welcome-email failed", error);
+    return json(res, 502, {
+      ok: false,
+      code: "WELCOME_EMAIL_DELIVERY_FAILED",
+      message: "가입 완료 메일 발송에 실패했습니다.",
+    });
   }
 };
 
