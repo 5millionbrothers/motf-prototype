@@ -45,6 +45,14 @@ const DEFAULT_STAY_PEOPLE = 10;
 const LAUNCH_STAY_REGION = "가평";
 const STANDARD_REFUND_POLICY = ["이용 14일 전까지 전액 환불", "이용 7일 전까지 50% 환불", "이용 3일 전까지 20% 환불", "이후 및 당일 취소는 환불 불가"];
 
+function normalizeStayRegion(value = "", address = "") {
+  const region = String(value || "").trim();
+  const locationText = `${region} ${String(address || "")}`.replace(/\s+/g, " ").trim();
+  if (/가평|대성리/.test(locationText)) return LAUNCH_STAY_REGION;
+  return region || "지역 미정";
+}
+window.motfNormalizeStayRegion = normalizeStayRegion;
+
 let NAVER_MAP_KEY_ID = window.MOTF_CONFIG?.NAVER_MAP_KEY_ID?.trim() || "";
 const NAVER_MAP_SCRIPT_ID = "motf-naver-map-sdk";
 let naverMapPromise = null;
@@ -564,7 +572,10 @@ const state = {
 
 window.motfApplyCatalog = function applyCatalog(nextStays, nextStores, options = {}) {
   if (Array.isArray(nextStays)) {
-    stays = nextStays.map((stay) => ({ ...stay, region: stay.region || LAUNCH_STAY_REGION }));
+    stays = nextStays.map((stay) => ({
+      ...stay,
+      region: normalizeStayRegion(stay.region, stay.distance),
+    }));
     const regionSelect = qs("#stayRegion");
     if (regionSelect) {
       const regions = [...new Set([DEFAULT_STAY_REGION, ...stays.map((stay) => stay.region).filter(Boolean)])];
@@ -4621,7 +4632,7 @@ window.addEventListener("popstate", () => {
 
 (async function boot() {
   // DB 연결 전 데모 숙소도 1차 운영 지역인 가평 목록에 함께 표시합니다.
-  stays = stays.map((stay) => ({ ...stay, region: LAUNCH_STAY_REGION }));
+  stays = stays.map((stay) => ({ ...stay, region: normalizeStayRegion(stay.region, stay.distance) }));
   initializeStaySearchDefaults();
   try {
     await loadPaymentConfig();

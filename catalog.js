@@ -28,7 +28,8 @@
   };
 
   function regionOf(business) {
-    return text(business.region || business.address?.split(/[ ,]/).filter(Boolean)[0] || "지역 미정");
+    const rawRegion = business.region || business.address?.split(/[ ,]/).filter(Boolean)[0] || "지역 미정";
+    return text(window.motfNormalizeStayRegion?.(rawRegion, business.address) || rawRegion);
   }
 
   function locationOf(business) {
