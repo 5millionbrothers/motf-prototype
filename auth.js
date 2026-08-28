@@ -229,13 +229,20 @@
       ? document.querySelector("#identityResetEmail")?.value.trim()
       : document.querySelector("#customerSignupEmail")?.value.trim();
     if (purpose === "password_reset" && !email) throw new Error("가입한 이메일을 먼저 입력해주세요.");
-    const start = await apiJson("/api/identity-start", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ purpose, email, accountType: "user", returnUrl: window.location.href, mobile: window.innerWidth < 720 }),
-    });
     const popup = window.open("", "motf_identity", "width=430,height=640,toolbar=no,menubar=no,scrollbars=yes,resizable=yes");
     if (!popup) throw new Error("본인인증 팝업이 차단되었습니다. 브라우저에서 팝업을 허용해주세요.");
+    popup.document.write("<!doctype html><html lang='ko'><meta charset='utf-8'><title>본인인증 연결 중</title><body style='font-family:sans-serif;padding:32px;text-align:center'>본인인증 화면을 연결하고 있습니다.</body></html>");
+    let start;
+    try {
+      start = await apiJson("/api/identity-start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ purpose, email, accountType: "user", returnUrl: window.location.href, mobile: window.innerWidth < 720 }),
+      });
+    } catch (error) {
+      popup.close();
+      throw error;
+    }
     const form = document.createElement("form");
     form.method = "POST";
     form.action = start.callUrl;

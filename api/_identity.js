@@ -1,5 +1,6 @@
 const crypto = require("crypto");
 const { env, requireEnv, requestJson, supabaseRequest, authenticatedUser } = require("./_server");
+const { encryptJson, decryptJson } = require("./_kcp-crypto");
 
 const ALLOWED_ORIGINS = new Set([
   "https://motf.co.kr",
@@ -94,23 +95,60 @@ function safeReturnUrl(value, fallbackOrigin = "https://motf.co.kr") {
   }
 }
 
-async function kcpAdapter(path, body) {
-  requireEnv(["KCP_CERT_ADAPTER_URL", "KCP_CERT_ADAPTER_SECRET"]);
-  const base = env("KCP_CERT_ADAPTER_URL").replace(/\/$/, "");
-  const result = await requestJson(`${base}${path}`, {
+function kcpEndpoints() {
+  const production = env("KCP_CERT_ENV").toLowerCase() === "production";
+  const host = production ? "https://cert.kcp.co.kr" : "https://testcert.kcp.co.kr";
+  return {
+    register: `${host}/api/reg/certDataReg.do`,
+    result: `${host}/api/query/getCertData.do`,
+  };
+}
+
+async function kcpRegister({ orderId, returnUrl }) {
+  requireEnv(["KCP_CERT_SITE_CODE", "KCP_CERT_ENC_KEY"]);
+  const siteCode = env("KCP_CERT_SITE_CODE");
+  const requestData = {
+    site_cd: siteCode,
+    ordr_idxx: orderId,
+    Ret_URL: returnUrl,
+    web_siteid: env("KCP_CERT_WEB_SITE_ID"),
+    param_opt_1: "",
+    param_opt_2: "",
+    param_opt_3: "",
+  };
+  const encrypted = encryptJson(requestData, env("KCP_CERT_ENC_KEY"), siteCode);
+  const result = await requestJson(kcpEndpoints().register, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${env("KCP_CERT_ADAPTER_SECRET")}`,
       "Content-Type": "application/json",
+      site_cd: siteCode,
+      rv: encrypted.rv,
     },
-    body: JSON.stringify(body),
+    body: encrypted.enc_data,
   }, 15000);
-  if (!result.ok) {
-    const error = new Error(result.data?.message || "KCP 본인인증 서버 요청에 실패했습니다.");
-    error.statusCode = result.status;
+  if (!result.ok || result.data?.res_cd !== "0000") {
+    const error = new Error(result.data?.res_msg || result.data?.message || "KCP 본인인증 거래등록에 실패했습니다.");
+    error.statusCode = result.ok ? 502 : result.status;
     throw error;
   }
-  return result.data;
+  return { regCertKey: result.data.reg_cert_key, callUrl: result.data.call_url };
+}
+
+async function kcpResult({ regCertKey, orderId }) {
+  requireEnv(["KCP_CERT_SITE_CODE", "KCP_CERT_ENC_KEY"]);
+  const siteCode = env("KCP_CERT_SITE_CODE");
+  const result = await requestJson(kcpEndpoints().result, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", site_cd: siteCode },
+    body: JSON.stringify({ reg_cert_key: regCertKey, ordr_idxx: orderId }),
+  }, 15000);
+  if (!result.ok || result.data?.res_cd !== "0000") {
+    const error = new Error(result.data?.res_msg || result.data?.message || "KCP 본인인증 결과 조회에 실패했습니다.");
+    error.statusCode = result.ok ? 502 : result.status;
+    throw error;
+  }
+  if (!result.data?.enc_cert_data || !result.data?.rv) throw new Error("KCP 본인인증 결과가 비어 있습니다.");
+  return decryptJson(result.data.enc_cert_data, result.data.rv, env("KCP_CERT_ENC_KEY"), siteCode);
 }
 
 async function verifiedSession(identityToken, purpose) {
@@ -144,7 +182,8 @@ module.exports = {
   normalizeBirthDate,
   isAdult,
   safeReturnUrl,
-  kcpAdapter,
+  kcpRegister,
+  kcpResult,
   verifiedSession,
   consumeSession,
   authenticatedUser,

@@ -1,7 +1,7 @@
 const { json } = require("./_utils");
-const { env, supabaseRequest } = require("./_server");
+const { supabaseRequest } = require("./_server");
 const {
-  allowCors, readBody, sha256, randomToken, safeReturnUrl, kcpAdapter,
+  allowCors, readBody, sha256, randomToken, safeReturnUrl, kcpRegister,
 } = require("./_identity");
 
 const PURPOSES = new Set(["signup", "owner_signup", "password_reset", "profile_upgrade"]);
@@ -39,13 +39,9 @@ module.exports = async function handler(req, res) {
     const sessionId = inserted?.[0]?.id;
     if (!sessionId) throw new Error("본인인증 세션을 만들지 못했습니다.");
 
-    const registered = await kcpAdapter("/v1/kcp/cert/register", {
-      siteCode: env("KCP_CERT_SITE_CODE"),
-      webSiteId: env("KCP_CERT_WEB_SITE_ID") || undefined,
+    const registered = await kcpRegister({
       orderId,
       returnUrl: callbackUrl,
-      state: identityToken,
-      purpose,
     });
     if (!registered?.regCertKey || !registered?.callUrl) throw new Error("KCP 인증창 정보를 받지 못했습니다.");
 
