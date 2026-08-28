@@ -8,11 +8,10 @@ module.exports = async function handler(req, res) {
   return json(res, 200, {
     ok: true,
     service: "motf-prototype",
-    portonePatch: "readable-account-mypage-2026-06-29-1",
+    paymentProvider: "toss",
     paymentConfigured: Boolean(
-      process.env.PORTONE_STORE_ID &&
-      process.env.PORTONE_CHANNEL_KEY &&
-      process.env.PORTONE_API_SECRET,
+      process.env.TOSS_CLIENT_KEY &&
+      process.env.TOSS_SECRET_KEY,
     ),
   });
 };
