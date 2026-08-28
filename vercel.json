@@ -1,16 +1,25 @@
 {
   "cleanUrls": true,
   "functions": {
-    "api/confirm-payment.js": {
+    "api/toss-confirm.js": {
       "maxDuration": 30
     },
-    "api/portone-webhook.js": {
-      "maxDuration": 30
-    },
-    "api/portone-diagnostics.js": {
+    "api/toss-webhook.js": {
       "maxDuration": 30
     },
     "api/cancel-reservation.js": {
+      "maxDuration": 30
+    },
+    "api/identity-start.js": {
+      "maxDuration": 30
+    },
+    "api/identity-callback.js": {
+      "maxDuration": 30
+    },
+    "api/identity-signup.js": {
+      "maxDuration": 30
+    },
+    "api/identity-password-reset.js": {
       "maxDuration": 30
     },
     "api/notifications-dispatch.js": {
@@ -38,6 +47,14 @@
     },
     {
       "source": "/my-mt/:path*",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/events",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/events/:path*",
       "destination": "/index.html"
     },
     {

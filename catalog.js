@@ -73,6 +73,9 @@
     const shortIntro = text(business.short_description || String(business.description || "").slice(0, 140) || "단체 행사 이용이 가능한 제휴 숙소입니다.");
     return {
       id: business.id,
+      displayOrder: Number(business.display_order) || 100,
+      discoveryWeight: Math.max(0, Number(business.discovery_weight) || 100),
+      isFeatured: Boolean(business.is_featured),
       name: text(business.business_name),
       region: regionOf(business),
       price: Math.min(...rooms.map((room) => room.price)),
@@ -130,6 +133,9 @@
     }));
     return {
       id: business.id,
+      displayOrder: Number(business.display_order) || 100,
+      discoveryWeight: Math.max(0, Number(business.discovery_weight) || 100),
+      isFeatured: Boolean(business.is_featured),
       name: text(business.business_name),
       region: regionOf(business),
       type: "moTF 제휴 마트",
@@ -142,10 +148,29 @@
     };
   }
 
+  function stableDailyScore(id, weight) {
+    const seed = `${new Date().toISOString().slice(0, 10)}:${id}`;
+    let hash = 2166136261;
+    for (let index = 0; index < seed.length; index += 1) {
+      hash ^= seed.charCodeAt(index);
+      hash = Math.imul(hash, 16777619);
+    }
+    const random = ((hash >>> 0) + 1) / 4294967297;
+    return Math.pow(random, 1 / Math.max(1, Number(weight) || 1));
+  }
+
+  function rankCatalog(items) {
+    return [...items].sort((left, right) => {
+      if (left.isFeatured !== right.isFeatured) return left.isFeatured ? -1 : 1;
+      if (left.displayOrder !== right.displayOrder) return left.displayOrder - right.displayOrder;
+      return stableDailyScore(right.id, right.discoveryWeight) - stableDailyScore(left.id, left.discoveryWeight);
+    });
+  }
+
   (async () => {
     let [businessResult, offeringResult] = await Promise.all([
       client.from("businesses")
-        .select("id, business_type, business_name, address, description, short_description, highlight_summary, highlight_keys, region, cover_image_url, gallery_image_urls, facilities, approval_status, latitude, longitude, location_verified_at, station_distance_m, convenience_distance_m, nearby_tags, room_count, bath_count, shared_bathroom_count, shared_bathroom_gender_separated, shared_bathroom_note, shoulder_season_ranges, peak_season_ranges, amenity_details, extra_fees, refund_policy, recommended_sets")
+        .select("id, business_type, business_name, address, description, short_description, highlight_summary, highlight_keys, region, cover_image_url, gallery_image_urls, facilities, approval_status, latitude, longitude, location_verified_at, station_distance_m, convenience_distance_m, nearby_tags, room_count, bath_count, shared_bathroom_count, shared_bathroom_gender_separated, shared_bathroom_note, shoulder_season_ranges, peak_season_ranges, amenity_details, extra_fees, refund_policy, recommended_sets, is_featured, display_order, discovery_weight")
         .eq("approval_status", "approved"),
       client.from("offerings")
         .select("id, business_id, name, description, price, is_active, max_people, min_people, base_people, extra_person_fee, unit, category, image_url, image_urls, sort_order, feature_summary, amenity_details, detail_sections, origin, nutrition_info, is_alcohol, stock_quantity, offseason_weekday_price, offseason_weekend_price, shoulder_weekday_price, shoulder_weekend_price, peak_weekday_price, peak_weekend_price, bathroom_count, bathroom_gender_separated, bathroom_note")
@@ -175,13 +200,13 @@
 
     const businesses = businessResult.data || [];
     const offerings = offeringResult.data || [];
-    const stays = businesses
+    const stays = rankCatalog(businesses
       .filter((business) => business.business_type === "stay")
       .map((business) => buildStay(business, offerings.filter((item) => item.business_id === business.id)))
-      .filter((business) => business.rooms.length);
-    const stores = businesses
+      .filter((business) => business.rooms.length));
+    const stores = rankCatalog(businesses
       .filter((business) => business.business_type === "market")
-      .map((business) => buildStore(business, offerings.filter((item) => item.business_id === business.id)));
+      .map((business) => buildStore(business, offerings.filter((item) => item.business_id === business.id))));
 
     window.motfApplyCatalog(stays, stores);
   })();

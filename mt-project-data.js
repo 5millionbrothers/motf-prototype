@@ -64,7 +64,6 @@
     }
     const { data: projects, error } = await client.from("mt_projects")
       .select(projectFields)
-      .eq("owner_id", currentUser.id)
       .order("starts_on", { ascending: false });
     if (error) throw error;
     const projectIds = (projects || []).map((project) => project.id);
@@ -77,7 +76,7 @@
       if (itemError) throw itemError;
       items = data || [];
     }
-    const hydrated = (projects || []).map((project) => ({ ...project, items: items.filter((item) => item.project_id === project.id) }));
+    const hydrated = (projects || []).map((project) => ({ ...project, is_owner: project.owner_id === currentUser.id, items: items.filter((item) => item.project_id === project.id) }));
     window.motfApplyMtProjects?.(hydrated);
     return hydrated;
   }
@@ -87,11 +86,10 @@
     const { data: project, error } = await client.from("mt_projects")
       .select(projectFields)
       .eq("id", projectId)
-      .eq("owner_id", currentUser.id)
       .single();
     if (error) throw error;
     const [children, candidates] = await Promise.all([projectChildren(project.id), candidateDetails(project.id)]);
-    currentProject = { ...project, ...children };
+    currentProject = { ...project, ...children, is_owner: project.owner_id === currentUser.id };
     window.motfApplyMtProject(currentProject, candidates);
     return currentProject;
   };
@@ -113,8 +111,24 @@
   function ensureProject() {
     requireUser();
     if (!currentProject) throw new Error("내 MT에서 여행을 먼저 선택하거나 새로 만들어주세요.");
+    if (currentProject.owner_id !== currentUser.id) throw new Error("초대받은 MT는 보기만 할 수 있습니다.");
     return currentProject;
   }
+
+  window.motfCreateMtInvite = async function createMtInvite() {
+    const project = ensureProject();
+    const { data, error } = await client.rpc("create_mt_project_invite", { target_project_id: project.id, valid_days: 7 });
+    if (error) throw error;
+    return data;
+  };
+
+  window.motfAcceptMtInvite = async function acceptMtInvite(code) {
+    requireUser();
+    const { data, error } = await client.rpc("accept_mt_project_invite", { target_code: String(code || "").trim() });
+    if (error) throw error;
+    await loadProjects();
+    return data;
+  };
 
   window.motfSaveMtProject = async function saveMtProject(payload) {
     const project = ensureProject();
@@ -270,7 +284,23 @@
     return data;
   };
 
-  loadProjects().catch((error) => console.warn("MT 목록을 불러오지 못했습니다.", error));
+  async function initializeProjects() {
+    await loadProjects();
+    const params = new URLSearchParams(location.search);
+    const inviteCode = params.get("invite") || window.sessionStorage.getItem("motf.pendingMtInvite");
+    if (!inviteCode || !currentUser) return;
+    try {
+      await window.motfAcceptMtInvite(inviteCode);
+      window.sessionStorage.removeItem("motf.pendingMtInvite");
+      params.delete("invite");
+      history.replaceState(history.state, "", `${location.pathname}${params.toString() ? `?${params}` : ""}`);
+    } catch (error) {
+      window.sessionStorage.removeItem("motf.pendingMtInvite");
+      console.warn("MT 초대 참여 실패", error);
+    }
+  }
+
+  initializeProjects().catch((error) => console.warn("MT 목록을 불러오지 못했습니다.", error));
   client.auth.onAuthStateChange((_event, session) => {
     if (session?.user?.id !== currentUser?.id) loadProjects().catch(console.warn);
   });

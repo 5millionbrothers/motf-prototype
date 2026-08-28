@@ -18,19 +18,9 @@
     refunded: "환불 완료",
     failed: "환불 확인 필요",
   };
-  let extraChargeRows = [];
   function displayStatus(item) {
     if (item.refund_status && item.refund_status !== "none") return refundText[item.refund_status] || statusText[item.status] || item.status;
     return statusText[item.status] || item.status;
-  }
-  function localIssuedPayments(userId) {
-    try {
-      if (!userId) return [];
-      return JSON.parse(window.localStorage.getItem("motf.localIssuedPayments") || "[]")
-        .filter((item) => item.userId && item.userId === userId);
-    } catch {
-      return [];
-    }
   }
   function isFutureDate(value) {
     if (!value) return true;
@@ -84,34 +74,33 @@
       window.motfApplyMyTransactions?.([], []);
       return;
     }
-    const [reservationResult, orderResult, intentResult, extraChargeResult, refundAccountResult] = await Promise.all([
+    const [reservationResult, orderResult, intentResult, pointResult] = await Promise.all([
       client.from("reservations")
-        .select("id, business_id, event_date, check_out_date, guest_count, offering_name, total_amount, base_accommodation_amount, extra_charges_total, status, refund_status, refund_amount, businesses(business_name)")
+        .select("id, business_id, event_date, check_out_date, guest_count, offering_name, total_amount, original_amount, customer_paid_amount, points_used, coupon_discount, base_accommodation_amount, status, refund_status, refund_amount, businesses(business_name)")
         .eq("customer_id", userId)
         .order("created_at", { ascending: false }),
       client.from("market_orders")
-        .select("id, business_id, pickup_time, total_amount, status, refund_status, refund_amount, businesses(business_name), market_order_items(id)")
+        .select("id, business_id, pickup_time, total_amount, original_amount, customer_paid_amount, points_used, coupon_discount, status, refund_status, refund_amount, businesses(business_name), market_order_items(id)")
         .eq("customer_id", userId)
         .order("created_at", { ascending: false }),
       client.from("payment_intents")
-        .select("order_id, kind, amount, order_name, status, virtual_account, virtual_account_issued_at, created_at, expires_at, extra_charge_request_id")
+        .select("order_id, kind, amount, original_amount, points_used, coupon_discount, order_name, status, payment_method, virtual_account, virtual_account_issued_at, created_at, expires_at, extra_charge_request_id")
         .eq("customer_id", userId)
-        .eq("status", "virtual_account_issued")
+        .in("status", ["virtual_account_issued", "waiting_for_deposit"])
         .order("created_at", { ascending: false }),
-      client.from("reservation_extra_charge_requests")
-        .select("id, reservation_id, business_id, items, total_amount, status, due_at, paid_at, created_at, reservations(customer_name, offering_name, event_date, check_out_date, guest_count), businesses(business_name)")
-        .eq("customer_id", userId)
-        .order("created_at", { ascending: false }),
-      client.from("customer_refund_accounts")
-        .select("bank, account_number, holder_name, phone")
+      client.from("point_accounts")
+        .select("balance")
         .eq("user_id", userId)
         .maybeSingle(),
     ]);
-    if (reservationResult.error || orderResult.error || intentResult.error || extraChargeResult.error) {
-      console.error(reservationResult.error || orderResult.error || intentResult.error || extraChargeResult.error);
+    if (reservationResult.error || orderResult.error || intentResult.error) {
+      console.error(reservationResult.error || orderResult.error || intentResult.error);
       return;
     }
-    if (!refundAccountResult.error && refundAccountResult.data) window.motfApplyRefundAccount?.(refundAccountResult.data);
+    const pointBalance = pointResult.error ? 0 : Number(pointResult.data?.balance || 0);
+    window.motfPointBalance = pointBalance;
+    document.querySelectorAll("[data-point-balance]").forEach((node) => { node.textContent = `${pointBalance.toLocaleString("ko-KR")}P`; });
+    document.querySelectorAll("#bookingPoints, #marketPoints").forEach((input) => { input.max = String(pointBalance); });
     const reservations = (reservationResult.data || []).map((item) => ({
       id: item.id,
       businessId: item.business_id,
@@ -120,9 +109,11 @@
       date: item.event_date,
       checkOutDate: item.check_out_date || "",
       people: item.guest_count,
-      amount: item.total_amount,
+      amount: item.original_amount || item.total_amount,
+      paidAmount: item.customer_paid_amount,
+      pointsUsed: item.points_used,
+      couponDiscount: item.coupon_discount,
       baseAmount: item.base_accommodation_amount,
-      extraChargesTotal: item.extra_charges_total,
       status: displayStatus(item),
       rawStatus: item.status,
       refundAmount: item.refund_amount,
@@ -132,7 +123,10 @@
       businessId: item.business_id,
       storeName: item.businesses?.business_name || "마트",
       pickupTime: String(item.pickup_time || "").slice(0, 5),
-      amount: item.total_amount,
+      amount: item.original_amount || item.total_amount,
+      paidAmount: item.customer_paid_amount,
+      pointsUsed: item.points_used,
+      couponDiscount: item.coupon_discount,
       status: displayStatus(item),
       rawStatus: item.status,
       refundAmount: item.refund_amount,
@@ -167,61 +161,6 @@
         });
       }
     });
-    localIssuedPayments(userId)
-      .filter((item) => !reservations.some((reservation) => reservation.id === item.orderId) && !orders.some((order) => order.id === item.orderId))
-      .filter((item) => isFutureDate(pendingAccountExpiresAt(item)))
-      .forEach((item) => {
-        const pendingItem = {
-          id: item.orderId,
-          amount: item.amount,
-          status: "입금 전",
-          virtualAccount: item.virtualAccount,
-          expiresAt: pendingAccountExpiresAt(item),
-          isPendingVirtualAccount: true,
-        };
-        if (item.type === "stay" || item.type === "extra_charge") {
-          reservations.unshift({
-            ...pendingItem,
-            stayName: item.stayName || "예약 요청 숙소",
-            roomName: item.roomName || item.itemName,
-            date: item.date || String(item.issuedAt || "").slice(0, 10),
-            checkOutDate: item.checkOutDate || "",
-            people: item.people || "-",
-            isExtraCharge: item.type === "extra_charge",
-          });
-        } else {
-          orders.unshift({
-            ...pendingItem,
-            storeName: item.storeName || "마트 주문 요청",
-            pickupTime: item.pickupTime || String(item.issuedAt || "").slice(11, 16),
-            items: [{ id: item.orderId }],
-          });
-        }
-      });
-    extraChargeRows = extraChargeResult.data || [];
-    const pendingExtraRequestIds = new Set((intentResult.data || []).filter((item) => item.kind === "extra_charge").map((item) => item.extra_charge_request_id).filter(Boolean));
-    extraChargeRows.forEach((item) => {
-      if (pendingExtraRequestIds.has(item.id)) return;
-      const reservation = item.reservations || {};
-      const itemsLabel = (item.items || []).map((row) => `${row.label || "추가 이용금"} ${Number(row.quantity || 1)}개`).join(" · ");
-      reservations.push({
-        id: `extra-${item.id}`,
-        extraChargeId: item.id,
-        businessId: item.business_id,
-        stayName: item.businesses?.business_name || "숙소",
-        roomName: reservation.offering_name || "숙소 예약",
-        date: reservation.event_date || String(item.created_at || "").slice(0, 10),
-        checkOutDate: reservation.check_out_date || "",
-        people: reservation.guest_count || "-",
-        amount: item.total_amount,
-        status: ({ submitted:"운영팀 검토 중", approved:"추가금 결제 요청", payment_prepared:"결제 준비", payment_pending:"입금 대기", paid:"입금 완료", rejected:"검토 반려", cancelled:"취소", expired:"기한 만료" })[item.status] || item.status,
-        rawStatus: item.status,
-        isExtraCharge: true,
-        canPayExtraCharge: ["approved", "payment_prepared"].includes(item.status),
-        itemsLabel,
-        dueAt: item.due_at,
-      });
-    });
     window.motfApplyMyTransactions?.(reservations, orders);
   }
   window.motfReloadTransactions = loadMyTransactions;
@@ -241,17 +180,8 @@
       const originalHtml = submitButton?.innerHTML;
       if (submitButton) { submitButton.disabled = true; submitButton.textContent = "결제 금액 확인 중..."; }
       try {
-        const refundAccount = window.motfGetRefundAccountDraft?.();
-        if (!refundAccount?.bank || !refundAccount?.account_number || !refundAccount?.holder_name) {
-          throw new Error("자동 환불을 위한 은행·계좌번호·예금주를 입력해주세요.");
-        }
-        const { error: refundAccountError } = await client.from("customer_refund_accounts").upsert({
-          user_id: window.motfCurrentUserId,
-          ...refundAccount,
-          updated_at: new Date().toISOString(),
-        }, { onConflict: "user_id" });
-        if (refundAccountError) throw refundAccountError;
-        const { data, error } = await client.rpc("prepare_stay_payment", {
+        const requestedPoints = Math.max(0, Math.min(Number(document.querySelector("#bookingPoints")?.value || 0), Number(window.motfPointBalance || 0)));
+        const { data, error } = await client.rpc("prepare_stay_checkout", {
           target_business_id: draft.business_id,
           target_offering_id: draft.offering_id,
           customer_name: draft.customer_name,
@@ -262,6 +192,8 @@
           request_memo: draft.request_memo,
           check_in_date: draft.event_date,
           check_out_date: draft.check_out_date,
+          requested_points: requestedPoints,
+          coupon_code: document.querySelector("#bookingCouponCode")?.value.trim() || null,
         });
         if (error) throw error;
         const intent = Array.isArray(data) ? data[0] : data;
@@ -290,7 +222,8 @@
       const originalHtml = submitButton?.innerHTML;
       if (submitButton) { submitButton.disabled = true; submitButton.textContent = "결제 금액 확인 중..."; }
       try {
-        const { data, error } = await client.rpc("prepare_market_payment", {
+        const requestedPoints = Math.max(0, Math.min(Number(document.querySelector("#marketPoints")?.value || 0), Number(window.motfPointBalance || 0)));
+        const { data, error } = await client.rpc("prepare_market_checkout", {
           target_business_id: draft.business_id,
           customer_name: draft.customer_name,
           contact_phone: draft.contact_phone,
@@ -298,6 +231,8 @@
           pickup_time: draft.pickup_time,
           request_memo: draft.request_memo,
           items: draft.items,
+          requested_points: requestedPoints,
+          coupon_code: document.querySelector("#marketCouponCode")?.value.trim() || null,
         });
         if (error) throw error;
         const intent = Array.isArray(data) ? data[0] : data;
@@ -324,34 +259,6 @@
   }, true);
 
   document.addEventListener("click", async (event) => {
-    const extraButton = event.target.closest("[data-extra-charge-pay]");
-    if (extraButton) {
-      const requestId = extraButton.dataset.extraChargePay;
-      const request = extraChargeRows.find((item) => item.id === requestId);
-      if (!request) return alert("추가금 요청을 다시 불러온 뒤 시도해주세요.");
-      extraButton.disabled = true;
-      try {
-        const { data, error } = await client.rpc("prepare_extra_charge_payment", { target_request_id: requestId });
-        if (error) throw error;
-        const intent = Array.isArray(data) ? data[0] : data;
-        if (!intent) throw new Error("추가금 결제 정보를 만들지 못했습니다.");
-        const reservation = request.reservations || {};
-        window.motfStartPreparedPayment?.(intent, {
-          customer_name: reservation.customer_name || window.motfCurrentUserProfile?.full_name || "이용자",
-          contact_phone: window.motfCurrentUserProfile?.phone || "",
-          stay_name: request.businesses?.business_name || "숙소",
-          offering_name: reservation.offering_name || "숙소 예약",
-          event_date: reservation.event_date,
-          check_out_date: reservation.check_out_date,
-          guest_count: reservation.guest_count,
-          items_label: (request.items || []).map((item) => item.label).filter(Boolean).join(" · "),
-        });
-      } catch (error) {
-        alert(error.message || "추가금 결제를 준비하지 못했습니다.");
-      } finally { extraButton.disabled = false; }
-      return;
-    }
-
     const cancelButton = event.target.closest("[data-cancel-reservation]");
     if (!cancelButton) return;
     const reservationId = cancelButton.dataset.cancelReservation;
@@ -378,7 +285,11 @@
 
   client.auth.onAuthStateChange((event) => {
     if (event === "SIGNED_IN") window.setTimeout(loadMyTransactions, 0);
-    if (event === "SIGNED_OUT") window.motfApplyMyTransactions?.([], []);
+    if (event === "SIGNED_OUT") {
+      window.motfPointBalance = 0;
+      document.querySelectorAll("[data-point-balance]").forEach((node) => { node.textContent = "0P"; });
+      window.motfApplyMyTransactions?.([], []);
+    }
   });
   window.setTimeout(loadMyTransactions, 0);
 })();

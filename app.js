@@ -36,10 +36,9 @@ const escapeHtml = (value) => String(value ?? "").replace(/[&<>'"]/g, (character
 }[character]));
 window.motfEscapeHtml = escapeHtml;
 
-let PORTONE_STORE_ID = window.MOTF_CONFIG?.PORTONE_STORE_ID?.trim() || "";
-let PORTONE_CHANNEL_KEY = window.MOTF_CONFIG?.PORTONE_CHANNEL_KEY?.trim() || "";
-const PORTONE_PENDING_PAYMENT_KEY = "motf.pendingPayment";
-const PORTONE_LOCAL_ISSUED_KEY = "motf.localIssuedPayments";
+let TOSS_CLIENT_KEY = window.MOTF_CONFIG?.TOSS_CLIENT_KEY?.trim() || "";
+let TOSS_ENABLED_METHODS = ["CARD", "TRANSFER"];
+const PENDING_PAYMENT_STORAGE_KEY = "motf.pendingPayment";
 const DEFAULT_STAY_REGION = "가평";
 const DEFAULT_STAY_PEOPLE = 10;
 const LAUNCH_STAY_REGION = "가평";
@@ -392,6 +391,7 @@ const state = {
   staysPerPage: 5,
   mtProjects: [],
   mtProjectMode: "list",
+  mtDirectoryFilter: "mine",
   mtCandidates: ["station", "river", "pine"],
   mtCandidateRecords: stays.filter((stay) => ["station", "river", "pine"].includes(String(stay.id))),
   mtProject: {
@@ -452,6 +452,11 @@ const state = {
     unavailableOfferingIds: new Set(),
   },
   publicStayCalendar: { businessId: "", blocks: [], loading: false },
+  platformEvents: [],
+  homepageCards: [],
+  eventFilter: "all",
+  selectedEvent: null,
+  gallery: { images: [], index: 0, alt: "" },
   pendingMtCandidateId: "",
   selectedUsageIds: new Set(),
 };
@@ -510,6 +515,15 @@ window.motfGetReservationDraft = function getReservationDraft() {
   };
 };
 
+window.motfApplyLaunchContent = function applyLaunchContent(events = [], cards = [], social = {}) {
+  state.platformEvents = Array.isArray(events) ? events : [];
+  state.homepageCards = Array.isArray(cards) ? cards : [];
+  const instagram = qs("[data-social-instagram]");
+  if (instagram) instagram.dataset.url = social.instagram_url || "";
+  if (currentRoute() === "home") renderHome();
+  if (currentRoute() === "events") renderEvents();
+};
+
 window.motfGetRefundAccountDraft = function getRefundAccountDraft() {
   return {
     bank: qs("#bookingRefundBank")?.value || "",
@@ -551,11 +565,17 @@ window.motfStartPreparedPayment = function startPreparedPayment(intent, draft) {
   const isStay = type === "stay";
   const isExtraCharge = type === "extra_charge";
   const amount = Number(intent.amount);
+  const originalAmount = Number(intent.original_amount || intent.amount);
+  const pointsUsed = Number(intent.points_used || 0);
+  const couponDiscount = Number(intent.coupon_discount || 0);
   state.pendingPayment = {
     type,
     title: isStay ? "숙소 예약" : isExtraCharge ? "숙소 추가 이용금" : "MT 장보기 주문",
     itemName: intent.order_name,
     amount,
+    originalAmount,
+    pointsUsed,
+    couponDiscount,
     orderId: intent.order_id,
     userId: window.motfCurrentUserId || "",
     customerName: draft.customer_name || window.motfCurrentUserProfile?.full_name || "이용자",
@@ -572,7 +592,9 @@ window.motfStartPreparedPayment = function startPreparedPayment(intent, draft) {
     lines: [
       ...(isStay ? [["숙박일", `${draft.event_date} ~ ${draft.check_out_date}`]] : []),
       ...(isExtraCharge ? [["연결 예약", draft.offering_name || "숙소 예약"], ["추가 이용 항목", draft.items_label || "추가 이용금"]] : []),
-      [isStay ? "기본 숙박비" : isExtraCharge ? "추가 이용금" : "상품 결제 금액", amount],
+      [isStay ? "객실 기본금" : isExtraCharge ? "추가 이용금" : "상품 금액", originalAmount],
+      ...(couponDiscount ? [["할인코드", -couponDiscount]] : []),
+      ...(pointsUsed ? [["포인트 사용", -pointsUsed]] : []),
     ],
   };
   savePendingPayment(state.pendingPayment);
@@ -644,6 +666,7 @@ window.motfClearUserScopedState = function clearUserScopedState() {
 
 const routeParents = {
   home: "home",
+  eventDetail: "events",
   stayDetail: "stays",
   roomDetail: "stays",
   booking: "stays",
@@ -670,6 +693,8 @@ const routeParents = {
 
 const appRoutes = new Set([
   "home",
+  "events",
+  "eventDetail",
   "myMt",
   "stays",
   "stayDetail",
@@ -702,6 +727,8 @@ const appRoutes = new Set([
 
 const routePaths = {
   home: "/",
+  events: "/events",
+  eventDetail: "/events/detail",
   myMt: "/my-mt",
   stays: "/stays",
   stayDetail: "/stays/detail",
@@ -781,6 +808,11 @@ function routeUrl(route) {
   return `${window.location.origin}${path}`;
 }
 
+function preservePendingMtInvite() {
+  const inviteCode = new URLSearchParams(window.location.search).get("invite");
+  if (inviteCode) window.sessionStorage.setItem("motf.pendingMtInvite", inviteCode.trim().toUpperCase());
+}
+
 function updateBrowserRoute(route, options = {}) {
   if (options.updateHistory === false) return;
   const method = options.replace ? "replaceState" : "pushState";
@@ -826,6 +858,8 @@ function goBack(fallbackRoute = "home") {
 
 function renderRoute(route) {
   if (route === "home") renderHome();
+  if (route === "events") renderEvents();
+  if (route === "eventDetail") renderEventDetail();
   if (route === "myMt") renderMyMt();
   if (route === "stays") renderStays();
   if (route === "stayDetail") renderStayDetail();
@@ -891,9 +925,85 @@ const marketBundleImages = [
 
 function renderHome() {
   renderHomePicks();
+  renderHomeEvents();
+  renderHomeCardNews();
   renderHomeMarketPicks();
   renderHomeStories();
   syncStaySearchPanel(qs("#home") || document);
+}
+
+function effectiveEventStatus(event) {
+  const now = Date.now();
+  const starts = new Date(event.starts_at).getTime();
+  const opens = new Date(event.application_opens_at).getTime();
+  const closes = new Date(event.application_closes_at).getTime();
+  if (["draft", "cancelled", "completed"].includes(event.status)) return event.status;
+  if (Number.isFinite(starts) && now >= new Date(event.ends_at).getTime()) return "completed";
+  if (event.status === "closed" || now >= closes || Number(event.application_count) >= Number(event.capacity)) return "closed";
+  if (now >= opens) return "open";
+  return "scheduled";
+}
+
+function eventStatusLabel(status) {
+  return { open: "신청 중", scheduled: "곧 신청", closed: "신청 마감", completed: "진행 종료", cancelled: "취소" }[status] || "준비 중";
+}
+
+function formatEventDate(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "일정 확인 중";
+  return new Intl.DateTimeFormat("ko-KR", { month: "long", day: "numeric", weekday: "short", hour: "2-digit", minute: "2-digit" }).format(date);
+}
+
+function eventCard(event, featured = false) {
+  const status = effectiveEventStatus(event);
+  return `<button class="platform-event-card ${featured ? "featured" : ""}" type="button" data-event-id="${event.id}">
+    <span class="platform-event-media"><img src="${event.poster_url}" alt="${escapeHtml(event.title)} 포스터" /><b class="event-status ${status}">${eventStatusLabel(status)}</b></span>
+    <span class="platform-event-body"><small>${formatEventDate(event.starts_at)} · ${escapeHtml(event.venue_name || "장소 공개 예정")}</small><strong>${escapeHtml(event.title)}</strong><span>${escapeHtml(event.short_description)}</span><span class="event-meta"><b>${money(event.price_per_person)} / 1인</b><b>${Number(event.application_count || 0).toLocaleString()} / ${Number(event.capacity).toLocaleString()}명</b></span></span>
+  </button>`;
+}
+
+function renderHomeEvents() {
+  const container = qs("#homeEventPicks");
+  if (!container) return;
+  const visible = state.platformEvents.filter((event) => !["draft", "cancelled"].includes(event.status)).slice(0, 3);
+  container.innerHTML = visible.length
+    ? visible.map((event, index) => eventCard(event, index === 0)).join("")
+    : `<div class="empty-state compact"><strong>첫 모티프 MT를 준비하고 있어요.</strong><span>신청 일정이 정해지면 가장 먼저 공개할게요.</span></div>`;
+  refreshIcons();
+}
+
+function renderHomeCardNews() {
+  const section = qs(".home-card-news");
+  const container = qs("#homeCardNews");
+  if (!section || !container) return;
+  section.hidden = !state.homepageCards.length;
+  container.innerHTML = state.homepageCards.map((card) => `<a class="home-news-card" href="${escapeHtml(card.link_url || "#")}" ${card.link_url ? 'target="_blank" rel="noopener noreferrer"' : ""}><img src="${card.image_url}" alt="" /><span><small>${escapeHtml(card.placement === "promotion" ? "프로모션" : "CARD NEWS")}</small><strong>${escapeHtml(card.title)}</strong><b>${escapeHtml(card.subtitle || card.link_label || "자세히 보기")}</b></span></a>`).join("");
+}
+
+function renderEvents() {
+  const container = qs("#eventDirectory");
+  if (!container) return;
+  const filtered = state.platformEvents.filter((event) => {
+    const status = effectiveEventStatus(event);
+    return !["draft", "cancelled"].includes(status) && (state.eventFilter === "all" || status === state.eventFilter);
+  });
+  container.innerHTML = filtered.length ? filtered.map((event) => eventCard(event, event.is_featured)).join("") : `<div class="empty-state"><strong>해당 상태의 이벤트가 없습니다.</strong><span>새 일정은 운영팀이 확정하는 즉시 공개됩니다.</span></div>`;
+  refreshIcons();
+}
+
+function renderEventDetail() {
+  const event = state.selectedEvent;
+  const container = qs("#eventDetailContent");
+  if (!container) return;
+  if (!event) { container.innerHTML = '<div class="empty-state">이벤트를 찾을 수 없습니다.</div>'; return; }
+  const status = effectiveEventStatus(event);
+  const canApply = status === "open" && event.google_form_url;
+  const timeline = Array.isArray(event.timeline) ? event.timeline : [];
+  const highlights = Array.isArray(event.highlights) ? event.highlights : [];
+  container.innerHTML = `<article class="event-detail-hero"><img src="${event.poster_url}" alt="${escapeHtml(event.title)} 포스터" /><div><span class="event-status ${status}">${eventStatusLabel(status)}</span><p class="eyebrow">moTF ORIGINAL</p><h1>${escapeHtml(event.title)}</h1><p>${escapeHtml(event.description || event.short_description)}</p><dl><div><dt>일정</dt><dd>${formatEventDate(event.starts_at)}</dd></div><div><dt>장소</dt><dd>${escapeHtml(event.venue_name || "공개 예정")}</dd></div><div><dt>참가비</dt><dd>${money(event.price_per_person)} / 1인</dd></div><div><dt>정원</dt><dd>${event.application_count || 0} / ${event.capacity}명</dd></div></dl>${canApply ? `<a class="primary-btn event-apply-button" href="${escapeHtml(event.google_form_url)}" target="_blank" rel="noopener noreferrer"><i data-lucide="external-link"></i>신청서 작성</a>` : `<button class="primary-btn event-apply-button" disabled>${status === "scheduled" ? `${formatEventDate(event.application_opens_at)} 오픈` : eventStatusLabel(status)}</button>`}</div></article>
+    ${highlights.length ? `<section class="event-detail-section"><p class="eyebrow">HIGHLIGHT</p><h2>이번 MT에서 만날 것들</h2><div class="event-highlight-list">${highlights.map((item) => `<span>${escapeHtml(item)}</span>`).join("")}</div></section>` : ""}
+    ${timeline.length ? `<section class="event-detail-section"><p class="eyebrow">TIMELINE</p><h2>진행 일정</h2><ol class="event-timeline">${timeline.map((item) => `<li><time>${escapeHtml(item.time || "")}</time><div><strong>${escapeHtml(item.title || "")}</strong><span>${escapeHtml(item.description || "")}</span></div></li>`).join("")}</ol></section>` : ""}`;
+  refreshIcons();
 }
 
 function renderHomePicks() {
@@ -1321,22 +1431,14 @@ function stayGalleryImages(stay) {
   return uniqueImages([
     stay.image,
     ...stay.images,
-    ...stay.rooms.flatMap((room) => room.images?.length ? room.images : [room.image]),
-    photo("photo-1600566753190-17f0baa2a6c3"),
-    photo("photo-1596394516093-501ba68a0ba6"),
-    photo("photo-1523217582562-09d0def993a6"),
-  ]).slice(0, 9);
+  ]);
 }
 
-function roomGalleryImages(stay, room) {
+function roomGalleryImages(_stay, room) {
   return uniqueImages([
     room.image,
     ...(room.images || []),
-    ...stay.images,
-    ...stay.rooms.flatMap((item) => item.images?.length ? item.images : [item.image]),
-    photo("photo-1600607688969-a5bfcd646154"),
-    photo("photo-1493809842364-78817add7ffb"),
-  ]).slice(0, 8);
+  ]);
 }
 
 function dashList(items) {
@@ -1425,15 +1527,13 @@ function roomDetailFacts(stay, room) {
 }
 
 function renderStayGallery(images, alt) {
+  const visible = images.slice(0, 5);
   return `
     <div class="stay-photo-layout">
-      <img class="stay-main-photo" src="${images[0]}" alt="${alt} 대표 사진" />
+      <button class="stay-main-photo" type="button" data-open-gallery="0"><img src="${visible[0]}" alt="${alt} 대표 사진" /></button>
       <div class="stay-side-photos">
-        ${images.slice(1, 5).map((src) => `<img src="${src}" alt="${alt} 추가 사진" />`).join("")}
+        ${visible.slice(1).map((src, index) => `<button type="button" data-open-gallery="${index + 1}"><img src="${src}" alt="${alt} 추가 사진 ${index + 1}" />${index === visible.length - 2 && images.length > 5 ? `<b>+${images.length - 5}</b>` : ""}</button>`).join("")}
       </div>
-    </div>
-    <div class="photo-strip" aria-label="추가 사진">
-      ${images.slice(1).map((src, index) => `<img src="${src}" alt="${alt} 추가 사진 ${index + 1}" />`).join("")}
     </div>
   `;
 }
@@ -1472,6 +1572,7 @@ function renderStayDetail() {
   ensureStayAvailability();
   const stay = state.selectedStay;
   const gallery = stayGalleryImages(stay);
+  state.gallery = { images: gallery, index: 0, alt: stay.name };
   const insight = stayReviewInsight(stay);
   qs("#stayDetailContent").innerHTML = `
     <section class="stay-detail-top">
@@ -1495,6 +1596,12 @@ function renderStayDetail() {
 
     <section class="stay-gallery-section">
       ${renderStayGallery(gallery, stay.name)}
+    </section>
+
+    <section class="stay-facility-showcase">
+      <div class="section-toolbar"><div><p class="eyebrow">FACILITIES</p><h2>단체 이용 시설</h2><span>강당·바베큐장 등은 일별 수용 인원이 달라 예약 전 확인이 필요합니다.</span></div><button class="secondary-btn" data-open-chat="${stay.name}"><i data-lucide="message-circle"></i>이용 가능 여부 문의</button></div>
+      ${amenityChecklist(stay)}
+      <p class="facility-onsite-note"><i data-lucide="info"></i>예약 시에는 객실 기본금만 결제하며, 추가 인원과 부대시설 요금은 현장에서 사장님에게 직접 결제합니다.</p>
     </section>
 
     ${insight ? `<section class="stay-review-insight"><i data-lucide="users-round"></i><div><small>실제 이용팀 리뷰 기준</small><strong>등록 정원은 최대 ${stay.maxPeople}명이지만, 쾌적 인원은 ${insight.min}~${insight.max}명입니다.</strong><span>${insight.count}개 검증 후기에서 계산한 MT 전용 정보입니다.</span></div></section>` : ""}
@@ -1524,7 +1631,7 @@ function renderStayDetail() {
     <div class="detail-sections detail-sections-bottom">
       <section class="info-panel">
         <h2>편의시설</h2>
-        ${amenityChecklist(stay)}
+        <p>상단 단체 이용 시설에서 제공 여부와 세부 조건을 확인해주세요.</p>
       </section>
       <section class="info-panel">
         <h2>추가요금</h2>
@@ -1611,6 +1718,7 @@ function renderRoomDetail() {
   const room = state.selectedRoom;
   const unavailable = isRoomUnavailable(room);
   const gallery = roomGalleryImages(stay, room);
+  state.gallery = { images: gallery, index: 0, alt: `${stay.name} ${room.name}` };
   const maxPeople = roomCapacityMax(room);
   const selectedBasePrice = bookingBaseRoomFee(stay, room);
   qs("#roomDetailContent").innerHTML = `
@@ -1730,10 +1838,10 @@ function renderBooking() {
       <div class="summary-line"><span>숙박일</span><strong>${stayDateRangeLabel().replace("숙박일 ", "")}</strong></div>
       <div class="summary-line"><span>예약 인원</span><strong>${qs("#bookingPeople").value}명</strong></div>
       <div class="summary-line"><span>기본 숙박비</span><strong>${money(amount.roomFee)}</strong></div>
-      ${amount.extraPeople ? `<div class="summary-line"><span>추가 인원 ${amount.extraPeople}명</span><strong>현장 확정 후 별도결제</strong></div>` : ""}
-      <div class="summary-line"><span>부대시설 이용금</span><strong>현장 확정 후 별도결제</strong></div>
+      ${amount.extraPeople ? `<div class="summary-line"><span>추가 인원 ${amount.extraPeople}명</span><strong>숙소 현장 결제</strong></div>` : ""}
+      <div class="summary-line"><span>부대시설 이용금</span><strong>숙소 현장 결제</strong></div>
       ${unavailable ? `<div class="summary-line"><span>예약 가능 여부</span><strong>선택 날짜 품절</strong></div>` : ""}
-      <div class="separate-charge-note"><i data-lucide="info"></i><span>지금은 객실 기본 숙박비만 결제합니다. 추가인원·바베큐 등은 이용 내역이 확정되면 사장님 요청과 운영팀 검토 후 별도 결제 안내가 발송됩니다.</span></div>
+      <div class="separate-charge-note"><i data-lucide="info"></i><span>모티프에서는 객실 기본금만 결제합니다. 추가 인원과 바베큐 등 부대시설 요금은 이용 당일 숙소에 직접 결제해주세요.</span></div>
       <div class="summary-line total"><span>지금 결제할 금액</span><strong>${money(amount.total)}</strong></div>
     `;
     const submitButton = qs('#bookingForm [type="submit"]');
@@ -2325,7 +2433,11 @@ function mtProjectList() {
 
 function renderMtDirectory() {
   const cards = qs("#mtProjectCards");
-  const projects = mtProjectList();
+  const projects = mtProjectList().filter((project) => {
+    if (state.mtDirectoryFilter === "completed") return project.status === "completed";
+    if (state.mtDirectoryFilter === "invited") return project.status !== "completed" && project.is_owner === false;
+    return project.status !== "completed" && project.is_owner !== false;
+  });
   if (!cards) return;
   cards.innerHTML = projects.length ? projects.map((project) => {
     const budget = Number(project.estimated_budget || 0);
@@ -2334,20 +2446,24 @@ function renderMtDirectory() {
     const progress = budget > 0 ? Math.min(100, Math.round(spent / budget * 100)) : 0;
     return `<button class="mt-project-card ${project.status === "completed" ? "completed" : ""}" type="button" data-open-mt-project="${project.id || "demo"}">
       <span class="mt-project-card-icon"><i data-lucide="folder-kanban"></i></span>
-      <span class="mt-project-card-copy"><small>${project.status === "completed" ? "완료된 MT" : escapeHtml(project.organization_name || "단체 여행")}</small><strong>${escapeHtml(project.title || "이름 없는 MT")}</strong><span>${formatMtDate(project.starts_on)}~${formatMtDate(project.ends_on)} · ${Number(project.guest_count || 0)}명 · ${escapeHtml(project.region || "지역 미정")}</span></span>
+      <span class="mt-project-card-copy"><small>${project.status === "completed" ? "완료된 MT" : project.is_owner === false ? "초대받은 MT · 보기 전용" : escapeHtml(project.organization_name || "단체 여행")}</small><strong>${escapeHtml(project.title || "이름 없는 MT")}</strong><span>${formatMtDate(project.starts_on)}~${formatMtDate(project.ends_on)} · ${Number(project.guest_count || 0)}명 · ${escapeHtml(project.region || "지역 미정")}</span></span>
       <span class="mt-project-card-budget"><small>예산 사용</small><strong>${money(spent)}</strong><span>${budget ? `${progress}% · ${remaining >= 0 ? `${money(remaining)} 남음` : `${money(Math.abs(remaining))} 초과`}` : "총예산 미설정"}</span></span>
       <i data-lucide="chevron-right"></i>
     </button>`;
-  }).join("") : `<div class="mt-directory-empty"><i data-lucide="folder-plus"></i><h2>아직 만든 MT가 없습니다</h2><p>새 MT를 만들고 숙소와 장보기 후보를 모아보세요.</p><button class="primary-btn" type="button" data-create-mt-project><i data-lucide="plus"></i>첫 MT 만들기</button></div>`;
+  }).join("") : `<div class="mt-directory-empty"><i data-lucide="folder-plus"></i><h2>${state.mtDirectoryFilter === "invited" ? "초대받은 MT가 없습니다" : state.mtDirectoryFilter === "completed" ? "종료된 MT가 없습니다" : "아직 만든 MT가 없습니다"}</h2><p>${state.mtDirectoryFilter === "mine" ? "새 MT를 만들고 숙소와 장보기 후보를 모아보세요." : "해당하는 여행이 생기면 이곳에 구분해 보여드려요."}</p>${state.mtDirectoryFilter === "mine" ? '<button class="primary-btn" type="button" data-create-mt-project><i data-lucide="plus"></i>첫 MT 만들기</button>' : ""}</div>`;
 }
 
 function renderMtProjectSummary() {
   const project = state.mtProject;
+  const readOnly = project.is_owner === false;
   const people = mtProjectPeople();
   const title = qs("#mtProjectTitle");
   if (title) title.textContent = project.title || "우리 MT";
   const completeButton = qs("[data-complete-mt-project]");
-  if (completeButton) completeButton.hidden = project.status === "completed";
+  if (completeButton) completeButton.hidden = project.status === "completed" || readOnly;
+  qsa("[data-edit-mt-project], [data-invite-mt-companion], [data-add-mt-itinerary], [data-add-mt-notice]").forEach((button) => { button.hidden = readOnly; });
+  const readOnlyBadge = qs("#mtReadonlyBadge");
+  if (readOnlyBadge) readOnlyBadge.hidden = !readOnly;
   const meta = qs("#myMt .mt-project-meta");
   if (meta) meta.innerHTML = `<span><i data-lucide="calendar-days"></i>${formatMtDate(project.starts_on)}~${formatMtDate(project.ends_on)}</span><span><i data-lucide="users"></i>${people}명</span><span><i data-lucide="map-pin"></i>${escapeHtml(project.region || "지역 미정")}</span>`;
   const budget = Number(project.estimated_budget || 0);
@@ -2373,7 +2489,9 @@ function renderMyMt() {
   const isDetail = state.mtProjectMode === "detail";
   directory.hidden = isDetail;
   workspace.hidden = !isDetail;
+  workspace.classList.toggle("readonly", isDetail && state.mtProject.is_owner === false);
   if (!isDetail) {
+    qsa("[data-mt-directory-filter]").forEach((button) => button.classList.toggle("active", button.dataset.mtDirectoryFilter === state.mtDirectoryFilter));
     renderMtDirectory();
     refreshIcons();
     return;
@@ -2504,7 +2622,7 @@ function renderStaySearchPanel(title = "예약 조건") {
 
 function getStoredPendingPayment() {
   try {
-    const rawPayment = window.localStorage.getItem(PORTONE_PENDING_PAYMENT_KEY);
+    const rawPayment = window.localStorage.getItem(PENDING_PAYMENT_STORAGE_KEY);
     return rawPayment ? JSON.parse(rawPayment) : null;
   } catch {
     return null;
@@ -2512,122 +2630,15 @@ function getStoredPendingPayment() {
 }
 
 function savePendingPayment(payment) {
-  window.localStorage.setItem(PORTONE_PENDING_PAYMENT_KEY, JSON.stringify(payment));
+  window.localStorage.setItem(PENDING_PAYMENT_STORAGE_KEY, JSON.stringify(payment));
 }
 
 function clearPendingPayment() {
-  window.localStorage.removeItem(PORTONE_PENDING_PAYMENT_KEY);
-}
-
-function saveLocalIssuedPayment(payment, virtualAccount) {
-  if (!hasVirtualAccountInfo(virtualAccount)) return;
-  const current = JSON.parse(window.localStorage.getItem(PORTONE_LOCAL_ISSUED_KEY) || "[]");
-  const userId = window.motfCurrentUserId || payment.userId || "";
-  const nextItem = {
-    orderId: payment.orderId,
-    userId,
-    type: payment.type,
-    itemName: payment.itemName,
-    amount: payment.amount,
-    virtualAccount,
-    stayName: payment.stayName,
-    roomName: payment.roomName,
-    storeName: payment.storeName,
-    location: payment.location,
-    date: payment.date,
-    checkOutDate: payment.checkOutDate,
-    people: payment.people,
-    pickupTime: payment.pickupTime,
-    issuedAt: new Date().toISOString(),
-  };
-  const next = [nextItem, ...current.filter((item) => item.orderId !== payment.orderId || item.userId !== userId)].slice(0, 20);
-  window.localStorage.setItem(PORTONE_LOCAL_ISSUED_KEY, JSON.stringify(next));
-}
-
-function portOnePaymentId(orderId) {
-  return String(orderId || "")
-    .replace(/^MOTF-STAY-/, "MS-")
-    .replace(/^MOTF-MARKET-/, "MM-")
-    .slice(0, 40);
+  window.localStorage.removeItem(PENDING_PAYMENT_STORAGE_KEY);
 }
 
 function normalizePhone(value) {
   return String(value || "").replace(/\D/g, "").slice(0, 20);
-}
-
-function pickVirtualAccountValue(source, keys) {
-  for (const key of keys) {
-    if (source && source[key] !== undefined && source[key] !== null && source[key] !== "") return source[key];
-  }
-  return "";
-}
-
-function findVirtualAccountSource(value, seen = new Set()) {
-  if (!value || typeof value !== "object" || seen.has(value)) return null;
-  seen.add(value);
-  const preferred =
-    value.virtualAccount ||
-    value.virtual_account ||
-    value.vbank ||
-    value.vBank ||
-    value.vbankIssued ||
-    value.virtualAccountIssued ||
-    value.virtual_account_issued ||
-    value.bankAccount ||
-    value.account ||
-    value.paymentMethodDetail ||
-    value.payment_method_detail ||
-    value.paymentMethod ||
-    value.payment_method ||
-    value.raw;
-  if (preferred && typeof preferred === "object") {
-    const found = findVirtualAccountSource(preferred, seen);
-    if (found) return found;
-  }
-  const accountNumber = pickVirtualAccountValue(value, [
-    "accountNumber", "account_number", "accountNo", "account_no", "account", "number",
-    "bankAccountNumber", "virtualAccountNumber", "vbankNum", "vbank_num", "vbankNumber",
-  ]);
-  const bankName = pickVirtualAccountValue(value, [
-    "bankName", "bank_name", "bank", "bankCode", "bank_code", "bankId", "bank_id",
-  ]);
-  const holderName = pickVirtualAccountValue(value, [
-    "holderName", "holder_name", "accountHolder", "account_holder", "customerName",
-    "depositorName", "depositor", "ownerName", "owner",
-  ]);
-  const dueDate = pickVirtualAccountValue(value, [
-    "dueDate", "due_date", "expiredAt", "expired_at", "expiresAt", "expires_at",
-    "expiryDate", "expiry_date",
-  ]) || value.expiry?.dueDate || value.expiry?.due_date || value.accountExpiry?.dueDate || value.accountExpiry?.due_date;
-  if (accountNumber || (bankName && holderName) || dueDate) return value;
-  for (const child of Object.values(value)) {
-    const found = findVirtualAccountSource(child, seen);
-    if (found) return found;
-  }
-  return null;
-}
-
-function normalizeVirtualAccount(value = {}) {
-  const source = findVirtualAccountSource(value) || value;
-  return {
-    bankName: pickVirtualAccountValue(source, ["bankName", "bank_name", "bank", "bankCode", "bank_code", "bankId", "bank_id"]),
-    accountNumber: pickVirtualAccountValue(source, [
-      "accountNumber", "account_number", "accountNo", "account_no", "account", "number",
-      "bankAccountNumber", "virtualAccountNumber", "vbankNum", "vbank_num", "vbankNumber",
-    ]),
-    holderName: pickVirtualAccountValue(source, [
-      "holderName", "holder_name", "accountHolder", "account_holder", "customerName",
-      "depositorName", "depositor", "ownerName", "owner",
-    ]),
-    dueDate: pickVirtualAccountValue(source, [
-      "dueDate", "due_date", "expiredAt", "expired_at", "expiresAt", "expires_at",
-      "expiryDate", "expiry_date",
-    ]) || source?.expiry?.dueDate || source?.expiry?.due_date || source?.accountExpiry?.dueDate || source?.accountExpiry?.due_date || "",
-  };
-}
-
-function hasVirtualAccountInfo(account = {}) {
-  return Boolean(account.bankName || account.accountNumber || account.holderName || account.dueDate);
 }
 
 function bankLabel(value = "") {
@@ -2672,50 +2683,6 @@ function displayOrderNumber(orderId = "", type = "stay") {
   return `${type === "stay" ? "예약" : type === "extra_charge" ? "추가금" : "주문"}-${shortId || "확인중"}`;
 }
 
-function localIssuedPayments() {
-  try {
-    const userId = window.motfCurrentUserId || "";
-    if (!userId) return [];
-    return JSON.parse(window.localStorage.getItem(PORTONE_LOCAL_ISSUED_KEY) || "[]")
-      .filter((item) => item.userId && item.userId === userId);
-  } catch {
-    return [];
-  }
-}
-
-function hydrateLocalIssuedTransactions() {
-  localIssuedPayments().forEach((item) => {
-    if (item.type === "stay" || item.type === "extra_charge") {
-      if (state.reservations.some((reservation) => reservation.id === item.orderId)) return;
-      state.reservations.unshift({
-        id: item.orderId,
-        stayName: item.stayName || "예약 요청 숙소",
-        roomName: item.roomName || item.itemName,
-        date: item.date || String(item.issuedAt || "").slice(0, 10),
-        checkOutDate: item.checkOutDate || "",
-        people: item.people || "-",
-        amount: item.amount,
-        status: "입금 전",
-        virtualAccount: item.virtualAccount,
-        isPendingVirtualAccount: true,
-        isExtraCharge: item.type === "extra_charge",
-      });
-      return;
-    }
-    if (state.orders.some((order) => order.id === item.orderId)) return;
-    state.orders.unshift({
-      id: item.orderId,
-      storeName: item.storeName || "마트 주문 요청",
-      pickupTime: item.pickupTime || String(item.issuedAt || "").slice(11, 16),
-      amount: item.amount,
-      status: "입금 전",
-      virtualAccount: item.virtualAccount,
-      isPendingVirtualAccount: true,
-      items: [{ id: item.orderId }],
-    });
-  });
-}
-
 function setTossWidgetStatus(message, isError = false) {
   const status = qs("#tossWidgetStatus");
   if (!status) return;
@@ -2723,17 +2690,17 @@ function setTossWidgetStatus(message, isError = false) {
   status.style.color = isError ? "#b74332" : "#6d7368";
 }
 
-function loadPortOneSdk() {
-  if (window.PortOne) return Promise.resolve();
+function loadTossPaymentsSdk() {
+  if (window.TossPayments) return Promise.resolve();
   return new Promise((resolve, reject) => {
-    const existingScript = document.querySelector('script[src="https://cdn.portone.io/v2/browser-sdk.js"]');
+    const existingScript = document.querySelector('script[src="https://js.tosspayments.com/v2/standard"]');
     if (existingScript) {
       existingScript.addEventListener("load", resolve, { once: true });
       existingScript.addEventListener("error", reject, { once: true });
       return;
     }
     const script = document.createElement("script");
-    script.src = "https://cdn.portone.io/v2/browser-sdk.js";
+    script.src = "https://js.tosspayments.com/v2/standard";
     script.async = true;
     script.onload = resolve;
     script.onerror = reject;
@@ -2746,12 +2713,13 @@ async function loadPaymentConfig() {
   window.setTimeout(() => controller.abort(), 4000);
   try {
     const response = await fetch("/api/payment-config", { cache: "no-store", signal: controller.signal });
+    if (!response.headers.get("content-type")?.includes("application/json")) return;
     const data = await response.json();
-    if (response.ok && data.portoneStoreId) PORTONE_STORE_ID = data.portoneStoreId;
-    if (response.ok && data.portoneChannelKey) PORTONE_CHANNEL_KEY = data.portoneChannelKey;
+    if (response.ok && data.tossClientKey) TOSS_CLIENT_KEY = data.tossClientKey;
+    if (response.ok && Array.isArray(data.enabledMethods)) TOSS_ENABLED_METHODS = data.enabledMethods;
     if (response.ok && data.naverMapKeyId) NAVER_MAP_KEY_ID = data.naverMapKeyId;
   } catch (error) {
-    console.warn("포트원 결제 공개 설정을 불러오지 못했습니다.", error);
+    console.warn("토스 결제 공개 설정을 불러오지 못했습니다.", error);
   }
 }
 
@@ -2782,12 +2750,10 @@ function setPaymentResult(status) {
 
   const resultText = {
     success: {
-      eyebrow: "입금 확인 완료",
-      title: payment.type === "stay" ? "결제 완료, 숙소 예약 요청이 접수되었습니다" : payment.type === "extra_charge" ? "추가 이용금 입금이 확인되었습니다" : "결제 완료, MT 장보기 주문이 접수되었습니다",
+      eyebrow: "결제 완료",
+      title: payment.type === "stay" ? "숙소 예약 요청이 접수되었습니다" : "MT 장보기 주문이 접수되었습니다",
       text: payment.type === "stay"
         ? "사장님이 예약 가능 여부를 확인한 뒤 확정합니다. 취소되면 전액 환불이 자동으로 접수됩니다."
-        : payment.type === "extra_charge"
-          ? "결제 금액은 예약 이용내역과 예결산에 자동으로 합산됩니다."
         : "사장님이 주문 가능 여부를 확인한 뒤 확정합니다. 취소되면 전액 환불이 자동으로 접수됩니다.",
       icon: "check",
       className: "",
@@ -3229,7 +3195,6 @@ window.motfGetUsageSnapshot = () => ({
 });
 
 function renderMypage() {
-  hydrateLocalIssuedTransactions();
   const reservationList = qs("#reservationList");
   const orderList = qs("#orderList");
   if (!reservationList || !orderList) {
@@ -3254,26 +3219,33 @@ async function renderTossWidgets(payment) {
   const paymentMethods = qs("#tossPaymentMethods");
   const agreement = qs("#tossAgreement");
   if (!paymentMethods || !agreement || !payment) return;
-  paymentMethods.innerHTML = `
-    <div class="portone-method-card">
-      <div>
-        <span>결제수단</span>
-        <strong>KG이니시스 가상계좌</strong>
-      </div>
-      <i data-lucide="landmark"></i>
-    </div>
-  `;
+  const methods = [
+    { id: "CARD", label: "신용·체크카드", note: "카드사 앱 또는 간편결제", icon: "credit-card" },
+    { id: "TRANSFER", label: "계좌이체", note: "내 계좌에서 바로 결제", icon: "landmark" },
+    { id: "VIRTUAL_ACCOUNT", label: "가상계좌", note: "12월 도입 예정", icon: "receipt-text" },
+  ];
+  const available = methods.filter((method) => TOSS_ENABLED_METHODS.includes(method.id));
+  if (!payment.paymentMethod || !available.some((method) => method.id === payment.paymentMethod)) {
+    payment.paymentMethod = available[0]?.id || "CARD";
+  }
+  paymentMethods.innerHTML = `<div class="toss-method-grid">${methods.map((method) => {
+    const enabled = TOSS_ENABLED_METHODS.includes(method.id);
+    return `<label class="toss-method-option ${enabled ? "" : "disabled"}">
+      <input type="radio" name="tossPaymentMethod" value="${method.id}" ${payment.paymentMethod === method.id ? "checked" : ""} ${enabled ? "" : "disabled"} />
+      <i data-lucide="${method.icon}"></i><span><strong>${method.label}</strong><small>${method.note}</small></span>
+    </label>`;
+  }).join("")}</div>`;
   agreement.innerHTML = `
-    <div class="portone-note-grid">
-      <div><span>1단계</span><strong>입금 완료</strong></div>
-      <div><span>2단계</span><strong>${payment.type === "extra_charge" ? "추가금 반영" : "예약 요청"}</strong></div>
-      <div><span>3단계</span><strong>${payment.type === "extra_charge" ? "예결산 자동 합산" : "예약 확인 후 최종 확정"}</strong></div>
-    </div>
+    <label class="toss-final-agreement"><input type="checkbox" id="tossFinalAgreement" />주문 내용과 환불 규정을 확인했으며 결제에 동의합니다.</label>
   `;
-  setTossWidgetStatus("아래 버튼을 누르면 포트원 KG이니시스 결제창이 열립니다.");
+  paymentMethods.querySelectorAll('input[name="tossPaymentMethod"]').forEach((input) => {
+    input.addEventListener("change", () => { payment.paymentMethod = input.value; savePendingPayment(payment); });
+  });
+  setTossWidgetStatus("토스페이먼츠 결제창에서 선택한 수단으로 안전하게 결제합니다.");
+  refreshIcons();
 }
 
-async function confirmPaymentOnServer(payment, params = new URLSearchParams(), portoneResponse = null) {
+async function confirmPaymentOnServer(payment, params = new URLSearchParams()) {
   for (let i = 0; i < 20 && !window.motfSupabase; i += 1) {
     await new Promise((resolve) => window.setTimeout(resolve, 100));
   }
@@ -3283,17 +3255,16 @@ async function confirmPaymentOnServer(payment, params = new URLSearchParams(), p
   if (!accessToken) throw new Error("Login expired. Please sign in again.");
   let response;
   try {
-    response = await fetch("/api/confirm-payment", {
+    response = await fetch("/api/toss-confirm", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${accessToken}`,
       },
       body: JSON.stringify({
-        paymentId: params.get("paymentId") || portOnePaymentId(payment.orderId),
+        paymentKey: params.get("paymentKey"),
         orderId: params.get("orderId") || payment.orderId,
         amount: Number(params.get("amount") || payment.amount),
-        ...(portoneResponse ? { portoneResponse } : {}),
       }),
     });
   } catch (error) {
@@ -3311,146 +3282,52 @@ async function confirmPaymentOnServer(payment, params = new URLSearchParams(), p
 
 async function requestTossPayment() {
   const payment = state.pendingPayment;
-  if (!payment) {
-    toast("결제할 내역이 없습니다.");
-    return;
+  if (!payment) return toast("결제할 내역이 없습니다.");
+  if (!qs("#tossFinalAgreement")?.checked) return toast("주문 내용과 환불 규정에 동의해주세요.");
+  if (!TOSS_CLIENT_KEY) {
+    state.paymentResult = {
+      status: "fail", type: payment.type, eyebrow: "결제 설정 필요", title: "토스 결제키가 설정되지 않았습니다",
+      text: "Vercel 환경변수 TOSS_CLIENT_KEY를 등록한 뒤 다시 시도해주세요.", icon: "key-round", className: "fail",
+      orderId: payment.orderId, itemName: payment.itemName, amount: payment.amount, backRoute: paymentBackRoute(),
+    };
+    return navigate("paymentResult");
   }
-  savePendingPayment(payment);
-  const showVirtualAccountIssued = (virtualAccount = {}, note = "", confirmed = false) => {
-    const normalizedAccount = normalizeVirtualAccount(virtualAccount);
-    const accountLabel = [
-      normalizedAccount.bankName,
-      normalizedAccount.accountNumber,
-      normalizedAccount.holderName,
-    ].filter(Boolean).join(" / ");
-    const hasAccountInfo = hasVirtualAccountInfo(normalizedAccount);
-    const isIssued = confirmed || hasAccountInfo;
-    if (isIssued && hasAccountInfo) saveLocalIssuedPayment(payment, normalizedAccount);
-    const issuedText = payment.type === "extra_charge" ? "아래 계좌로 입금하면 추가 이용금이 예약 내역에 반영됩니다." : "아래 계좌로 입금하면 사장님 확인 후 확정됩니다.";
-    const pendingText = "포트원 결제창 호출은 완료되었습니다. 입금 정보 확인이 지연되면 마이페이지에서 다시 확인해주세요.";
-    state.paymentResult = {
-      status: isIssued ? "virtual_account_issued" : "pending",
-      type: payment.type,
-      eyebrow: isIssued ? (payment.type === "stay" ? "예약 요청 완료" : payment.type === "extra_charge" ? "추가금 입금 대기" : "주문 요청 완료") : "결제창 호출 완료",
-      title: isIssued ? (payment.type === "stay" ? "예약 요청이 접수되었습니다" : payment.type === "extra_charge" ? "추가 이용금 계좌가 발급되었습니다" : "주문 요청이 접수되었습니다") : "포트원 결제창 호출이 완료되었습니다",
-      text: note || (isIssued ? issuedText : pendingText),
-      icon: "landmark",
-      className: "",
-      orderId: payment.orderId,
-      itemName: payment.itemName,
-      amount: payment.amount,
-      stayName: payment.stayName,
-      roomName: payment.roomName,
-      storeName: payment.storeName,
-      location: payment.location,
-      date: payment.date,
-      checkOutDate: payment.checkOutDate,
-      people: payment.people,
-      pickupTime: payment.pickupTime,
-      virtualAccount: normalizedAccount,
-      backRoute: paymentBackRoute(),
-    };
-    navigate("paymentResult");
-  };
-  const showVirtualAccountLookupError = (error) => {
-    state.paymentResult = {
-      status: "fail",
-      type: payment.type,
-      eyebrow: "입금 정보 확인 실패",
-      title: "가상계좌 입금 정보를 불러오지 못했습니다",
-      text: error.message || "포트원 결제는 호출되었지만 계좌번호 확인이 완료되지 않았습니다. 잠시 후 마이페이지에서 확인하거나 다시 시도해주세요.",
-      icon: "x",
-      className: "fail",
-      orderId: payment.orderId,
-      itemName: payment.itemName,
-      amount: payment.amount,
-      stayName: payment.stayName,
-      roomName: payment.roomName,
-      storeName: payment.storeName,
-      location: payment.location,
-      date: payment.date,
-      checkOutDate: payment.checkOutDate,
-      people: payment.people,
-      pickupTime: payment.pickupTime,
-      backRoute: paymentBackRoute(),
-    };
-    navigate("paymentResult");
-  };
 
   try {
-    if (!PORTONE_STORE_ID || !PORTONE_CHANNEL_KEY) {
-      throw new Error("PortOne Store ID 또는 Channel Key가 설정되지 않았습니다.");
-    }
-    await loadPortOneSdk();
+    await loadTossPaymentsSdk();
     const { data: sessionData } = await window.motfSupabase.auth.getSession();
-    const customerEmail = payment.customerEmail || sessionData.session?.user?.email || "";
-    if (!customerEmail) {
-      throw new Error("KG이니시스 결제창 호출을 위해 구매자 이메일이 필요합니다. 로그인 이메일을 확인해주세요.");
-    }
-    const mobilePhone = normalizePhone(payment.customerPhone);
-    const response = await window.PortOne.requestPayment({
-      storeId: PORTONE_STORE_ID,
-      channelKey: PORTONE_CHANNEL_KEY,
-      paymentId: portOnePaymentId(payment.orderId),
+    const activeSession = sessionData.session;
+    if (!activeSession?.user) throw new Error("로그인이 만료되었습니다. 다시 로그인해주세요.");
+    const method = payment.paymentMethod || "CARD";
+    if (!TOSS_ENABLED_METHODS.includes(method)) throw new Error("현재 사용할 수 없는 결제수단입니다.");
+    savePendingPayment(payment);
+    const tossPayments = window.TossPayments(TOSS_CLIENT_KEY);
+    const paymentClient = tossPayments.payment({ customerKey: activeSession.user.id });
+    const tossRequest = {
+      method,
+      amount: { currency: "KRW", value: Number(payment.amount) },
+      orderId: payment.orderId,
       orderName: payment.itemName,
-      totalAmount: payment.amount,
-      currency: "CURRENCY_KRW",
-      payMethod: "VIRTUAL_ACCOUNT",
-      virtualAccount: {
-        accountExpiry: {
-          validHours: 24,
-        },
-      },
-      customer: {
-        fullName: payment.customerName || "moTF user",
-        email: customerEmail,
-        ...(mobilePhone ? { phoneNumber: mobilePhone } : {}),
-      },
-    });
-    if (response?.code) throw new Error(response.message || "PortOne payment window failed.");
-    const responseAccount = normalizeVirtualAccount(response);
-    try {
-      const result = await confirmPaymentOnServer(payment, new URLSearchParams({
-        paymentId: portOnePaymentId(payment.orderId),
-        orderId: payment.orderId,
-      }), response);
-      if (result.status === "paid") {
-        await window.motfReloadTransactions?.();
-        setPaymentResult("success");
-        return;
-      }
-      const issuedAccount = normalizeVirtualAccount(result.virtualAccount || responseAccount);
-      if (!hasVirtualAccountInfo(issuedAccount)) {
-        throw new Error("서버가 가상계좌 계좌번호를 반환하지 않았습니다. api/confirm-payment.js 배포와 포트원 API Secret을 확인해주세요.");
-      }
-      if (hasVirtualAccountInfo(issuedAccount)) saveLocalIssuedPayment(payment, issuedAccount);
-      showVirtualAccountIssued(
-        issuedAccount,
-        "",
-        true
-      );
-    } catch (confirmError) {
-      console.warn("PortOne server confirmation pending", confirmError);
-      const hasBrowserAccount = hasVirtualAccountInfo(responseAccount);
-      if (hasBrowserAccount) {
-        showVirtualAccountIssued(
-          responseAccount,
-          "가상계좌는 발급되었습니다. 입금 완료 후 예약 요청 상태로 전환됩니다.",
-          true
-        );
-        return;
-      }
-      showVirtualAccountLookupError(confirmError);
+      successUrl: `${window.location.origin}/payment?orderId=${encodeURIComponent(payment.orderId)}`,
+      failUrl: `${window.location.origin}/payment?orderId=${encodeURIComponent(payment.orderId)}`,
+      customerEmail: payment.customerEmail || activeSession.user.email || undefined,
+      customerName: payment.customerName || "moTF 이용자",
+      customerMobilePhone: String(payment.customerPhone || "").replace(/\D/g, "") || undefined,
+    };
+    if (method === "VIRTUAL_ACCOUNT") {
+      tossRequest.virtualAccount = { cashReceipt: { type: "소득공제" }, useEscrow: false, validHours: 24 };
     }
+    await paymentClient.requestPayment(tossRequest);
   } catch (error) {
+    const cancelled = ["USER_CANCEL", "PAY_PROCESS_CANCELED"].includes(error.code);
     state.paymentResult = {
-      status: "fail",
+      status: cancelled ? "cancel" : "fail",
       type: payment.type,
-      eyebrow: "가상계좌 발급 실패",
-      title: "포트원 결제창을 완료하지 못했습니다",
-      text: error.message || "브라우저 또는 결제 설정을 확인한 뒤 다시 시도해주세요.",
-      icon: "x",
-      className: "fail",
+      eyebrow: cancelled ? "결제 취소" : "결제 실패",
+      title: cancelled ? "결제를 취소했습니다" : "결제를 완료하지 못했습니다",
+      text: error.message || "결제 정보를 확인한 뒤 다시 시도해주세요.",
+      icon: cancelled ? "rotate-ccw" : "x",
+      className: cancelled ? "cancel" : "fail",
       orderId: payment.orderId,
       itemName: payment.itemName,
       amount: payment.amount,
@@ -3461,7 +3338,58 @@ async function requestTossPayment() {
 }
 
 async function handleTossRedirect() {
-  return false;
+  const params = new URLSearchParams(window.location.search);
+  const paymentKey = params.get("paymentKey");
+  const orderId = params.get("orderId");
+  const amount = Number(params.get("amount"));
+  const errorCode = params.get("code");
+  const errorMessage = params.get("message");
+  if (!paymentKey && !errorCode) return false;
+
+  const payment = state.pendingPayment || getStoredPendingPayment();
+  if (!payment || (orderId && payment.orderId !== orderId)) {
+    state.paymentResult = {
+      status: "fail", type: "stay", eyebrow: "결제 확인 필요", title: "결제 준비 정보를 찾지 못했습니다",
+      text: "마이페이지에서 결제 내역을 확인하거나 고객센터에 문의해주세요.", icon: "x", className: "fail",
+      orderId: orderId || "-", itemName: "결제 내역", amount: amount || 0, backRoute: "mypage",
+    };
+    navigate("paymentResult", { replace: true });
+    return true;
+  }
+
+  if (errorCode) {
+    state.paymentResult = {
+      status: "fail", type: payment.type, eyebrow: "결제 실패", title: "결제가 완료되지 않았습니다",
+      text: errorMessage || "결제창에서 요청을 완료하지 못했습니다.", icon: "x", className: "fail",
+      errorCode, orderId: payment.orderId, itemName: payment.itemName, amount: payment.amount, backRoute: paymentBackRoute(),
+    };
+    window.history.replaceState({}, "", "/payment");
+    navigate("paymentResult", { replace: true });
+    return true;
+  }
+
+  state.paymentResult = {
+    status: "confirming", type: payment.type, eyebrow: "결제 확인 중", title: "결제를 안전하게 확인하고 있습니다",
+    text: "창을 닫지 마세요. 승인 결과를 한 번만 확인합니다.", icon: "loader-circle", className: "",
+    orderId: payment.orderId, itemName: payment.itemName, amount: payment.amount, backRoute: paymentBackRoute(),
+  };
+  navigate("paymentResult", { replace: true });
+  try {
+    await confirmPaymentOnServer(payment, params);
+    await window.motfReloadTransactions?.();
+    state.pendingPayment = payment;
+    setPaymentResult("success");
+  } catch (error) {
+    state.paymentResult = {
+      status: "fail", type: payment.type, eyebrow: "승인 확인 실패", title: "결제 상태를 확인해주세요",
+      text: error.message || "토스 승인 확인에 실패했습니다.", icon: "x", className: "fail",
+      orderId: payment.orderId, itemName: payment.itemName, amount: payment.amount, backRoute: paymentBackRoute(),
+    };
+    navigate("paymentResult", { replace: true });
+  } finally {
+    window.history.replaceState({}, "", "/payment");
+  }
+  return true;
 }
 
 function pendingAccountDueDate(item = {}) {
@@ -3489,7 +3417,6 @@ function reservationCard(item) {
         ${item.isPendingVirtualAccount ? `<p class="muted">입금 완료가 자동 확인되면 예약 요청 완료 상태로 넘어가고, 사장님 확인 후 최종 확정됩니다.</p>` : ""}
         ${item.refundAmount ? `<p class="muted">환불 예정 금액 ${money(item.refundAmount)}</p>` : ""}
         <div class="button-row">
-          ${item.canPayExtraCharge ? `<button class="primary-btn" data-extra-charge-pay="${item.extraChargeId}"><i data-lucide="landmark"></i>추가금 결제</button>` : ""}
           ${!item.isExtraCharge && item.rawStatus === "confirmed" ? `<button class="ghost-btn" data-cancel-reservation="${item.id}"><i data-lucide="rotate-ccw"></i>예약 취소</button>` : ""}
           <button class="secondary-btn" data-budget-file="${item.id}"><i data-lucide="file-spreadsheet"></i>예결산 엑셀 생성</button>
           <button class="ghost-btn" data-route="review"><i data-lucide="star"></i>리뷰</button>
@@ -4512,6 +4439,82 @@ qsa(".brand").forEach((brand) => {
   });
 });
 
+function updatePhotoGallery() {
+  const image = qs("#photoGalleryImage");
+  const caption = qs("#photoGalleryCaption");
+  if (!image || !state.gallery.images.length) return;
+  state.gallery.index = (state.gallery.index + state.gallery.images.length) % state.gallery.images.length;
+  image.src = state.gallery.images[state.gallery.index];
+  caption.textContent = `${state.gallery.alt} · ${state.gallery.index + 1} / ${state.gallery.images.length}`;
+}
+
+document.addEventListener("click", (event) => {
+  const mtFilter = event.target.closest("[data-mt-directory-filter]");
+  if (mtFilter) {
+    state.mtDirectoryFilter = mtFilter.dataset.mtDirectoryFilter;
+    renderMyMt();
+    return;
+  }
+  if (event.target.closest("[data-join-mt-invite]")) {
+    const code = window.prompt("받은 초대코드를 입력해주세요.", "")?.trim();
+    if (!code) return;
+    window.motfAcceptMtInvite?.(code).then((projectId) => {
+      state.mtDirectoryFilter = "invited";
+      renderMyMt();
+      toast("초대받은 MT에 참여했습니다.");
+      if (projectId) window.motfSelectMtProject?.(projectId);
+    }).catch((error) => toast(error.message || "초대코드를 확인해주세요."));
+    return;
+  }
+  if (event.target.closest("[data-invite-mt-companion]")) {
+    window.motfCreateMtInvite?.().then(async (code) => {
+      const link = `${window.location.origin}/my-mt?invite=${encodeURIComponent(code)}`;
+      try { await navigator.clipboard.writeText(link); toast("7일 동안 유효한 초대 링크를 복사했습니다."); }
+      catch { window.prompt("아래 초대 링크를 전달해주세요.", link); }
+    }).catch((error) => toast(error.message || "초대 링크를 만들지 못했습니다."));
+    return;
+  }
+  const eventCardButton = event.target.closest("[data-event-id]");
+  if (eventCardButton) {
+    state.selectedEvent = state.platformEvents.find((item) => String(item.id) === String(eventCardButton.dataset.eventId)) || null;
+    navigate("eventDetail");
+    return;
+  }
+  const eventFilterButton = event.target.closest("[data-event-filter]");
+  if (eventFilterButton) {
+    state.eventFilter = eventFilterButton.dataset.eventFilter;
+    qsa("[data-event-filter]").forEach((button) => button.classList.toggle("active", button === eventFilterButton));
+    renderEvents();
+    return;
+  }
+  const galleryButton = event.target.closest("[data-open-gallery]");
+  if (galleryButton) {
+    state.gallery.index = Number(galleryButton.dataset.openGallery || 0);
+    updatePhotoGallery();
+    qs("#photoGalleryDialog")?.showModal();
+    refreshIcons();
+    return;
+  }
+  const galleryMove = event.target.closest("[data-gallery-move]");
+  if (galleryMove) {
+    state.gallery.index += Number(galleryMove.dataset.galleryMove || 0);
+    updatePhotoGallery();
+    return;
+  }
+  if (event.target.closest("[data-close-photo-gallery]")) {
+    qs("#photoGalleryDialog")?.close();
+    return;
+  }
+  const instagram = event.target.closest("[data-social-instagram]");
+  if (instagram) {
+    const url = instagram.dataset.url;
+    if (!url) {
+      event.preventDefault();
+      toast("공식 인스타그램 주소를 운영자 화면에서 등록해주세요.");
+    } else instagram.href = url;
+  }
+});
+
 window.addEventListener("popstate", () => {
   if (appHistoryDepth > 0) appHistoryDepth -= 1;
   routeHistory.pop();
@@ -4519,15 +4522,16 @@ window.addEventListener("popstate", () => {
 });
 
 (async function boot() {
+  preservePendingMtInvite();
   // DB 연결 전 데모 숙소도 1차 운영 지역인 가평 목록에 함께 표시합니다.
   stays = stays.map((stay) => ({ ...stay, region: normalizeStayRegion(stay.region, stay.distance) }));
   initializeStaySearchDefaults();
   try {
     await loadPaymentConfig();
-    navigate(routeFromLocation(), { record: false, replace: true });
+    const handledPaymentRedirect = await handleTossRedirect();
+    if (!handledPaymentRedirect) navigate(routeFromLocation(), { record: false, replace: true });
     updateCartBadge();
     refreshIcons();
-    await handleTossRedirect();
   } catch (error) {
     console.warn("결제 설정을 불러오지 못했습니다.", error);
   }
