@@ -1,18 +1,58 @@
 (async function loadLaunchContent() {
   const client = window.motfSupabase;
   if (!client) return;
+
+  let cachedCards = [];
+  let cachedSocial = {};
+  let boundaryTimer = 0;
+
   const [eventsResult, cardsResult, settingsResult, popupResult] = await Promise.all([
     client.rpc("get_public_platform_events"),
     client.from("homepage_cards").select("*").order("sort_order").limit(12),
     client.from("platform_settings").select("setting_value").eq("setting_key", "social").maybeSingle(),
     client.from("popup_banners").select("*").order("starts_at", { ascending: false }).limit(3),
   ]);
-  window.motfApplyLaunchContent?.(
-    eventsResult.error ? [] : (eventsResult.data || []),
-    cardsResult.error ? [] : (cardsResult.data || []),
-    settingsResult.data?.setting_value || {},
-  );
+
+  cachedCards = cardsResult.error ? [] : (cardsResult.data || []);
+  cachedSocial = settingsResult.data?.setting_value || {};
+  applyEvents(eventsResult.error ? [] : (eventsResult.data || []));
   if (!popupResult.error) showPopup(popupResult.data?.[0]);
+
+  async function refreshEvents() {
+    const result = await client.rpc("get_public_platform_events");
+    if (result.error) {
+      console.warn("MOriginal 목록을 갱신하지 못했습니다.", result.error);
+      return;
+    }
+    applyEvents(result.data || []);
+  }
+
+  function applyEvents(events) {
+    window.motfApplyLaunchContent?.(events, cachedCards, cachedSocial);
+    scheduleNextBoundary(events);
+  }
+
+  function scheduleNextBoundary(events) {
+    window.clearTimeout(boundaryTimer);
+    const now = Date.now();
+    const boundaries = events.flatMap((event) => [
+      event.application_opens_at,
+      event.application_closes_at,
+      event.ends_at,
+    ]).map((value) => new Date(value).getTime()).filter((time) => Number.isFinite(time) && time > now);
+    if (!boundaries.length) return;
+    const delay = Math.min(Math.max(1000, Math.min(...boundaries) - now + 750), 2147483000);
+    boundaryTimer = window.setTimeout(refreshEvents, delay);
+  }
+
+  const fallbackTimer = window.setInterval(refreshEvents, 60000);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) refreshEvents();
+  });
+  window.addEventListener("pagehide", () => {
+    window.clearTimeout(boundaryTimer);
+    window.clearInterval(fallbackTimer);
+  }, { once: true });
 
   function showPopup(popup) {
     if (!popup) return;

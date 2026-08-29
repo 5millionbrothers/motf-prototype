@@ -799,17 +799,10 @@
         return;
       }
     }
-    const { data, error } = await client
-      .from("profiles")
-      .update({
-        organization: organization || null,
-        password_set_at: needsPassword ? new Date().toISOString() : profile.password_set_at,
-        profile_completed_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", session.user.id)
-      .select("email, full_name, phone, birth_date, identity_verified_at, adult_verified_at, password_set_at, organization, role, status")
-      .single();
+    const { data, error } = await client.rpc("complete_verified_user_profile", {
+      profile_organization: organization,
+      password_was_set: needsPassword,
+    });
     submitButton.disabled = false;
     submitButton.textContent = "기본 정보 저장";
 
@@ -817,7 +810,7 @@
       setMessage(`기본 정보를 저장하지 못했습니다: ${error.message}`, "error");
       return;
     }
-    profile = data;
+    profile = Array.isArray(data) ? data[0] : data;
     window.motfCurrentUserProfile = profile;
     window.localStorage.removeItem(profileCompletionDismissKey());
     updateAccountView();

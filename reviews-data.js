@@ -32,30 +32,40 @@
   }
 
   async function loadReviews() {
-    const { data, error } = await client.rpc("get_public_reviews", { limit_count: 40 });
+    const [reviewsResult, summariesResult] = await Promise.all([
+      client.rpc("get_public_reviews", { limit_count: 100 }),
+      client.rpc("get_public_review_summaries"),
+    ]);
+
+    const { data, error } = reviewsResult;
 
     if (error) {
       console.error("리뷰를 불러오지 못했습니다.", error);
-      return;
+    } else {
+      window.motfApplyReviews?.((data || []).map((review) => ({
+        id: review.id,
+        businessId: review.business_id,
+        type: review.transaction_type === "market" ? "market" : "stay",
+        target: review.business_name || "이용 후기",
+        score: Number(review.rating) || 5,
+        tags: Array.isArray(review.tags) ? review.tags : [],
+        images: Array.isArray(review.image_urls) ? review.image_urls : [],
+        text: review.body || "",
+        author: authorLabel(review),
+        createdAt: review.created_at,
+        structuredScores: review.structured_scores || {},
+        comfortablePeopleMin: review.comfortable_people_min,
+        comfortablePeopleMax: review.comfortable_people_max,
+        recommend30Plus: review.recommend_30_plus,
+        organizerDifficulty: review.organizer_difficulty,
+      })));
     }
 
-    window.motfApplyReviews?.((data || []).map((review) => ({
-      id: review.id,
-      businessId: review.business_id,
-      type: review.transaction_type === "market" ? "market" : "stay",
-      target: escapeHtml(review.business_name || "이용 후기"),
-      score: Number(review.rating) || 5,
-      tags: Array.isArray(review.tags) ? review.tags.map(escapeHtml) : [],
-      images: Array.isArray(review.image_urls) ? review.image_urls : [],
-      text: escapeHtml(review.body || ""),
-      author: escapeHtml(authorLabel(review)),
-      createdAt: review.created_at,
-      structuredScores: review.structured_scores || {},
-      comfortablePeopleMin: review.comfortable_people_min,
-      comfortablePeopleMax: review.comfortable_people_max,
-      recommend30Plus: review.recommend_30_plus,
-      organizerDifficulty: review.organizer_difficulty,
-    })));
+    if (summariesResult.error) {
+      console.warn("숙소별 리뷰 요약을 불러오지 못했습니다.", summariesResult.error);
+    } else {
+      window.motfApplyReviewSummaries?.(Array.isArray(summariesResult.data) ? summariesResult.data : []);
+    }
   }
 
   async function loadReviewTargets() {

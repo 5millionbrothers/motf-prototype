@@ -385,6 +385,7 @@ const state = {
   reservations: [],
   orders: [],
   reviews: [],
+  reviewSummaries: {},
   reviewScope: "all",
   reviewTargets: [],
   stayPage: 1,
@@ -519,11 +520,15 @@ window.motfGetReservationDraft = function getReservationDraft() {
 
 window.motfApplyLaunchContent = function applyLaunchContent(events = [], cards = [], social = {}) {
   state.platformEvents = Array.isArray(events) ? events : [];
+  if (state.selectedEvent) {
+    state.selectedEvent = state.platformEvents.find((event) => String(event.id) === String(state.selectedEvent.id)) || state.selectedEvent;
+  }
   state.homepageCards = Array.isArray(cards) ? cards : [];
   const instagram = qs("[data-social-instagram]");
   if (instagram) instagram.dataset.url = social.instagram_url || "";
   if (currentRoute() === "home") renderHome();
   if (currentRoute() === "events") renderEvents();
+  if (currentRoute() === "eventDetail") renderEventDetail();
 };
 
 window.motfGetRefundAccountDraft = function getRefundAccountDraft() {
@@ -966,12 +971,27 @@ function formatEventDate(value) {
   return new Intl.DateTimeFormat("ko-KR", { month: "long", day: "numeric", weekday: "short", hour: "2-digit", minute: "2-digit" }).format(date);
 }
 
+function safeExternalUrl(value) {
+  try {
+    const url = new URL(String(value || ""));
+    return ["http:", "https:"].includes(url.protocol) ? url.toString() : "";
+  } catch {
+    return "";
+  }
+}
+
 function eventCard(event, featured = false) {
   const status = effectiveEventStatus(event);
-  return `<button class="platform-event-card ${featured ? "featured" : ""}" type="button" data-event-id="${event.id}">
-    <span class="platform-event-media"><img src="${event.poster_url}" alt="${escapeHtml(event.title)} 포스터" /><b class="event-status ${status}">${eventStatusLabel(status)}</b></span>
-    <span class="platform-event-body"><small>${formatEventDate(event.starts_at)} · ${escapeHtml(event.venue_name || "장소 공개 예정")}</small><strong>${escapeHtml(event.title)}</strong><span>${escapeHtml(event.short_description)}</span><span class="event-meta"><b>${money(event.price_per_person)} / 1인</b><b>${Number(event.application_count || 0).toLocaleString()} / ${Number(event.capacity).toLocaleString()}명</b></span></span>
-  </button>`;
+  const formUrl = status === "open" ? safeExternalUrl(event.google_form_url) : "";
+  return `<article class="platform-event-card event-card-${status} ${featured ? "featured" : ""}">
+    <button class="platform-event-main" type="button" data-event-id="${event.id}" aria-label="${escapeHtml(event.title)} 상세 보기">
+      <span class="platform-event-media"><img src="${event.poster_url}" alt="${escapeHtml(event.title)} 포스터" /><b class="event-status ${status}">${eventStatusLabel(status)}</b></span>
+      <span class="platform-event-body"><small>${formatEventDate(event.starts_at)} · ${escapeHtml(event.venue_name || "장소 공개 예정")}</small><strong>${escapeHtml(event.title)}</strong><span>${escapeHtml(event.short_description)}</span><span class="event-meta"><b>${money(event.price_per_person)} / 1인</b><b>${Number(event.application_count || 0).toLocaleString()} / ${Number(event.capacity).toLocaleString()}명</b></span></span>
+    </button>
+    <span class="platform-event-actions">${formUrl
+      ? `<a class="event-card-apply" href="${escapeHtml(formUrl)}" target="_blank" rel="noopener noreferrer"><i data-lucide="external-link"></i>신청 중 · 바로 신청</a>`
+      : `<span class="event-card-state ${status}">${status === "scheduled" ? `${formatEventDate(event.application_opens_at)} 오픈` : eventStatusLabel(status)}</span>`}<button type="button" data-event-id="${event.id}">상세보기</button></span>
+  </article>`;
 }
 
 function renderHomeEvents() {
@@ -1009,10 +1029,12 @@ function renderEventDetail() {
   if (!container) return;
   if (!event) { container.innerHTML = '<div class="empty-state">이벤트를 찾을 수 없습니다.</div>'; return; }
   const status = effectiveEventStatus(event);
-  const canApply = status === "open" && event.google_form_url;
+  const formUrl = status === "open" ? safeExternalUrl(event.google_form_url) : "";
+  const promoVideoUrl = safeExternalUrl(event.promo_video_url);
+  const canApply = Boolean(formUrl);
   const timeline = Array.isArray(event.timeline) ? event.timeline : [];
   const highlights = Array.isArray(event.highlights) ? event.highlights : [];
-  container.innerHTML = `<article class="event-detail-hero"><img src="${event.poster_url}" alt="${escapeHtml(event.title)} 포스터" /><div><span class="event-status ${status}">${eventStatusLabel(status)}</span><p class="eyebrow">moTF ORIGINAL</p><h1>${escapeHtml(event.title)}</h1><p>${escapeHtml(event.description || event.short_description)}</p><dl><div><dt>일정</dt><dd>${formatEventDate(event.starts_at)}</dd></div><div><dt>장소</dt><dd>${escapeHtml(event.venue_name || "공개 예정")}</dd></div><div><dt>참가비</dt><dd>${money(event.price_per_person)} / 1인</dd></div><div><dt>정원</dt><dd>${event.application_count || 0} / ${event.capacity}명</dd></div></dl>${canApply ? `<a class="primary-btn event-apply-button" href="${escapeHtml(event.google_form_url)}" target="_blank" rel="noopener noreferrer"><i data-lucide="external-link"></i>신청서 작성</a>` : `<button class="primary-btn event-apply-button" disabled>${status === "scheduled" ? `${formatEventDate(event.application_opens_at)} 오픈` : eventStatusLabel(status)}</button>`}</div></article>
+  container.innerHTML = `<article class="event-detail-hero"><img src="${event.poster_url}" alt="${escapeHtml(event.title)} 포스터" /><div><span class="event-status ${status}">${eventStatusLabel(status)}</span><p class="eyebrow">moTF ORIGINAL</p><h1>${escapeHtml(event.title)}</h1><p>${escapeHtml(event.description || event.short_description)}</p><dl><div><dt>일정</dt><dd>${formatEventDate(event.starts_at)}</dd></div><div><dt>장소</dt><dd>${escapeHtml(event.venue_name || "공개 예정")}</dd></div><div><dt>참가비</dt><dd>${money(event.price_per_person)} / 1인</dd></div><div><dt>정원</dt><dd>${event.application_count || 0} / ${event.capacity}명</dd></div></dl><div class="event-detail-actions">${canApply ? `<a class="primary-btn event-apply-button" href="${escapeHtml(formUrl)}" target="_blank" rel="noopener noreferrer"><i data-lucide="external-link"></i>신청 중 · 구글폼 열기</a>` : `<button class="primary-btn event-apply-button" disabled>${status === "scheduled" ? `${formatEventDate(event.application_opens_at)} 오픈` : eventStatusLabel(status)}</button>`}${promoVideoUrl ? `<a class="secondary-btn event-video-button" href="${escapeHtml(promoVideoUrl)}" target="_blank" rel="noopener noreferrer"><i data-lucide="play-circle"></i>홍보 영상 보기</a>` : ""}</div></div></article>
     ${highlights.length ? `<section class="event-detail-section"><p class="eyebrow">HIGHLIGHT</p><h2>이번 MT에서 만날 것들</h2><div class="event-highlight-list">${highlights.map((item) => `<span>${escapeHtml(item)}</span>`).join("")}</div></section>` : ""}
     ${timeline.length ? `<section class="event-detail-section"><p class="eyebrow">TIMELINE</p><h2>진행 일정</h2><ol class="event-timeline">${timeline.map((item) => `<li><time>${escapeHtml(item.time || "")}</time><div><strong>${escapeHtml(item.title || "")}</strong><span>${escapeHtml(item.description || "")}</span></div></li>`).join("")}</ol></section>` : ""}`;
   refreshIcons();
@@ -1033,18 +1055,26 @@ function renderHomePicks() {
   container.innerHTML = stays.map((stay) => {
     const estimate = estimateMtStayCost(stay);
     const highlights = (stay.highlights?.length ? stay.highlights : stay.amenities || []).slice(0, 3);
+    const reviewSummary = stayReviewSummary(stay);
     return `
-    <button class="home-stay-pick" type="button" data-stay-id="${stay.id}">
-      <img src="${stay.image}" alt="${escapeHtml(stay.name)}" />
-      <span class="home-stay-pick-body">
-        <small>${escapeHtml(stay.region)} · 최대 ${stay.maxPeople}명</small>
-        <strong>${escapeHtml(stay.name)}</strong>
-        <span class="home-stay-features">${Array.from({ length: 3 }, (_, index) => highlights[index]
-          ? `<b>${escapeHtml(highlights[index])}</b>`
-          : '<b class="feature-placeholder" aria-hidden="true">&nbsp;</b>').join("")}</span>
-        <span>${estimate.people}명 예상 총액 ${money(estimate.total)}</span>
-      </span>
-    </button>
+    <article class="home-stay-pick">
+      <button class="home-stay-pick-main" type="button" data-stay-id="${stay.id}" aria-label="${escapeHtml(stay.name)} 상세 보기">
+        <img src="${stay.image}" alt="${escapeHtml(stay.name)}" />
+        <span class="home-stay-pick-body">
+          <small>${escapeHtml(stay.region)} · 최대 ${stay.maxPeople}명</small>
+          <strong>${escapeHtml(stay.name)}</strong>
+          <span class="home-stay-features">${Array.from({ length: 3 }, (_, index) => highlights[index]
+            ? `<b>${escapeHtml(highlights[index])}</b>`
+            : '<b class="feature-placeholder" aria-hidden="true">&nbsp;</b>').join("")}</span>
+          <span>${estimate.people}명 예상 총액 ${money(estimate.total)}</span>
+        </span>
+      </button>
+      <button class="home-stay-review-link" type="button" data-stay-review-id="${stay.id}" aria-label="${escapeHtml(stay.name)} 리뷰 바로 보기">
+        <span><i data-lucide="star"></i>${reviewSummary.count ? `${reviewSummary.rating.toFixed(1)} / 5` : "새 숙소"}</span>
+        <strong>${reviewSummary.count ? `리뷰 ${reviewSummary.count}개` : "첫 리뷰를 기다리고 있어요"}</strong>
+        <i data-lucide="chevron-right"></i>
+      </button>
+    </article>
   `}).join("");
   window.requestAnimationFrame(() => {
     const canScroll = container.scrollWidth > container.clientWidth + 2;
@@ -1398,6 +1428,7 @@ function renderStays() {
 function stayCard(stay) {
   const availableCount = availableRoomsForStay(stay).length;
   const estimate = estimateMtStayCost(stay);
+  const reviewSummary = stayReviewSummary(stay);
   const selected = state.mtCandidateRecords.some((candidate) => String(candidate.businessId || candidate.business_id) === String(stay.id));
   const bathLabel = stay.bathCount ? `화장실 ${stay.bathCount}개` : "화장실 수 확인 필요";
   return `
@@ -1408,7 +1439,7 @@ function stayCard(stay) {
           <div class="listing-meta">
             <span class="pill">${stay.region}</span>
             <span class="pill success">최대 ${stay.maxPeople}명</span>
-            <span class="pill">★ ${stay.rating} (${stay.reviews})</span>
+            <button class="stay-review-chip" type="button" data-stay-review-id="${stay.id}" aria-label="${escapeHtml(stay.name)} 리뷰 보기"><i data-lucide="star"></i>${reviewSummary.count ? `${reviewSummary.rating.toFixed(1)} / 5 · 리뷰 ${reviewSummary.count}개` : "아직 리뷰 없음"}</button>
           </div>
           <h3>${stay.name}</h3>
           <p class="stay-card-intro">${stay.intro}</p>
@@ -1581,12 +1612,50 @@ function roomOptionCard(room, index, stay) {
   `;
 }
 
+function matchingStayReviews(stay) {
+  return state.reviews.filter((review) => review.type === "stay" && String(review.businessId || "") === String(stay?.id || ""));
+}
+
+function stayReviewSummary(stay) {
+  const stored = state.reviewSummaries[String(stay?.id || "")];
+  if (stored && Number(stored.count) > 0) {
+    return { rating: Number(stored.rating) || 0, count: Number(stored.count) || 0 };
+  }
+  const reviews = matchingStayReviews(stay);
+  if (!reviews.length) return { rating: 0, count: 0 };
+  const average = reviews.reduce((sum, review) => sum + Number(review.score || 0), 0) / reviews.length / 2;
+  return { rating: Math.round(average * 10) / 10, count: reviews.length };
+}
+
+function formatReviewDate(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value).slice(0, 10);
+  return date.toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric" });
+}
+
+function stayReviewPreviewCard(review) {
+  const score5 = Math.max(0, Math.min(5, Number(review.score || 0) / 2));
+  return `
+    <article class="stay-review-card">
+      <div class="stay-review-card-head">
+        <span class="review-score">${renderStarPreview(review.score)}<b>${score5.toFixed(1)}</b></span>
+        <time datetime="${escapeHtml(review.createdAt || "")}">${escapeHtml(formatReviewDate(review.createdAt))}</time>
+      </div>
+      <p>${escapeHtml(review.text || "작성된 내용이 없습니다.")}</p>
+      ${Array.isArray(review.tags) && review.tags.length ? `<div class="stay-review-tags">${review.tags.slice(0, 4).map((tag) => `<span>${escapeHtml(tag)}</span>`).join("")}</div>` : ""}
+      <strong>${escapeHtml(review.author || "moTF 이용자")}</strong>
+    </article>`;
+}
+
 function renderStayDetail() {
   ensureStayAvailability();
   const stay = state.selectedStay;
   const gallery = stayGalleryImages(stay);
   state.gallery = { images: gallery, index: 0, alt: stay.name };
   const insight = stayReviewInsight(stay);
+  const stayReviews = matchingStayReviews(stay);
+  const reviewSummary = stayReviewSummary(stay);
   qs("#stayDetailContent").innerHTML = `
     <section class="stay-detail-top">
       <div>
@@ -1598,17 +1667,35 @@ function renderStayDetail() {
           <span class="pill success">최대 ${stay.maxPeople}명</span>
           <span class="pill">방 ${stay.roomCount}개</span>
           <span class="pill">${stay.bathCount ? `화장실 ${stay.bathCount}개` : "화장실 수 확인 필요"}</span>
-          <span class="pill">★ ${stay.rating} (${stay.reviews})</span>
+          <button class="stay-detail-review-summary" type="button" data-scroll-stay-reviews><i data-lucide="star"></i>${reviewSummary.count ? `<strong>${reviewSummary.rating.toFixed(1)}</strong><span>/ 5 · 리뷰 ${reviewSummary.count}개</span>` : "<strong>신규</strong><span>아직 리뷰 없음</span>"}</button>
         </div>
       </div>
       <div class="button-row">
         <button class="secondary-btn" data-open-chat="${stay.name}"><i data-lucide="messages-square"></i>사장님과 채팅</button>
-        <button class="ghost-btn" data-route="review"><i data-lucide="star"></i>리뷰 보기</button>
+        <button class="ghost-btn" data-scroll-stay-reviews><i data-lucide="star"></i>리뷰 바로 보기</button>
       </div>
     </section>
 
     <section class="stay-gallery-section">
       ${renderStayGallery(gallery, stay.name, true)}
+    </section>
+
+    <section id="stayReviewsSection" class="stay-reviews-section" aria-labelledby="stayReviewsTitle">
+      <header class="stay-reviews-heading">
+        <div class="stay-reviews-score-block">
+          <i data-lucide="star"></i>
+          <strong>${reviewSummary.count ? reviewSummary.rating.toFixed(1) : "신규"}</strong>
+          <span>${reviewSummary.count ? "/ 5" : "리뷰 0개"}</span>
+        </div>
+        <div>
+          <p class="eyebrow">VERIFIED REVIEWS</p>
+          <h2 id="stayReviewsTitle">실제 이용팀 리뷰 ${reviewSummary.count ? `${reviewSummary.count}개` : ""}</h2>
+          <p>${reviewSummary.count ? "예약과 이용이 확인된 팀의 후기를 모았어요." : "이용 완료 후 작성된 첫 리뷰가 곧 이곳에 표시됩니다."}</p>
+        </div>
+      </header>
+      ${stayReviews.length
+        ? `<div class="stay-review-preview-grid">${stayReviews.slice(0, 6).map(stayReviewPreviewCard).join("")}</div>${stayReviews.length > 6 ? `<button class="secondary-btn stay-review-more" type="button" data-route="review"><i data-lucide="list"></i>리뷰 전체 보기</button>` : ""}`
+        : '<div class="stay-review-empty"><i data-lucide="message-square-text"></i><span>아직 등록된 리뷰가 없습니다.</span></div>'}
     </section>
 
     <section class="stay-facility-showcase">
@@ -3592,7 +3679,19 @@ function reviewCard(review) {
 
 window.motfApplyReviews = function applyReviews(nextReviews = []) {
   state.reviews = Array.isArray(nextReviews) ? nextReviews : [];
+  if (currentRoute() === "home") renderHomePicks();
+  if (currentRoute() === "stays") renderStays();
   if (currentRoute() === "review") renderReviews();
+  if (currentRoute() === "stayDetail") renderStayDetail();
+};
+
+window.motfApplyReviewSummaries = function applyReviewSummaries(nextSummaries = []) {
+  state.reviewSummaries = Object.fromEntries((Array.isArray(nextSummaries) ? nextSummaries : []).map((summary) => [
+    String(summary.business_id || ""),
+    { rating: Number(summary.average_rating_5) || 0, count: Number(summary.review_count) || 0 },
+  ]));
+  if (currentRoute() === "home") renderHomePicks();
+  if (currentRoute() === "stays") renderStays();
   if (currentRoute() === "stayDetail") renderStayDetail();
 };
 
@@ -3881,6 +3980,20 @@ document.addEventListener("click", async (event) => {
     state.stayPage = Number(stayPageButton.dataset.stayPage || 1);
     renderStays();
     qs("#stayList")?.closest("section")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    return;
+  }
+
+  const stayReviewButton = event.target.closest("[data-stay-review-id]");
+  if (stayReviewButton) {
+    state.selectedStay = stays.find((stay) => String(stay.id) === String(stayReviewButton.dataset.stayReviewId)) || stays[0];
+    state.selectedRoom = state.selectedStay.rooms[0];
+    navigate("stayDetail");
+    window.requestAnimationFrame(() => qs("#stayReviewsSection")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+    return;
+  }
+
+  if (event.target.closest("[data-scroll-stay-reviews]")) {
+    qs("#stayReviewsSection")?.scrollIntoView({ behavior: "smooth", block: "start" });
     return;
   }
 
