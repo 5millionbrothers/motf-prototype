@@ -290,18 +290,21 @@
     const inviteCode = params.get("invite") || window.sessionStorage.getItem("motf.pendingMtInvite");
     if (!inviteCode || !currentUser) return;
     try {
-      await window.motfAcceptMtInvite(inviteCode);
+      const projectId = await window.motfAcceptMtInvite(inviteCode);
       window.sessionStorage.removeItem("motf.pendingMtInvite");
       params.delete("invite");
       history.replaceState(history.state, "", `${location.pathname}${params.toString() ? `?${params}` : ""}`);
+      if (projectId) await window.motfSelectMtProject(projectId);
+      window.motfNavigate?.("myMt", { replace: true });
+      window.toast?.("초대받은 MT를 보기 전용으로 연결했습니다.");
     } catch (error) {
-      window.sessionStorage.removeItem("motf.pendingMtInvite");
       console.warn("MT 초대 참여 실패", error);
+      window.toast?.(error.message || "초대 링크를 확인하지 못했습니다.");
     }
   }
 
   initializeProjects().catch((error) => console.warn("MT 목록을 불러오지 못했습니다.", error));
   client.auth.onAuthStateChange((_event, session) => {
-    if (session?.user?.id !== currentUser?.id) loadProjects().catch(console.warn);
+    if (session?.user?.id !== currentUser?.id) initializeProjects().catch(console.warn);
   });
 })();

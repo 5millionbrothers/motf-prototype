@@ -67,6 +67,74 @@
     return [bank, number].filter(Boolean).join(" ") + (holder ? ` (예금주 ${holder})` : "");
   }
 
+  const benefitPreviews = { stay: null, market: null };
+  const benefitFields = {
+    stay: { points: "#bookingPoints", coupon: "#bookingCouponCode", result: "#stayBenefitPreview" },
+    market: { points: "#marketPoints", coupon: "#marketCouponCode", result: "#marketBenefitPreview" },
+  };
+
+  function benefitInput(kind) {
+    const fields = benefitFields[kind];
+    const requested = Number(document.querySelector(fields.points)?.value || 0);
+    return {
+      points: Number.isFinite(requested) ? Math.max(0, Math.min(requested, Number(window.motfPointBalance || 0))) : 0,
+      coupon: document.querySelector(fields.coupon)?.value.trim().toUpperCase() || "",
+    };
+  }
+
+  function benefitSignature(kind, context, input = benefitInput(kind)) {
+    return [kind, context?.businessId || "", Number(context?.originalAmount || 0), input.points, input.coupon].join(":");
+  }
+
+  function invalidateBenefitPreview(kind) {
+    benefitPreviews[kind] = null;
+    const result = document.querySelector(benefitFields[kind].result);
+    if (result) {
+      result.className = "checkout-benefit-result";
+      result.textContent = "변경한 혜택을 최종 금액에 반영하려면 적용을 눌러주세요.";
+    }
+  }
+
+  async function previewBenefits(kind, button = null) {
+    const verified = await window.motfEnsureIdentityVerified?.();
+    if (verified === false) throw new Error("휴대폰 본인인증을 완료해주세요.");
+    const context = window.motfGetCheckoutPreviewContext?.(kind);
+    if (!context?.originalAmount || !isUuid(context.businessId)) throw new Error("결제할 상품 정보를 먼저 확인해주세요.");
+    const input = benefitInput(kind);
+    const originalText = button?.textContent;
+    if (button) { button.disabled = true; button.textContent = "확인 중"; }
+    try {
+      const { data, error } = await client.rpc("preview_checkout_benefits", {
+        target_original_amount: Number(context.originalAmount),
+        target_transaction_kind: kind,
+        target_business_id: context.businessId,
+        requested_points: input.points,
+        requested_coupon_code: input.coupon || null,
+      });
+      if (error) throw error;
+      const preview = Array.isArray(data) ? data[0] : data;
+      if (!preview) throw new Error("혜택 적용 결과를 확인하지 못했습니다.");
+      benefitPreviews[kind] = { ...preview, signature: benefitSignature(kind, context, input) };
+      const result = document.querySelector(benefitFields[kind].result);
+      if (result) {
+        const coupon = Number(preview.applied_coupon_discount || 0);
+        const points = Number(preview.applied_points || 0);
+        result.className = "checkout-benefit-result applied";
+        result.innerHTML = `<div><span>상품 금액</span><b>${Number(preview.original_amount).toLocaleString("ko-KR")}원</b></div>${coupon ? `<div><span>${preview.coupon_name || "할인코드"}</span><b>-${coupon.toLocaleString("ko-KR")}원</b></div>` : ""}${points ? `<div><span>포인트 사용</span><b>-${points.toLocaleString("ko-KR")}P</b></div>` : ""}<div class="final"><span>최종 결제금액</span><strong>${Number(preview.payable_amount).toLocaleString("ko-KR")}원</strong></div>`;
+      }
+      return preview;
+    } finally {
+      if (button) { button.disabled = false; button.textContent = originalText; }
+    }
+  }
+
+  async function ensureBenefitPreview(kind) {
+    const context = window.motfGetCheckoutPreviewContext?.(kind);
+    const signature = benefitSignature(kind, context);
+    if (benefitPreviews[kind]?.signature === signature) return benefitPreviews[kind];
+    return previewBenefits(kind);
+  }
+
   async function loadMyTransactions() {
     const { data: authData } = await client.auth.getSession();
     const userId = authData.session?.user?.id;
@@ -74,7 +142,7 @@
       window.motfApplyMyTransactions?.([], []);
       return;
     }
-    const [reservationResult, orderResult, intentResult, pointResult] = await Promise.all([
+    const [reservationResult, orderResult, intentResult, pointResult, pointLedgerResult] = await Promise.all([
       client.from("reservations")
         .select("id, business_id, event_date, check_out_date, guest_count, offering_name, total_amount, original_amount, customer_paid_amount, points_used, coupon_discount, base_accommodation_amount, status, refund_status, refund_amount, businesses(business_name)")
         .eq("customer_id", userId)
@@ -89,9 +157,14 @@
         .in("status", ["virtual_account_issued", "waiting_for_deposit"])
         .order("created_at", { ascending: false }),
       client.from("point_accounts")
-        .select("balance")
+        .select("balance, lifetime_earned, lifetime_used")
         .eq("user_id", userId)
         .maybeSingle(),
+      client.from("point_ledger")
+        .select("id, amount, balance_after, entry_type, reason, created_at")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(100),
     ]);
     if (reservationResult.error || orderResult.error || intentResult.error) {
       console.error(reservationResult.error || orderResult.error || intentResult.error);
@@ -100,7 +173,9 @@
     const pointBalance = pointResult.error ? 0 : Number(pointResult.data?.balance || 0);
     window.motfPointBalance = pointBalance;
     document.querySelectorAll("[data-point-balance]").forEach((node) => { node.textContent = `${pointBalance.toLocaleString("ko-KR")}P`; });
+    document.querySelectorAll("[data-point-wallet]").forEach((node) => { node.hidden = false; });
     document.querySelectorAll("#bookingPoints, #marketPoints").forEach((input) => { input.max = String(pointBalance); });
+    window.motfApplyPointData?.(pointResult.data || {}, pointLedgerResult.error ? [] : (pointLedgerResult.data || []));
     const reservations = (reservationResult.data || []).map((item) => ({
       id: item.id,
       businessId: item.business_id,
@@ -180,7 +255,10 @@
       const originalHtml = submitButton?.innerHTML;
       if (submitButton) { submitButton.disabled = true; submitButton.textContent = "결제 금액 확인 중..."; }
       try {
-        const requestedPoints = Math.max(0, Math.min(Number(document.querySelector("#bookingPoints")?.value || 0), Number(window.motfPointBalance || 0)));
+        const verified = await window.motfEnsureIdentityVerified?.();
+        if (verified === false) throw new Error("휴대폰 본인인증을 완료해주세요.");
+        await ensureBenefitPreview("stay");
+        const requestedPoints = benefitInput("stay").points;
         const { data, error } = await client.rpc("prepare_stay_checkout", {
           target_business_id: draft.business_id,
           target_offering_id: draft.offering_id,
@@ -222,7 +300,10 @@
       const originalHtml = submitButton?.innerHTML;
       if (submitButton) { submitButton.disabled = true; submitButton.textContent = "결제 금액 확인 중..."; }
       try {
-        const requestedPoints = Math.max(0, Math.min(Number(document.querySelector("#marketPoints")?.value || 0), Number(window.motfPointBalance || 0)));
+        const verified = await window.motfEnsureIdentityVerified?.();
+        if (verified === false) throw new Error("휴대폰 본인인증을 완료해주세요.");
+        await ensureBenefitPreview("market");
+        const requestedPoints = benefitInput("market").points;
         const { data, error } = await client.rpc("prepare_market_checkout", {
           target_business_id: draft.business_id,
           customer_name: draft.customer_name,
@@ -259,6 +340,31 @@
   }, true);
 
   document.addEventListener("click", async (event) => {
+    const previewButton = event.target.closest("[data-preview-benefits]");
+    if (previewButton) {
+      try { await previewBenefits(previewButton.dataset.previewBenefits, previewButton); }
+      catch (error) {
+        const result = document.querySelector(benefitFields[previewButton.dataset.previewBenefits].result);
+        if (result) { result.className = "checkout-benefit-result error"; result.textContent = error.message || "혜택을 적용하지 못했습니다."; }
+      }
+      return;
+    }
+    const allPointsButton = event.target.closest("[data-use-all-points]");
+    if (allPointsButton) {
+      const kind = allPointsButton.dataset.useAllPoints;
+      const input = document.querySelector(benefitFields[kind].points);
+      if (input) input.value = String(window.motfPointBalance || 0);
+      invalidateBenefitPreview(kind);
+      return;
+    }
+    const resetBenefitsButton = event.target.closest("[data-reset-benefits]");
+    if (resetBenefitsButton) {
+      const kind = resetBenefitsButton.dataset.resetBenefits;
+      document.querySelector(benefitFields[kind].points).value = "0";
+      document.querySelector(benefitFields[kind].coupon).value = "";
+      invalidateBenefitPreview(kind);
+      return;
+    }
     const cancelButton = event.target.closest("[data-cancel-reservation]");
     if (!cancelButton) return;
     const reservationId = cancelButton.dataset.cancelReservation;
@@ -283,11 +389,19 @@
     } finally { cancelButton.disabled = false; }
   });
 
+  document.addEventListener("input", (event) => {
+    const kind = event.target.closest('[data-checkout-benefits="stay"]') ? "stay"
+      : event.target.closest('[data-checkout-benefits="market"]') ? "market" : "";
+    if (kind) invalidateBenefitPreview(kind);
+  });
+
   client.auth.onAuthStateChange((event) => {
     if (event === "SIGNED_IN") window.setTimeout(loadMyTransactions, 0);
     if (event === "SIGNED_OUT") {
       window.motfPointBalance = 0;
       document.querySelectorAll("[data-point-balance]").forEach((node) => { node.textContent = "0P"; });
+      document.querySelectorAll("[data-point-wallet]").forEach((node) => { node.hidden = true; });
+      window.motfApplyPointData?.({}, []);
       window.motfApplyMyTransactions?.([], []);
     }
   });

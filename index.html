@@ -13,7 +13,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;500;600&amp;display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" />
-    <link rel="stylesheet" href="styles.css?v=20260728-market1" />
+    <link rel="stylesheet" href="styles.css?v=20260829-release2" />
     <link rel="stylesheet" href="auth.css?v=20260712-policy-links1" />
     <script async src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" onload="window.__motfRefreshIcons && window.__motfRefreshIcons()"></script>
     <script async src="https://js.tosspayments.com/v2/standard"></script>
@@ -31,11 +31,12 @@
       </div>
       <nav class="top-nav" aria-label="주요 메뉴">
         <button class="nav-link nav-link-project" data-route="myMt"><i data-lucide="folder-kanban"></i>내 MT</button>
-        <button class="nav-link" data-route="events">모티프 MT</button>
+        <button class="nav-link" data-route="events">MOriginal</button>
         <button class="nav-link" data-route="stays">숙소</button>
         <button class="nav-link" data-route="market">장보기</button>
         <button class="nav-link" data-route="community">커뮤니티</button>
         <span class="nav-coming-soon" title="계절 상품 준비 중">빠지·스키 <small>COMING SOON</small></span>
+        <button class="header-point-wallet" type="button" data-point-wallet data-route="myUsage" hidden aria-label="보유 포인트와 내역 보기"><i data-lucide="circle-dollar-sign"></i><b data-point-balance>0P</b></button>
         <button class="nav-link icon-nav" data-route="chat" aria-label="채팅"><i data-lucide="message-circle"></i></button>
         <button class="nav-link icon-nav" data-route="mypage" aria-label="마이페이지"><i data-lucide="user-round"></i></button>
       </nav>
@@ -93,7 +94,7 @@
       </section>
 
       <section id="events" class="view events-view">
-        <header class="view-title event-page-head"><div><p class="eyebrow">moTF ORIGINAL</p><h1>모티프 MT</h1><p>낯선 사람과도 즐겁게 연결되는, 모티프가 직접 기획한 단체 여행입니다.</p></div></header>
+        <header class="view-title event-page-head"><div><p class="eyebrow">moTF ORIGINAL</p><h1>MOriginal</h1><p>낯선 사람과도 즐겁게 연결되는, 모티프가 직접 기획한 단체 여행입니다.</p></div></header>
         <div class="event-status-tabs" role="tablist">
           <button class="active" type="button" data-event-filter="all">전체</button>
           <button type="button" data-event-filter="open">신청 중</button>
@@ -105,7 +106,7 @@
       </section>
 
       <section id="eventDetail" class="view event-detail-view">
-        <button class="ghost-btn back-btn" data-route="events"><i data-lucide="chevron-left"></i>모티프 MT</button>
+        <button class="ghost-btn back-btn" data-route="events"><i data-lucide="chevron-left"></i>MOriginal</button>
         <div id="eventDetailContent"></div>
       </section>
 
@@ -316,8 +317,10 @@
             <label>숙소에 전달할 요청사항<textarea id="bookingMemo" rows="8" maxlength="2000" placeholder="예: 이용할 시설과 시간, 바비큐 인원, 숯·그릴 수량, 픽업 요청, 방 배정 방식, 늦은 체크인, 침구 추가 등 사장님이 확인해야 할 내용을 자세히 적어주세요."></textarea></label>
             <div class="checkout-benefits" data-checkout-benefits="stay">
               <div class="checkout-benefits-head"><strong>포인트·할인</strong><span>보유 <b data-point-balance>0P</b></span></div>
-              <label>할인코드<input id="bookingCouponCode" autocomplete="off" maxlength="40" placeholder="할인코드 입력" /></label>
-              <label>포인트 사용<input id="bookingPoints" type="number" min="0" step="100" value="0" inputmode="numeric" /></label>
+              <label>할인코드<div class="benefit-input-action"><input id="bookingCouponCode" autocomplete="off" maxlength="40" placeholder="할인코드 입력" /><button class="secondary-btn" type="button" data-preview-benefits="stay">적용</button></div></label>
+              <label>포인트 사용<div class="benefit-input-action"><input id="bookingPoints" type="number" min="0" step="100" value="0" inputmode="numeric" /><button class="secondary-btn" type="button" data-preview-benefits="stay">적용</button></div></label>
+              <div class="benefit-quick-actions"><button type="button" data-use-all-points="stay">전액 사용</button><button type="button" data-reset-benefits="stay">사용 취소</button></div>
+              <div class="checkout-benefit-result" id="stayBenefitPreview" aria-live="polite">포인트 또는 할인코드를 입력한 뒤 적용해주세요.</div>
             </div>
             <label class="checkbox-row"><input required type="checkbox" id="bookingTerms" />환불·취소 정책과 시설 이용 규칙에 동의합니다.</label>
             <button class="primary-btn" type="submit"><i data-lucide="credit-card"></i>예약 결제 준비하기</button>
@@ -368,8 +371,10 @@
             <label>요청사항<textarea id="pickupMemo" rows="3"></textarea></label>
             <div class="checkout-benefits" data-checkout-benefits="market">
               <div class="checkout-benefits-head"><strong>포인트·할인</strong><span>보유 <b data-point-balance>0P</b></span></div>
-              <label>할인코드<input id="marketCouponCode" autocomplete="off" maxlength="40" placeholder="할인코드 입력" /></label>
-              <label>포인트 사용<input id="marketPoints" type="number" min="0" step="100" value="0" inputmode="numeric" /></label>
+              <label>할인코드<div class="benefit-input-action"><input id="marketCouponCode" autocomplete="off" maxlength="40" placeholder="할인코드 입력" /><button class="secondary-btn" type="button" data-preview-benefits="market">적용</button></div></label>
+              <label>포인트 사용<div class="benefit-input-action"><input id="marketPoints" type="number" min="0" step="100" value="0" inputmode="numeric" /><button class="secondary-btn" type="button" data-preview-benefits="market">적용</button></div></label>
+              <div class="benefit-quick-actions"><button type="button" data-use-all-points="market">전액 사용</button><button type="button" data-reset-benefits="market">사용 취소</button></div>
+              <div class="checkout-benefit-result" id="marketBenefitPreview" aria-live="polite">포인트 또는 할인코드를 입력한 뒤 적용해주세요.</div>
             </div>
             <div id="cartSummary"></div>
             <button class="primary-btn" type="submit"><i data-lucide="credit-card"></i>결제하기</button>
@@ -620,6 +625,11 @@
             <strong>이용안내</strong>
             <span>문의하기, 고객센터, 이용약관, 개인정보 처리방침</span>
           </button>
+          <button class="mypage-menu-card mypage-point-card" data-route="myUsage">
+            <i data-lucide="circle-dollar-sign"></i>
+            <strong><span data-point-balance>0P</span> 보유</strong>
+            <span>포인트 적립과 사용 내역 확인</span>
+          </button>
         </div>
       </section>
 
@@ -637,6 +647,16 @@
           <button class="secondary-btn" type="submit"><i data-lucide="search"></i>기간 조회</button>
           <button class="ghost-btn" type="reset">전체 보기</button>
         </form>
+        <section class="point-history-section">
+          <div class="point-balance-summary">
+            <div><span>사용 가능한 포인트</span><strong data-point-balance>0P</strong></div>
+            <dl><div><dt>누적 적립</dt><dd id="pointLifetimeEarned">0P</dd></div><div><dt>누적 사용</dt><dd id="pointLifetimeUsed">0P</dd></div></dl>
+          </div>
+          <div>
+            <div class="section-toolbar"><h2>포인트 내역</h2><span>적립·사용·환불 내역을 최신순으로 확인합니다.</span></div>
+            <div id="pointHistoryList" class="point-history-list"><div class="empty-state compact">포인트 내역이 없습니다.</div></div>
+          </div>
+        </section>
         <div class="mypage-grid">
           <section>
             <h2>숙소 예약</h2>
@@ -940,11 +960,16 @@
       <a class="footer-instagram" data-social-instagram href="#" target="_blank" rel="noopener noreferrer" aria-label="모티프 인스타그램"><i data-lucide="camera"></i><span>Instagram</span></a>
     </footer>
 
-    <dialog id="photoGalleryDialog" class="photo-gallery-dialog">
-      <button type="button" class="photo-gallery-close" data-close-photo-gallery aria-label="사진 닫기"><i data-lucide="x"></i></button>
-      <button type="button" class="photo-gallery-nav previous" data-gallery-move="-1" aria-label="이전 사진"><i data-lucide="chevron-left"></i></button>
-      <figure><img id="photoGalleryImage" alt="숙소 사진 크게 보기" /><figcaption id="photoGalleryCaption"></figcaption></figure>
-      <button type="button" class="photo-gallery-nav next" data-gallery-move="1" aria-label="다음 사진"><i data-lucide="chevron-right"></i></button>
+    <dialog id="photoGalleryDialog" class="photo-gallery-dialog" aria-label="숙소 사진 전체보기">
+      <div class="photo-gallery-toolbar"><span id="photoGalleryCounter"></span><button type="button" class="photo-gallery-close" data-close-photo-gallery aria-label="사진 닫기"><i data-lucide="x"></i></button></div>
+      <div class="photo-gallery-stage">
+        <button type="button" class="photo-gallery-peek previous" data-gallery-move="-1" aria-label="이전 사진 보기"><img id="photoGalleryPrevious" alt="이전 사진" /></button>
+        <button type="button" class="photo-gallery-nav previous" data-gallery-move="-1" aria-label="이전 사진"><i data-lucide="chevron-left"></i></button>
+        <figure><img id="photoGalleryImage" alt="숙소 사진 크게 보기" /><figcaption id="photoGalleryCaption"></figcaption></figure>
+        <button type="button" class="photo-gallery-nav next" data-gallery-move="1" aria-label="다음 사진"><i data-lucide="chevron-right"></i></button>
+        <button type="button" class="photo-gallery-peek next" data-gallery-move="1" aria-label="다음 사진 보기"><img id="photoGalleryNext" alt="다음 사진" /></button>
+      </div>
+      <div class="photo-gallery-thumbnails" id="photoGalleryThumbnails" aria-label="사진 목록"></div>
     </dialog>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
@@ -953,16 +978,16 @@
     <script src="config.js?v=20260622-naver1"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ko.js"></script>
-    <script src="app.js?v=20260728-market1"></script>
+    <script src="app.js?v=20260829-release2"></script>
     <script src="budget-export.js?v=20260721-batch2"></script>
-    <script src="auth.js?v=20260712-login-clear1"></script>
+    <script src="auth.js?v=20260829-release2"></script>
     <script src="catalog.js?v=20260728-market1"></script>
-    <script src="transactions.js?v=20260728-pay2"></script>
+    <script src="transactions.js?v=20260829-release2"></script>
     <script src="chat-data.js?v=20260721-batch2"></script>
     <script src="support-data.js?v=20260621-support1"></script>
     <script src="reviews-data.js?v=20260721-batch2"></script>
     <script src="product-refresh.js?v=20260728-pay2"></script>
-    <script src="mt-project-data.js?v=20260728-pay2"></script>
+    <script src="mt-project-data.js?v=20260829-release2"></script>
     <script src="content-data.js?v=20260829-launch1"></script>
   </body>
 </html>

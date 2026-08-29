@@ -459,6 +459,8 @@ const state = {
   gallery: { images: [], index: 0, alt: "" },
   pendingMtCandidateId: "",
   selectedUsageIds: new Set(),
+  pointAccount: { balance: 0, lifetimeEarned: 0, lifetimeUsed: 0 },
+  pointHistory: [],
 };
 
 window.motfApplyCatalog = function applyCatalog(nextStays, nextStores, options = {}) {
@@ -606,6 +608,16 @@ window.motfApplyMyTransactions = function applyMyTransactions(reservations, orde
   state.reservations = reservations;
   state.orders = orders;
   renderMypage();
+};
+
+window.motfApplyPointData = function applyPointData(account = {}, ledger = []) {
+  state.pointAccount = {
+    balance: Number(account.balance || 0),
+    lifetimeEarned: Number(account.lifetime_earned || 0),
+    lifetimeUsed: Number(account.lifetime_used || 0),
+  };
+  state.pointHistory = Array.isArray(ledger) ? ledger : [];
+  renderPointHistory();
 };
 
 window.motfAddCommunityPost = function addCommunityPost(post) {
@@ -968,7 +980,7 @@ function renderHomeEvents() {
   const visible = state.platformEvents.filter((event) => !["draft", "cancelled"].includes(event.status)).slice(0, 3);
   container.innerHTML = visible.length
     ? visible.map((event, index) => eventCard(event, index === 0)).join("")
-    : `<div class="empty-state compact"><strong>첫 모티프 MT를 준비하고 있어요.</strong><span>신청 일정이 정해지면 가장 먼저 공개할게요.</span></div>`;
+    : `<div class="empty-state compact"><strong>첫 MOriginal을 준비하고 있어요.</strong><span>신청 일정이 정해지면 가장 먼저 공개할게요.</span></div>`;
   refreshIcons();
 }
 
@@ -1526,13 +1538,14 @@ function roomDetailFacts(stay, room) {
   ];
 }
 
-function renderStayGallery(images, alt) {
-  const visible = images.slice(0, 5);
+function renderStayGallery(images, alt, expanded = false) {
+  const visibleCount = expanded ? 7 : 5;
+  const visible = images.slice(0, visibleCount);
   return `
-    <div class="stay-photo-layout">
+    <div class="stay-photo-layout ${expanded ? "expanded" : "room-gallery-layout"}">
       <button class="stay-main-photo" type="button" data-open-gallery="0"><img src="${visible[0]}" alt="${alt} 대표 사진" /></button>
       <div class="stay-side-photos">
-        ${visible.slice(1).map((src, index) => `<button type="button" data-open-gallery="${index + 1}"><img src="${src}" alt="${alt} 추가 사진 ${index + 1}" />${index === visible.length - 2 && images.length > 5 ? `<b>+${images.length - 5}</b>` : ""}</button>`).join("")}
+        ${visible.slice(1).map((src, index) => `<button type="button" data-open-gallery="${index + 1}"><img src="${src}" alt="${alt} 추가 사진 ${index + 1}" />${index === visible.length - 2 && images.length > visibleCount ? `<b>사진 전체보기 +${images.length - visibleCount}</b>` : ""}</button>`).join("")}
       </div>
     </div>
   `;
@@ -1595,7 +1608,7 @@ function renderStayDetail() {
     </section>
 
     <section class="stay-gallery-section">
-      ${renderStayGallery(gallery, stay.name)}
+      ${renderStayGallery(gallery, stay.name, true)}
     </section>
 
     <section class="stay-facility-showcase">
@@ -2133,6 +2146,19 @@ function paymentBackRoute() {
   if (!state.pendingPayment) return "stays";
   return state.pendingPayment.type === "stay" ? "booking" : state.pendingPayment.type === "extra_charge" ? "myUsage" : "cart";
 }
+
+window.motfGetCheckoutPreviewContext = function getCheckoutPreviewContext(kind) {
+  if (kind === "stay") {
+    return {
+      originalAmount: bookingAmount().total,
+      businessId: state.selectedStay?.id || null,
+    };
+  }
+  return {
+    originalAmount: cartTotal(),
+    businessId: state.selectedStore?.id || (state.cart.length ? findProduct(state.cart[0]?.productId)?.store?.id || null : null),
+  };
+};
 
 function paymentHomeRoute() {
   if (!state.paymentResult) return "stays";
@@ -3189,6 +3215,9 @@ window.motfGetActiveCommunityPost = () => ({ boardId: state.activeBoardId, post:
 window.motfAppendCommunityComment = (comment) => { activePost().comments.push(comment); renderPostDetail(); };
 window.motfFindBusinessByName = (name) => [...stays, ...stores].find((item) => item.name === escapeHtml(name)) || null;
 window.motfNavigate = navigate;
+window.navigate = navigate;
+window.currentRoute = currentRoute;
+window.toast = toast;
 window.motfGetUsageSnapshot = () => ({
   reservations: state.reservations.map((item) => ({ ...item })),
   orders: state.orders.map((item) => ({ ...item })),
@@ -3212,7 +3241,24 @@ function renderMypage() {
     selectedBudgetButton.disabled = state.selectedUsageIds.size === 0;
     selectedBudgetButton.innerHTML = `<i data-lucide="file-spreadsheet"></i>${state.selectedUsageIds.size ? `${state.selectedUsageIds.size}건 예결산 생성` : "선택 내역 예결산"}`;
   }
+  renderPointHistory();
   refreshIcons();
+}
+
+function renderPointHistory() {
+  const earned = qs("#pointLifetimeEarned");
+  const used = qs("#pointLifetimeUsed");
+  const list = qs("#pointHistoryList");
+  if (earned) earned.textContent = `${state.pointAccount.lifetimeEarned.toLocaleString("ko-KR")}P`;
+  if (used) used.textContent = `${state.pointAccount.lifetimeUsed.toLocaleString("ko-KR")}P`;
+  if (!list) return;
+  const labels = { earn: "적립", use: "사용", refund: "복구", expire: "소멸", admin_adjust: "운영 조정" };
+  list.innerHTML = state.pointHistory.length
+    ? state.pointHistory.map((item) => {
+      const amount = Number(item.amount || 0);
+      return `<article class="point-history-row"><div><strong>${escapeHtml(item.reason || labels[item.entry_type] || "포인트 변동")}</strong><span>${formatDateTime(item.created_at)} · ${labels[item.entry_type] || item.entry_type}</span></div><div class="${amount >= 0 ? "positive" : "negative"}"><b>${amount >= 0 ? "+" : ""}${amount.toLocaleString("ko-KR")}P</b><small>잔액 ${Number(item.balance_after || 0).toLocaleString("ko-KR")}P</small></div></article>`;
+    }).join("")
+    : '<div class="empty-state compact">포인트 내역이 없습니다.</div>';
 }
 
 async function renderTossWidgets(payment) {
@@ -4442,10 +4488,23 @@ qsa(".brand").forEach((brand) => {
 function updatePhotoGallery() {
   const image = qs("#photoGalleryImage");
   const caption = qs("#photoGalleryCaption");
+  const previous = qs("#photoGalleryPrevious");
+  const next = qs("#photoGalleryNext");
+  const counter = qs("#photoGalleryCounter");
+  const thumbnails = qs("#photoGalleryThumbnails");
   if (!image || !state.gallery.images.length) return;
   state.gallery.index = (state.gallery.index + state.gallery.images.length) % state.gallery.images.length;
   image.src = state.gallery.images[state.gallery.index];
-  caption.textContent = `${state.gallery.alt} · ${state.gallery.index + 1} / ${state.gallery.images.length}`;
+  const previousIndex = (state.gallery.index - 1 + state.gallery.images.length) % state.gallery.images.length;
+  const nextIndex = (state.gallery.index + 1) % state.gallery.images.length;
+  if (previous) previous.src = state.gallery.images[previousIndex];
+  if (next) next.src = state.gallery.images[nextIndex];
+  if (counter) counter.textContent = `${state.gallery.index + 1} / ${state.gallery.images.length}`;
+  caption.textContent = state.gallery.alt;
+  if (thumbnails) {
+    thumbnails.innerHTML = state.gallery.images.map((src, index) => `<button type="button" data-gallery-index="${index}" class="${index === state.gallery.index ? "active" : ""}" aria-label="${index + 1}번째 사진"><img src="${src}" alt="" /></button>`).join("");
+    thumbnails.querySelector(".active")?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+  }
 }
 
 document.addEventListener("click", (event) => {
@@ -4468,7 +4527,7 @@ document.addEventListener("click", (event) => {
   }
   if (event.target.closest("[data-invite-mt-companion]")) {
     window.motfCreateMtInvite?.().then(async (code) => {
-      const link = `${window.location.origin}/my-mt?invite=${encodeURIComponent(code)}`;
+      const link = `${window.location.origin}/?route=myMt&invite=${encodeURIComponent(code)}`;
       try { await navigator.clipboard.writeText(link); toast("7일 동안 유효한 초대 링크를 복사했습니다."); }
       catch { window.prompt("아래 초대 링크를 전달해주세요.", link); }
     }).catch((error) => toast(error.message || "초대 링크를 만들지 못했습니다."));
@@ -4501,6 +4560,12 @@ document.addEventListener("click", (event) => {
     updatePhotoGallery();
     return;
   }
+  const galleryIndex = event.target.closest("[data-gallery-index]");
+  if (galleryIndex) {
+    state.gallery.index = Number(galleryIndex.dataset.galleryIndex || 0);
+    updatePhotoGallery();
+    return;
+  }
   if (event.target.closest("[data-close-photo-gallery]")) {
     qs("#photoGalleryDialog")?.close();
     return;
@@ -4512,6 +4577,19 @@ document.addEventListener("click", (event) => {
       event.preventDefault();
       toast("공식 인스타그램 주소를 운영자 화면에서 등록해주세요.");
     } else instagram.href = url;
+  }
+});
+
+document.addEventListener("keydown", (event) => {
+  const dialog = qs("#photoGalleryDialog");
+  if (!dialog?.open) return;
+  if (event.key === "ArrowLeft") {
+    state.gallery.index -= 1;
+    updatePhotoGallery();
+  }
+  if (event.key === "ArrowRight") {
+    state.gallery.index += 1;
+    updatePhotoGallery();
   }
 });
 

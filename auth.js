@@ -22,6 +22,7 @@
   window.motfSupabase = client;
 
   const protectedRoutes = new Set([
+    "myMt",
     "mypage",
     "myUsage",
     "myAccount",
@@ -183,7 +184,7 @@
           <div class="identity-result" id="profileIdentityResult" hidden></div>
           <label>휴대전화번호<input id="profileCompletePhone" type="tel" autocomplete="tel" readonly maxlength="20" placeholder="본인인증 후 자동 입력" /></label>
           <label>학교/소속
-            <input id="profileCompleteOrganization" autocomplete="organization" maxlength="80" placeholder="예: 한국대 경영학과 학생회" />
+            <input id="profileCompleteOrganization" autocomplete="organization" maxlength="80" required placeholder="예: 한국대 경영학과 학생회" />
           </label>
           <div id="kakaoPasswordFields" hidden>
             <label>서비스 비밀번호<input id="profileCompletePassword" type="password" autocomplete="new-password" minlength="8" maxlength="12" placeholder="영문·숫자·특수문자 8~12자리" /></label>
@@ -350,6 +351,7 @@
     document.querySelectorAll("[data-auth-tab]").forEach((button) => {
       button.classList.toggle("active", button.dataset.authTab === tab);
     });
+    modal.querySelectorAll("[data-auth-close]").forEach((button) => { button.hidden = false; });
     setMessage("");
   }
 
@@ -404,6 +406,7 @@
     const passwordFields = document.querySelector("#kakaoPasswordFields");
     passwordFields.hidden = !needsPassword;
     passwordFields.querySelectorAll("input").forEach((input) => { input.required = needsPassword; });
+    modal.querySelectorAll("[data-auth-close], [data-profile-complete-later]").forEach((button) => { button.hidden = true; });
     modal.hidden = false;
     document.body.classList.add("auth-modal-open");
     setMessage(profile?.identity_verified_at
@@ -413,8 +416,6 @@
   }
 
   function maybePromptProfileCompletion() {
-    const key = profileCompletionDismissKey();
-    if (!key || window.localStorage.getItem(key) === "1") return;
     if (needsProfileCompletion()) window.setTimeout(openProfileCompletion, 250);
   }
 
@@ -446,6 +447,18 @@
     setMessage("이 기능은 로그인 후 이용할 수 있어요.");
     return false;
   }
+
+  window.motfEnsureIdentityVerified = async function ensureIdentityVerified() {
+    if (!session?.user) {
+      requireLogin();
+      return false;
+    }
+    if (!profile) await loadProfile();
+    if (profile?.identity_verified_at) return true;
+    openProfileCompletion();
+    setMessage("예약과 주문을 계속하려면 휴대폰 본인인증을 완료해주세요.", "error");
+    return false;
+  };
 
   async function loadProfile() {
     profile = null;
@@ -769,8 +782,8 @@
       setMessage("연락처를 다시 확인해주세요.", "error");
       return;
     }
-    if (!phone && !organization) {
-      setMessage("전화번호 또는 학교/소속 중 하나 이상 입력해주세요.", "error");
+    if (!organization) {
+      setMessage("학교/소속을 입력해주세요.", "error");
       return;
     }
 
@@ -815,6 +828,7 @@
   document.addEventListener("click", async (event) => {
     const closeButton = event.target.closest("[data-auth-close]");
     if (closeButton) {
+      if (!profileCompleteForm.hidden && needsProfileCompletion()) return;
       closeModal();
       return;
     }
@@ -895,13 +909,6 @@
         return;
       }
       openPasswordChange();
-      return;
-    }
-
-    if (event.target.closest("[data-profile-complete-later]")) {
-      const key = profileCompletionDismissKey();
-      if (key) window.localStorage.setItem(key, "1");
-      closeModal();
       return;
     }
 
@@ -1066,8 +1073,16 @@
     requireLogin();
   }, true);
 
+  window.addEventListener("motf:routechange", (event) => {
+    const route = event.detail?.route;
+    if (session?.user || !protectedRoutes.has(route)) return;
+    window.motfNavigate?.("home", { record: false, replace: true });
+    requireLogin(() => window.motfNavigate?.(route));
+    setMessage("이 기능은 로그인 후 이용할 수 있어요.");
+  });
+
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && !modal.hidden) closeModal();
+    if (event.key === "Escape" && !modal.hidden && (profileCompleteForm.hidden || !needsProfileCompletion())) closeModal();
   });
 
   client.auth.onAuthStateChange((event, nextSession) => {
@@ -1105,7 +1120,9 @@
     maybePromptProfileCompletion();
     requestWelcomeEmail();
 
-    const activeRoute = typeof window.currentRoute === "function" ? window.currentRoute() : "home";
+    const activeRoute = typeof window.currentRoute === "function"
+      ? window.currentRoute()
+      : document.body.dataset.currentRoute || "home";
     if (!session?.user && protectedRoutes.has(activeRoute)) {
       window.navigate?.("home", { record: false, replace: true });
       openModal("login", () => window.navigate?.(activeRoute));
