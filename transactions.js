@@ -75,11 +75,39 @@
 
   function benefitInput(kind) {
     const fields = benefitFields[kind];
-    const requested = Number(document.querySelector(fields.points)?.value || 0);
+    const pointsInput = document.querySelector(fields.points);
+    const requested = Number(pointsInput?.value || 0);
+    const balance = Math.max(0, Number(window.motfPointBalance || 0));
+    const points = Number.isFinite(requested) ? Math.max(0, Math.min(requested, balance)) : 0;
+    if (pointsInput && Number(pointsInput.value || 0) !== points) pointsInput.value = String(points);
     return {
-      points: Number.isFinite(requested) ? Math.max(0, Math.min(requested, Number(window.motfPointBalance || 0))) : 0,
+      points,
       coupon: document.querySelector(fields.coupon)?.value.trim().toUpperCase() || "",
     };
+  }
+
+  function syncPointControls(balanceValue = 0) {
+    const balance = Math.max(0, Number(balanceValue || 0));
+    window.motfPointBalance = balance;
+    document.querySelectorAll("[data-point-balance]").forEach((node) => { node.textContent = `${balance.toLocaleString("ko-KR")}P`; });
+    Object.entries(benefitFields).forEach(([kind, fields]) => {
+      const input = document.querySelector(fields.points);
+      const apply = document.querySelector(`[data-point-apply="${kind}"]`);
+      const all = document.querySelector(`[data-use-all-points="${kind}"]`);
+      if (input) {
+        input.max = String(balance);
+        input.disabled = balance <= 0;
+        if (balance <= 0 || Number(input.value || 0) > balance) input.value = balance <= 0 ? "0" : String(balance);
+        input.placeholder = balance > 0 ? "사용할 포인트" : "사용 가능 포인트 없음";
+      }
+      if (apply) apply.disabled = balance <= 0;
+      if (all) all.disabled = balance <= 0;
+      const result = document.querySelector(fields.result);
+      if (balance <= 0 && result && !document.querySelector(fields.coupon)?.value.trim()) {
+        result.className = "checkout-benefit-result unavailable";
+        result.textContent = "사용 가능한 포인트가 없습니다. 할인코드는 별도로 적용할 수 있어요.";
+      }
+    });
   }
 
   function benefitSignature(kind, context, input = benefitInput(kind)) {
@@ -101,6 +129,7 @@
     const context = window.motfGetCheckoutPreviewContext?.(kind);
     if (!context?.originalAmount || !isUuid(context.businessId)) throw new Error("결제할 상품 정보를 먼저 확인해주세요.");
     const input = benefitInput(kind);
+    if (button?.dataset.pointApply && Number(window.motfPointBalance || 0) <= 0) throw new Error("사용 가능한 포인트가 없습니다.");
     const originalText = button?.textContent;
     if (button) { button.disabled = true; button.textContent = "확인 중"; }
     try {
@@ -130,8 +159,20 @@
 
   async function ensureBenefitPreview(kind) {
     const context = window.motfGetCheckoutPreviewContext?.(kind);
+    const input = benefitInput(kind);
     const signature = benefitSignature(kind, context);
     if (benefitPreviews[kind]?.signature === signature) return benefitPreviews[kind];
+    if (!input.points && !input.coupon) {
+      const preview = {
+        original_amount: Number(context?.originalAmount || 0),
+        payable_amount: Number(context?.originalAmount || 0),
+        applied_points: 0,
+        applied_coupon_discount: 0,
+        signature,
+      };
+      benefitPreviews[kind] = preview;
+      return preview;
+    }
     return previewBenefits(kind);
   }
 
@@ -139,6 +180,7 @@
     const { data: authData } = await client.auth.getSession();
     const userId = authData.session?.user?.id;
     if (!userId) {
+      syncPointControls(0);
       window.motfApplyMyTransactions?.([], []);
       return;
     }
@@ -171,10 +213,8 @@
       return;
     }
     const pointBalance = pointResult.error ? 0 : Number(pointResult.data?.balance || 0);
-    window.motfPointBalance = pointBalance;
-    document.querySelectorAll("[data-point-balance]").forEach((node) => { node.textContent = `${pointBalance.toLocaleString("ko-KR")}P`; });
+    syncPointControls(pointBalance);
     document.querySelectorAll("[data-point-wallet]").forEach((node) => { node.hidden = false; });
-    document.querySelectorAll("#bookingPoints, #marketPoints").forEach((input) => { input.max = String(pointBalance); });
     window.motfApplyPointData?.(pointResult.data || {}, pointLedgerResult.error ? [] : (pointLedgerResult.data || []));
     const reservations = (reservationResult.data || []).map((item) => ({
       id: item.id,
@@ -328,14 +368,18 @@
     }
   }, true);
 
-  // 필수 입력값이 빠져 submit 이벤트 자체가 발생하지 않는 경우에도
-  // 사용자가 버튼이 고장 났다고 느끼지 않도록 명확한 안내를 보여준다.
   document.addEventListener("click", (event) => {
     const submitButton = event.target.closest('#bookingForm [type="submit"], #orderForm [type="submit"]');
     if (!submitButton) return;
     const form = submitButton.closest("form");
     if (form && !form.checkValidity()) {
-      window.setTimeout(() => alert("필수 입력 항목과 동의 체크를 모두 확인해주세요."), 0);
+      event.preventDefault();
+      const invalid = form.querySelector(":invalid");
+      window.setTimeout(() => {
+        form.reportValidity();
+        invalid?.focus();
+        if (invalid?.id === "bookingTerms") window.motfToast?.("환불·취소 정책과 시설 이용 규칙에 동의해주세요.");
+      }, 0);
     }
   }, true);
 
@@ -352,6 +396,7 @@
     const allPointsButton = event.target.closest("[data-use-all-points]");
     if (allPointsButton) {
       const kind = allPointsButton.dataset.useAllPoints;
+      if (Number(window.motfPointBalance || 0) <= 0) return window.motfToast?.("사용 가능한 포인트가 없습니다.");
       const input = document.querySelector(benefitFields[kind].points);
       if (input) input.value = String(window.motfPointBalance || 0);
       invalidateBenefitPreview(kind);
@@ -398,8 +443,7 @@
   client.auth.onAuthStateChange((event) => {
     if (event === "SIGNED_IN") window.setTimeout(loadMyTransactions, 0);
     if (event === "SIGNED_OUT") {
-      window.motfPointBalance = 0;
-      document.querySelectorAll("[data-point-balance]").forEach((node) => { node.textContent = "0P"; });
+      syncPointControls(0);
       document.querySelectorAll("[data-point-wallet]").forEach((node) => { node.hidden = true; });
       window.motfApplyPointData?.({}, []);
       window.motfApplyMyTransactions?.([], []);

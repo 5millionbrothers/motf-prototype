@@ -1,7 +1,13 @@
 const { json } = require("./_utils");
 
 function env(name) {
-  return String(process.env[name] || "").trim();
+  const aliases = {
+    SUPABASE_URL: ["SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_URL"],
+    SUPABASE_PUBLISHABLE_KEY: ["SUPABASE_PUBLISHABLE_KEY", "SUPABASE_ANON_KEY", "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "NEXT_PUBLIC_SUPABASE_ANON_KEY"],
+    SUPABASE_SERVICE_ROLE_KEY: ["SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_SECRET_KEY"],
+  };
+  const candidates = aliases[name] || [name];
+  return candidates.map((key) => String(process.env[key] || "").trim()).find(Boolean) || "";
 }
 
 function requireEnv(names) {

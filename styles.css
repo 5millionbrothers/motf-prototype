@@ -1005,7 +1005,6 @@ input[type="range"] {
 .secondary-btn,
 .ghost-btn,
 .primary-icon,
-.pay-chip,
 .tag-chip {
   display: inline-flex;
   align-items: center;
@@ -1388,26 +1387,6 @@ input[type="range"] {
   border-bottom: 0;
   font-size: 18px;
   font-weight: 700;
-}
-
-.payment-methods {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.pay-chip {
-  min-height: 36px;
-  padding: 0 10px;
-  color: var(--muted);
-  background: var(--paper);
-  border-color: var(--line);
-}
-
-.pay-chip.active {
-  color: #fff;
-  background: var(--teal);
-  border-color: var(--teal);
 }
 
 .toss-ready-card,
@@ -4172,30 +4151,30 @@ h2 {
 .checkout-benefits-head span { color: var(--muted); font-size: 13px; }
 .checkout-benefits-head b { color: var(--teal-dark); }
 
-.toss-method-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-.toss-method-option {
+.toss-launch-summary {
   display: flex;
-  min-height: 72px;
   align-items: center;
   gap: 12px;
-  padding: 14px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #fff;
-  cursor: pointer;
-  transition: border-color .18s ease, background .18s ease;
+  padding: 16px;
+  background: #f5f8f2;
 }
-.toss-method-option:has(input:checked) { border-color: var(--teal); background: #f2f6ef; }
-.toss-method-option.disabled { opacity: .45; cursor: not-allowed; }
-.toss-method-option input { width: 18px; height: 18px; accent-color: var(--teal); }
-.toss-method-option svg { width: 21px; height: 21px; color: var(--teal-dark); }
-.toss-method-option span { display: grid; gap: 3px; }
-.toss-method-option small { color: var(--muted); font-size: 12px; }
-.toss-final-agreement { display: flex; align-items: flex-start; gap: 9px; color: var(--ink); font-size: 14px; }
-.toss-final-agreement input { width: 18px; height: 18px; margin-top: 1px; accent-color: var(--teal); }
+.toss-launch-summary > div { display: grid; gap: 4px; }
+.toss-launch-summary strong { color: var(--ink); font-size: 14px; }
+.toss-launch-summary p { margin: 0; }
+.toss-launch-icon { display: grid; flex: 0 0 40px; width: 40px; height: 40px; place-items: center; color: #fff; background: var(--teal-dark); border-radius: 8px; }
+.toss-launch-icon svg { width: 20px; height: 20px; }
+
+.benefit-input-action input:disabled {
+  color: var(--muted);
+  background: #f1f2ef;
+  cursor: not-allowed;
+}
+.benefit-input-action button:disabled,
+.benefit-quick-actions button:disabled { opacity: .42; cursor: not-allowed; }
+.checkout-benefit-result.unavailable { color: #6f756b; background: #f7f8f5; border-style: solid; }
 
 @media (max-width: 700px) {
-  .checkout-benefits, .toss-method-grid { grid-template-columns: 1fr; }
+  .checkout-benefits { grid-template-columns: 1fr; }
 }
 /* Launch content, hosted events and media gallery */
 .nav-coming-soon { display:flex; align-items:center; gap:5px; color:var(--muted); font-size:12px; white-space:nowrap; cursor:not-allowed; }

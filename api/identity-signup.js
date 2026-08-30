@@ -5,6 +5,7 @@ const { allowCors, readBody, passwordIsValid, verifiedSession, consumeSession, s
 module.exports = async function handler(req, res) {
   if (allowCors(req, res)) return;
   if (req.method !== "POST") return json(res, 405, { ok: false, message: "POST only." });
+  let createdUserId = "";
   try {
     requireEnv(["SUPABASE_URL", "SUPABASE_PUBLISHABLE_KEY", "SUPABASE_SERVICE_ROLE_KEY"]);
     const body = await readBody(req);
@@ -17,6 +18,8 @@ module.exports = async function handler(req, res) {
     const identity = await verifiedSession(String(body.identityToken || ""), purpose);
     const duplicates = await supabaseRequest(`/rest/v1/profiles?identity_ci_hash=eq.${encodeURIComponent(identity.verified_ci_hash)}&withdrawal_processed_at=is.null&select=id&limit=1`);
     if (duplicates?.length) return json(res, 409, { ok: false, message: "이미 가입된 본인인증 정보입니다. 기존 계정으로 로그인하거나 비밀번호 찾기를 이용해주세요." });
+    const emailDuplicates = await supabaseRequest(`/rest/v1/profiles?email=ilike.${encodeURIComponent(email)}&withdrawal_processed_at=is.null&select=id&limit=1`);
+    if (emailDuplicates?.length) return json(res, 409, { ok: false, message: "이미 가입된 이메일입니다. 로그인하거나 비밀번호 찾기를 이용해주세요." });
     const redirectTo = safeReturnUrl(body.emailRedirectTo, accountType === "partner" ? "https://motfowner.co.kr" : "https://motf.co.kr");
     const metadata = {
       account_type: accountType,
@@ -39,12 +42,20 @@ module.exports = async function handler(req, res) {
       throw error;
     }
     const userId = signup.data.user.id;
-    await supabaseRequest(`/rest/v1/profiles?id=eq.${userId}`, {
-      method: "PATCH",
-      headers: { Prefer: "return=minimal" },
+    if (Array.isArray(signup.data.user.identities) && signup.data.user.identities.length === 0) {
+      return json(res, 409, { ok: false, message: "이미 가입된 이메일입니다. 로그인하거나 비밀번호 찾기를 이용해주세요." });
+    }
+    createdUserId = userId;
+    const savedProfiles = await supabaseRequest("/rest/v1/profiles?on_conflict=id", {
+      method: "POST",
+      headers: { Prefer: "resolution=merge-duplicates,return=representation" },
       body: JSON.stringify({
+        id: userId,
+        email,
         full_name: identity.verified_name,
         phone: identity.verified_phone,
+        role: accountType,
+        status: accountType === "partner" ? "pending" : "approved",
         birth_date: identity.verified_birth_date,
         identity_provider: "kcp",
         identity_ci_hash: identity.verified_ci_hash,
@@ -53,9 +64,19 @@ module.exports = async function handler(req, res) {
         password_set_at: new Date().toISOString(),
       }),
     });
+    if (!Array.isArray(savedProfiles) || savedProfiles[0]?.id !== userId) throw new Error("회원 정보를 저장하지 못했습니다.");
     await consumeSession(identity.id, userId);
+    createdUserId = "";
     return json(res, 200, { ok: true, emailConfirmationRequired: !signup.data.access_token });
   } catch (error) {
+    if (createdUserId) {
+      try {
+        await supabaseRequest(`/auth/v1/admin/users/${encodeURIComponent(createdUserId)}`, { method: "DELETE" });
+      } catch (rollbackError) {
+        console.error("identity-signup rollback failed", { userId: createdUserId, message: rollbackError.message });
+      }
+    }
+    console.error("identity-signup failed", { status: error.statusCode || 500, message: error.message });
     return json(res, error.statusCode || 500, { ok: false, message: error.message || "회원가입에 실패했습니다." });
   }
 };

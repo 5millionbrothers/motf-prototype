@@ -318,7 +318,7 @@
             <div class="checkout-benefits" data-checkout-benefits="stay">
               <div class="checkout-benefits-head"><strong>포인트·할인</strong><span>보유 <b data-point-balance>0P</b></span></div>
               <label>할인코드<div class="benefit-input-action"><input id="bookingCouponCode" autocomplete="off" maxlength="40" placeholder="할인코드 입력" /><button class="secondary-btn" type="button" data-preview-benefits="stay">적용</button></div></label>
-              <label>포인트 사용<div class="benefit-input-action"><input id="bookingPoints" type="number" min="0" step="100" value="0" inputmode="numeric" /><button class="secondary-btn" type="button" data-preview-benefits="stay">적용</button></div></label>
+              <label>포인트 사용<div class="benefit-input-action"><input id="bookingPoints" type="number" min="0" step="100" value="0" inputmode="numeric" /><button class="secondary-btn" type="button" data-preview-benefits="stay" data-point-apply="stay">적용</button></div></label>
               <div class="benefit-quick-actions"><button type="button" data-use-all-points="stay">전액 사용</button><button type="button" data-reset-benefits="stay">사용 취소</button></div>
               <div class="checkout-benefit-result" id="stayBenefitPreview" aria-live="polite">포인트 또는 할인코드를 입력한 뒤 적용해주세요.</div>
             </div>
@@ -372,7 +372,7 @@
             <div class="checkout-benefits" data-checkout-benefits="market">
               <div class="checkout-benefits-head"><strong>포인트·할인</strong><span>보유 <b data-point-balance>0P</b></span></div>
               <label>할인코드<div class="benefit-input-action"><input id="marketCouponCode" autocomplete="off" maxlength="40" placeholder="할인코드 입력" /><button class="secondary-btn" type="button" data-preview-benefits="market">적용</button></div></label>
-              <label>포인트 사용<div class="benefit-input-action"><input id="marketPoints" type="number" min="0" step="100" value="0" inputmode="numeric" /><button class="secondary-btn" type="button" data-preview-benefits="market">적용</button></div></label>
+              <label>포인트 사용<div class="benefit-input-action"><input id="marketPoints" type="number" min="0" step="100" value="0" inputmode="numeric" /><button class="secondary-btn" type="button" data-preview-benefits="market" data-point-apply="market">적용</button></div></label>
               <div class="benefit-quick-actions"><button type="button" data-use-all-points="market">전액 사용</button><button type="button" data-reset-benefits="market">사용 취소</button></div>
               <div class="checkout-benefit-result" id="marketBenefitPreview" aria-live="polite">포인트 또는 할인코드를 입력한 뒤 적용해주세요.</div>
             </div>
@@ -388,21 +388,20 @@
             <div class="view-title compact">
               <div>
                 <p class="eyebrow">토스페이먼츠 안전결제</p>
-                <h1>결제수단을 선택해주세요</h1>
+                <h1>토스페이먼츠 안전결제</h1>
               </div>
             </div>
             <div id="paymentSummary"></div>
             <div class="toss-widget-box">
               <div class="toss-widget-header">
                 <i data-lucide="wallet-cards"></i>
-                <strong>결제수단 확인</strong>
+                <strong>안전한 결제</strong>
               </div>
               <div id="tossPaymentMethods" class="toss-widget-area"></div>
-              <div id="tossAgreement" class="toss-widget-area"></div>
               <p id="tossWidgetStatus" class="toss-widget-status">결제 설정을 확인하고 있습니다.</p>
             </div>
             <div class="button-row">
-              <button class="primary-btn" data-toss-payment><i data-lucide="credit-card"></i>결제하기</button>
+              <button class="primary-btn" data-toss-payment><i data-lucide="credit-card"></i>토스페이먼츠에서 결제하기</button>
             </div>
           </section>
           <aside class="summary-panel">

@@ -33,9 +33,8 @@ SUPABASE_URL=https://프로젝트.supabase.co
 SUPABASE_PUBLISHABLE_KEY=Supabase publishable key
 SUPABASE_SERVICE_ROLE_KEY=Supabase service_role key
 
-TOSS_CLIENT_KEY=토스 클라이언트 키
-TOSS_SECRET_KEY=토스 시크릿 키
-TOSS_ENABLED_METHODS=CARD,TRANSFER
+TOSS_CLIENT_KEY=토스 주문서형·결제창형 클라이언트 키
+TOSS_SECRET_KEY=위 클라이언트 키와 같은 쌍의 주문서형·결제창형 시크릿 키
 
 KCP_CERT_SITE_CODE=KCP 본인확인 사이트코드
 KCP_CERT_WEB_SITE_ID=KCP 웹사이트 ID(발급된 경우)
@@ -48,7 +47,7 @@ NAVER_MAP_KEY_ID=네이버 지도 API Key ID
 
 `TOSS_SECRET_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `KCP_CERT_ADAPTER_SECRET`, `IDENTITY_HASH_PEPPER`는 브라우저 코드, `config.js`, GitHub에 넣지 않습니다.
 
-가상계좌를 여는 시점에는 `TOSS_ENABLED_METHODS=CARD,TRANSFER,VIRTUAL_ACCOUNT`로 바꾸고, 토스 계약에서 가상계좌가 활성화되었는지 먼저 확인합니다.
+가상계좌를 여는 시점에는 토스페이먼츠 어드민의 결제창 설정에서 가상계좌를 활성화하고 계약 상태를 확인합니다. 이용자는 moTF 화면이 아니라 토스 안전결제창에서 현재 가능한 결제수단을 선택합니다.
 
 ## 적용 순서
 

@@ -37,7 +37,7 @@ const escapeHtml = (value) => String(value ?? "").replace(/[&<>'"]/g, (character
 window.motfEscapeHtml = escapeHtml;
 
 let TOSS_CLIENT_KEY = window.MOTF_CONFIG?.TOSS_CLIENT_KEY?.trim() || "";
-let TOSS_ENABLED_METHODS = ["CARD", "TRANSFER"];
+let activeTossPaymentWindow = null;
 const PENDING_PAYMENT_STORAGE_KEY = "motf.pendingPayment";
 const DEFAULT_STAY_REGION = "가평";
 const DEFAULT_STAY_PEOPLE = 10;
@@ -2829,7 +2829,6 @@ async function loadPaymentConfig() {
     if (!response.headers.get("content-type")?.includes("application/json")) return;
     const data = await response.json();
     if (response.ok && data.tossClientKey) TOSS_CLIENT_KEY = data.tossClientKey;
-    if (response.ok && Array.isArray(data.enabledMethods)) TOSS_ENABLED_METHODS = data.enabledMethods;
     if (response.ok && data.naverMapKeyId) NAVER_MAP_KEY_ID = data.naverMapKeyId;
   } catch (error) {
     console.warn("토스 결제 공개 설정을 불러오지 못했습니다.", error);
@@ -3350,31 +3349,16 @@ function renderPointHistory() {
 
 async function renderTossWidgets(payment) {
   const paymentMethods = qs("#tossPaymentMethods");
-  const agreement = qs("#tossAgreement");
-  if (!paymentMethods || !agreement || !payment) return;
-  const methods = [
-    { id: "CARD", label: "신용·체크카드", note: "카드사 앱 또는 간편결제", icon: "credit-card" },
-    { id: "TRANSFER", label: "계좌이체", note: "내 계좌에서 바로 결제", icon: "landmark" },
-    { id: "VIRTUAL_ACCOUNT", label: "가상계좌", note: "12월 도입 예정", icon: "receipt-text" },
-  ];
-  const available = methods.filter((method) => TOSS_ENABLED_METHODS.includes(method.id));
-  if (!payment.paymentMethod || !available.some((method) => method.id === payment.paymentMethod)) {
-    payment.paymentMethod = available[0]?.id || "CARD";
-  }
-  paymentMethods.innerHTML = `<div class="toss-method-grid">${methods.map((method) => {
-    const enabled = TOSS_ENABLED_METHODS.includes(method.id);
-    return `<label class="toss-method-option ${enabled ? "" : "disabled"}">
-      <input type="radio" name="tossPaymentMethod" value="${method.id}" ${payment.paymentMethod === method.id ? "checked" : ""} ${enabled ? "" : "disabled"} />
-      <i data-lucide="${method.icon}"></i><span><strong>${method.label}</strong><small>${method.note}</small></span>
-    </label>`;
-  }).join("")}</div>`;
-  agreement.innerHTML = `
-    <label class="toss-final-agreement"><input type="checkbox" id="tossFinalAgreement" />주문 내용과 환불 규정을 확인했으며 결제에 동의합니다.</label>
-  `;
-  paymentMethods.querySelectorAll('input[name="tossPaymentMethod"]').forEach((input) => {
-    input.addEventListener("change", () => { payment.paymentMethod = input.value; savePendingPayment(payment); });
-  });
-  setTossWidgetStatus("토스페이먼츠 결제창에서 선택한 수단으로 안전하게 결제합니다.");
+  if (!paymentMethods || !payment) return;
+  paymentMethods.innerHTML = `
+    <div class="toss-launch-summary">
+      <span class="toss-launch-icon"><i data-lucide="shield-check"></i></span>
+      <div>
+        <strong>결제수단은 토스페이먼츠에서 선택합니다</strong>
+        <p>카드·계좌이체 등 현재 이용 가능한 수단을 안전결제창에서 바로 확인할 수 있어요.</p>
+      </div>
+    </div>`;
+  setTossWidgetStatus("아래 버튼을 누르면 토스페이먼츠 안전결제창이 열립니다.");
   refreshIcons();
 }
 
@@ -3416,7 +3400,7 @@ async function confirmPaymentOnServer(payment, params = new URLSearchParams()) {
 async function requestTossPayment() {
   const payment = state.pendingPayment;
   if (!payment) return toast("결제할 내역이 없습니다.");
-  if (!qs("#tossFinalAgreement")?.checked) return toast("주문 내용과 환불 규정에 동의해주세요.");
+  if (activeTossPaymentWindow) return toast("이미 토스페이먼츠 결제창이 열려 있습니다.");
   if (!TOSS_CLIENT_KEY) {
     state.paymentResult = {
       status: "fail", type: payment.type, eyebrow: "결제 설정 필요", title: "토스 결제키가 설정되지 않았습니다",
@@ -3426,39 +3410,28 @@ async function requestTossPayment() {
     return navigate("paymentResult");
   }
 
-  try {
-    await loadTossPaymentsSdk();
-    const { data: sessionData } = await window.motfSupabase.auth.getSession();
-    const activeSession = sessionData.session;
-    if (!activeSession?.user) throw new Error("로그인이 만료되었습니다. 다시 로그인해주세요.");
-    const method = payment.paymentMethod || "CARD";
-    if (!TOSS_ENABLED_METHODS.includes(method)) throw new Error("현재 사용할 수 없는 결제수단입니다.");
-    savePendingPayment(payment);
-    const tossPayments = window.TossPayments(TOSS_CLIENT_KEY);
-    const paymentClient = tossPayments.payment({ customerKey: activeSession.user.id });
-    const tossRequest = {
-      method,
-      amount: { currency: "KRW", value: Number(payment.amount) },
-      orderId: payment.orderId,
-      orderName: payment.itemName,
-      successUrl: `${window.location.origin}/payment?orderId=${encodeURIComponent(payment.orderId)}`,
-      failUrl: `${window.location.origin}/payment?orderId=${encodeURIComponent(payment.orderId)}`,
-      customerEmail: payment.customerEmail || activeSession.user.email || undefined,
-      customerName: payment.customerName || "moTF 이용자",
-      customerMobilePhone: String(payment.customerPhone || "").replace(/\D/g, "") || undefined,
-    };
-    if (method === "VIRTUAL_ACCOUNT") {
-      tossRequest.virtualAccount = { cashReceipt: { type: "소득공제" }, useEscrow: false, validHours: 24 };
-    }
-    await paymentClient.requestPayment(tossRequest);
-  } catch (error) {
-    const cancelled = ["USER_CANCEL", "PAY_PROCESS_CANCELED"].includes(error.code);
+  const paymentButton = qs("[data-toss-payment]");
+  const resetPaymentButton = () => {
+    if (!paymentButton) return;
+    paymentButton.disabled = false;
+    paymentButton.innerHTML = '<i data-lucide="credit-card"></i>토스페이먼츠에서 결제하기';
+    refreshIcons();
+  };
+  const closePaymentWindow = async () => {
+    const currentWindow = activeTossPaymentWindow;
+    activeTossPaymentWindow = null;
+    if (currentWindow) await currentWindow.destroy().catch(() => {});
+  };
+  const showPaymentError = async (error) => {
+    await closePaymentWindow();
+    resetPaymentButton();
+    const cancelled = ["USER_CANCEL", "PAY_PROCESS_CANCELED"].includes(error?.code);
     state.paymentResult = {
       status: cancelled ? "cancel" : "fail",
       type: payment.type,
       eyebrow: cancelled ? "결제 취소" : "결제 실패",
       title: cancelled ? "결제를 취소했습니다" : "결제를 완료하지 못했습니다",
-      text: error.message || "결제 정보를 확인한 뒤 다시 시도해주세요.",
+      text: error?.message || "결제 정보를 확인한 뒤 다시 시도해주세요.",
       icon: cancelled ? "rotate-ccw" : "x",
       className: cancelled ? "cancel" : "fail",
       orderId: payment.orderId,
@@ -3467,6 +3440,50 @@ async function requestTossPayment() {
       backRoute: paymentBackRoute(),
     };
     navigate("paymentResult");
+  };
+
+  try {
+    if (paymentButton) {
+      paymentButton.disabled = true;
+      paymentButton.innerHTML = '<i data-lucide="loader-circle"></i>안전결제창 여는 중';
+      refreshIcons();
+    }
+    await loadTossPaymentsSdk();
+    const { data: sessionData } = await window.motfSupabase.auth.getSession();
+    const activeSession = sessionData.session;
+    if (!activeSession?.user) throw new Error("로그인이 만료되었습니다. 다시 로그인해주세요.");
+    savePendingPayment(payment);
+    const tossPayments = window.TossPayments(TOSS_CLIENT_KEY);
+    const widgets = tossPayments.widgets({ customerKey: activeSession.user.id });
+    await widgets.setAmount({ currency: "KRW", value: Number(payment.amount) });
+    const tossRequest = {
+      orderId: payment.orderId,
+      orderName: payment.itemName,
+      successUrl: `${window.location.origin}/payment`,
+      failUrl: `${window.location.origin}/payment`,
+      customerEmail: payment.customerEmail || activeSession.user.email || undefined,
+      customerName: payment.customerName || "moTF 이용자",
+      customerMobilePhone: String(payment.customerPhone || "").replace(/\D/g, "") || undefined,
+      transfer: { useEscrow: false },
+      virtualAccount: { useEscrow: false, cashReceipt: { type: "소득공제" } },
+    };
+    const paymentWindow = await widgets.renderPaymentWindow();
+    activeTossPaymentWindow = paymentWindow;
+    setTossWidgetStatus("토스페이먼츠에서 결제수단을 선택해주세요.");
+    paymentWindow.on("paymentRequest", async () => {
+      try {
+        await widgets.requestPayment(tossRequest);
+      } catch (error) {
+        await showPaymentError(error);
+      }
+    });
+    paymentWindow.on("cancel", async () => {
+      await closePaymentWindow();
+      resetPaymentButton();
+      setTossWidgetStatus("결제창을 닫았습니다. 필요할 때 다시 결제할 수 있어요.");
+    });
+  } catch (error) {
+    await showPaymentError(error);
   }
 }
 
@@ -4271,14 +4288,6 @@ document.addEventListener("click", async (event) => {
   const tossPaymentButton = event.target.closest("[data-toss-payment]");
   if (tossPaymentButton) {
     requestTossPayment();
-    return;
-  }
-
-  const payChip = event.target.closest(".pay-chip");
-  if (payChip) {
-    const group = payChip.closest(".payment-methods");
-    group.querySelectorAll(".pay-chip").forEach((chip) => chip.classList.remove("active"));
-    payChip.classList.add("active");
     return;
   }
 
