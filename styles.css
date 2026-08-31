@@ -4736,18 +4736,25 @@ h2 {
 }
 
 .stay-listing-card .listing-body {
-  grid-template-columns: minmax(0, 1fr) 190px;
+  grid-template-columns: minmax(0, 1fr) 168px;
 }
 
 .stay-card-action-buttons {
-  grid-template-columns: minmax(58px, 1fr) minmax(58px, 1fr) 34px 34px;
+  grid-template-columns: minmax(62px, 1fr) 34px 34px;
   align-items: center;
 }
 
-.stay-card-action-buttons .candidate-button,
-.stay-card-action-buttons .primary-btn {
+.stay-card-action-buttons .candidate-button {
   padding-inline: 6px;
   letter-spacing: -0.02em;
+}
+
+.stay-card-copy .listing-meta {
+  margin-bottom: 3px;
+}
+
+.stay-card-copy h3 {
+  margin-top: 3px;
 }
 
 @media (max-width: 1080px) {
@@ -4781,5 +4788,5 @@ h2 {
   .favorite-stay-list { grid-template-columns: 1fr; }
   .favorite-stay-card { grid-template-columns: 74px minmax(0, 1fr) auto; }
   .favorite-stay-card img { width: 74px; height: 62px; }
-  .stay-card-action-buttons { grid-template-columns: 1fr 1fr 36px 36px; }
+  .stay-card-action-buttons { grid-template-columns: 1fr 36px 36px; }
 }

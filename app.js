@@ -881,22 +881,11 @@ async function toggleFavoriteStay(stayId) {
   await loadFavoriteStaysFromDatabase();
   const ids = loadFavoriteStayIds();
   const key = String(stayId);
-  const nextFavorite = !ids.has(key);
-  if (nextFavorite) {
-    const { error } = await client
-      .from("user_favorite_stays")
-      .upsert({ user_id: userId, business_id: key }, { onConflict: "user_id,business_id" });
-    if (error) throw error;
-    ids.add(key);
-  } else {
-    const { error } = await client
-      .from("user_favorite_stays")
-      .delete()
-      .eq("user_id", userId)
-      .eq("business_id", key);
-    if (error) throw error;
-    ids.delete(key);
-  }
+  const { data, error } = await client.rpc("toggle_favorite_stay", { target_business_id: key });
+  if (error) throw error;
+  const nextFavorite = Boolean(Array.isArray(data) ? data[0] : data);
+  if (nextFavorite) ids.add(key);
+  else ids.delete(key);
   state.favoriteStayIds = ids;
   state.favoriteLoadedForUser = userId;
   return nextFavorite;
@@ -1608,7 +1597,6 @@ function stayCard(stay) {
           <span class="stay-card-availability">${availableCount}/${stay.rooms.length} 객실 가능</span>
           <div class="stay-card-action-buttons">
             <button class="secondary-btn candidate-button ${selected ? "active" : ""}" data-add-mt-candidate="${stay.id}" aria-label="${selected ? "담은 객실 후보 확인" : "객실 후보 담기"}"><i data-lucide="${selected ? "check" : "plus"}"></i>${selected ? "담김" : "후보"}</button>
-            <button class="primary-btn" data-stay-id="${stay.id}"><i data-lucide="search"></i>상세</button>
             ${favoriteStayButton(stay, true)}
             <button class="ghost-btn stay-chat-icon" data-open-chat="${stay.name}" aria-label="${stay.name}에 문의" title="채팅 문의"><i data-lucide="message-circle"></i></button>
           </div>
