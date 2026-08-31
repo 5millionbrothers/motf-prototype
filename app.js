@@ -462,6 +462,8 @@ const state = {
   selectedUsageIds: new Set(),
   pointAccount: { balance: 0, lifetimeEarned: 0, lifetimeUsed: 0 },
   pointHistory: [],
+  favoriteStayIds: loadLocalFavoriteStayIds(),
+  favoriteLoadedForUser: "",
 };
 
 window.motfApplyCatalog = function applyCatalog(nextStays, nextStores, options = {}) {
@@ -676,6 +678,8 @@ window.motfClearUserScopedState = function clearUserScopedState() {
   };
   state.selectedUsageIds.clear();
   state.pendingPayment = null;
+  state.favoriteStayIds = new Set();
+  state.favoriteLoadedForUser = "";
   clearPendingPayment();
   if (currentRoute() === "myMt") renderMyMt();
   if (currentRoute() === "myUsage" || currentRoute() === "mypage") renderMypage();
@@ -789,6 +793,8 @@ const routeHistory = [];
 let appHistoryDepth = 0;
 const qs = (selector) => document.querySelector(selector);
 const qsa = (selector) => [...document.querySelectorAll(selector)];
+const FAVORITE_STAYS_STORAGE_KEY = "motf.favoriteStays.v1";
+const MARKET_GUIDE_SESSION_KEY = "motf.marketGuide.seen";
 
 function refreshIcons() {
   if (window.lucide) {
@@ -804,6 +810,149 @@ function toast(message) {
   el.classList.add("show");
   window.clearTimeout(toast.timer);
   toast.timer = window.setTimeout(() => el.classList.remove("show"), 2200);
+}
+
+function loadFavoriteStayIds() {
+  return new Set(state.favoriteStayIds || []);
+}
+
+function saveFavoriteStayIds(ids) {
+  state.favoriteStayIds = new Set([...ids].map(String));
+  window.localStorage.setItem(FAVORITE_STAYS_STORAGE_KEY, JSON.stringify([...ids]));
+}
+
+function loadLocalFavoriteStayIds() {
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(FAVORITE_STAYS_STORAGE_KEY) || "[]");
+    return new Set(Array.isArray(saved) ? saved.map(String) : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function isFavoriteStay(stayId) {
+  return loadFavoriteStayIds().has(String(stayId));
+}
+
+function isSupabaseUuid(value) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ""));
+}
+
+async function loadFavoriteStaysFromDatabase(force = false) {
+  const userId = window.motfCurrentUserId || "";
+  const client = window.motfSupabase;
+  if (!userId || !client) {
+    state.favoriteStayIds = loadLocalFavoriteStayIds();
+    state.favoriteLoadedForUser = "";
+    return;
+  }
+  if (!force && state.favoriteLoadedForUser === userId) return;
+  const { data, error } = await client
+    .from("user_favorite_stays")
+    .select("business_id")
+    .eq("user_id", userId);
+  if (error) {
+    console.warn("찜한 숙소를 불러오지 못했습니다.", error);
+    state.favoriteStayIds = loadLocalFavoriteStayIds();
+    state.favoriteLoadedForUser = "";
+    return;
+  }
+  state.favoriteStayIds = new Set((data || []).map((item) => String(item.business_id)));
+  state.favoriteLoadedForUser = userId;
+}
+
+function refreshFavoriteViews() {
+  const route = currentRoute();
+  if (route === "home") renderHomePicks();
+  if (route === "stays") renderStays();
+  if (route === "stayDetail") renderStayDetail();
+  if (route === "mypage") renderMypage();
+}
+
+async function toggleFavoriteStay(stayId) {
+  const userId = window.motfCurrentUserId || "";
+  const client = window.motfSupabase;
+  if (!userId || !client) {
+    throw new Error("로그인 후 찜 기능을 이용할 수 있어요.");
+  }
+  if (!isSupabaseUuid(stayId)) {
+    throw new Error("실제 등록된 숙소만 찜할 수 있어요.");
+  }
+  await loadFavoriteStaysFromDatabase();
+  const ids = loadFavoriteStayIds();
+  const key = String(stayId);
+  const nextFavorite = !ids.has(key);
+  if (nextFavorite) {
+    const { error } = await client
+      .from("user_favorite_stays")
+      .upsert({ user_id: userId, business_id: key }, { onConflict: "user_id,business_id" });
+    if (error) throw error;
+    ids.add(key);
+  } else {
+    const { error } = await client
+      .from("user_favorite_stays")
+      .delete()
+      .eq("user_id", userId)
+      .eq("business_id", key);
+    if (error) throw error;
+    ids.delete(key);
+  }
+  state.favoriteStayIds = ids;
+  state.favoriteLoadedForUser = userId;
+  return nextFavorite;
+}
+
+function favoriteStayButton(stay, compact = false) {
+  const active = isFavoriteStay(stay.id);
+  return `<button class="favorite-stay-button ${active ? "active" : ""} ${compact ? "compact" : ""}" type="button" data-toggle-favorite-stay="${stay.id}" aria-pressed="${active}" aria-label="${escapeHtml(stay.name)} ${active ? "찜 해제" : "찜하기"}"><i data-lucide="heart"></i>${compact ? "" : `<span>${active ? "찜 해제" : "찜하기"}</span>`}</button>`;
+}
+
+async function shareOrCopy({ title, text, url, successMessage = "공유 링크를 복사했습니다." }) {
+  const shareData = { title, text, url };
+  if (navigator.share) {
+    try {
+      await navigator.share(shareData);
+      return;
+    } catch (error) {
+      if (error?.name === "AbortError") return;
+    }
+  }
+  try {
+    await navigator.clipboard.writeText(url);
+    toast(successMessage);
+  } catch {
+    window.prompt("아래 링크를 복사해서 공유해주세요.", url);
+  }
+}
+
+function stayShareUrl(stay) {
+  return `${window.location.origin}/stays/detail?stay=${encodeURIComponent(stay.id)}`;
+}
+
+function applyRouteSelection(route) {
+  const params = new URLSearchParams(window.location.search);
+  if (route === "stayDetail") {
+    const stayId = params.get("stay");
+    if (stayId) {
+      const sharedStay = stays.find((stay) => String(stay.id) === String(stayId));
+      if (sharedStay) {
+        state.selectedStay = sharedStay;
+        state.selectedRoom = sharedStay.rooms?.[0] || null;
+      }
+    }
+  }
+}
+
+function maybeShowMarketGuide() {
+  const dialog = qs("#marketGuideDialog");
+  if (!dialog || dialog.open || window.sessionStorage.getItem(MARKET_GUIDE_SESSION_KEY)) return;
+  window.sessionStorage.setItem(MARKET_GUIDE_SESSION_KEY, "1");
+  window.setTimeout(() => {
+    if (currentRoute() === "market") {
+      dialog.showModal?.();
+      refreshIcons();
+    }
+  }, 180);
 }
 
 function currentRoute() {
@@ -874,6 +1023,7 @@ function goBack(fallbackRoute = "home") {
 }
 
 function renderRoute(route) {
+  applyRouteSelection(route);
   if (route === "home") renderHome();
   if (route === "events") renderEvents();
   if (route === "eventDetail") renderEventDetail();
@@ -903,6 +1053,7 @@ function renderRoute(route) {
   if (route === "myUsage") renderMypage();
   if (route === "budgetPreview") window.motfRenderBudgetPreview?.();
   if (route === "review") renderReviews();
+  if (route === "market") maybeShowMarketGuide();
 }
 
 const homeStories = [
@@ -1432,7 +1583,7 @@ function stayCard(stay) {
   const selected = state.mtCandidateRecords.some((candidate) => String(candidate.businessId || candidate.business_id) === String(stay.id));
   const bathLabel = stay.bathCount ? `화장실 ${stay.bathCount}개` : "화장실 수 확인 필요";
   return `
-    <article class="listing-card stay-listing-card">
+    <article class="listing-card stay-listing-card" data-stay-card-id="${stay.id}" role="button" tabindex="0" aria-label="${escapeHtml(stay.name)} 상세 보기">
       <img src="${stay.image}" alt="${stay.name} 사진" />
       <div class="listing-body stay-listing-body">
         <div class="stay-card-copy">
@@ -1458,6 +1609,7 @@ function stayCard(stay) {
           <div class="stay-card-action-buttons">
             <button class="secondary-btn candidate-button ${selected ? "active" : ""}" data-add-mt-candidate="${stay.id}" aria-label="${selected ? "담은 객실 후보 확인" : "객실 후보 담기"}"><i data-lucide="${selected ? "check" : "plus"}"></i>${selected ? "담김" : "후보"}</button>
             <button class="primary-btn" data-stay-id="${stay.id}"><i data-lucide="search"></i>상세</button>
+            ${favoriteStayButton(stay, true)}
             <button class="ghost-btn stay-chat-icon" data-open-chat="${stay.name}" aria-label="${stay.name}에 문의" title="채팅 문의"><i data-lucide="message-circle"></i></button>
           </div>
         </div>
@@ -1672,6 +1824,8 @@ function renderStayDetail() {
       </div>
       <div class="button-row">
         <button class="secondary-btn" data-open-chat="${stay.name}"><i data-lucide="messages-square"></i>사장님과 채팅</button>
+        <button class="ghost-btn" type="button" data-share-stay="${stay.id}"><i data-lucide="share-2"></i>공유</button>
+        ${favoriteStayButton(stay)}
         <button class="ghost-btn" data-scroll-stay-reviews><i data-lucide="star"></i>리뷰 바로 보기</button>
       </div>
     </section>
@@ -3327,8 +3481,30 @@ function renderMypage() {
     selectedBudgetButton.disabled = state.selectedUsageIds.size === 0;
     selectedBudgetButton.innerHTML = `<i data-lucide="file-spreadsheet"></i>${state.selectedUsageIds.size ? `${state.selectedUsageIds.size}건 예결산 생성` : "선택 내역 예결산"}`;
   }
+  renderFavoriteStays();
   renderPointHistory();
   refreshIcons();
+}
+
+function renderFavoriteStays() {
+  const list = qs("#favoriteStayList");
+  if (!list) return;
+  const favoriteIds = loadFavoriteStayIds();
+  const favoriteStays = stays.filter((stay) => favoriteIds.has(String(stay.id)));
+  list.innerHTML = favoriteStays.length
+    ? favoriteStays.map((stay) => {
+      const estimate = estimateMtStayCost(stay);
+      return `<article class="favorite-stay-card" data-stay-card-id="${stay.id}" role="button" tabindex="0" aria-label="${escapeHtml(stay.name)} 상세 보기">
+        <img src="${stay.image}" alt="${escapeHtml(stay.name)} 사진" />
+        <div>
+          <small>${escapeHtml(stay.region)} · 최대 ${stay.maxPeople}명</small>
+          <strong>${escapeHtml(stay.name)}</strong>
+          <span>${estimate.people}명 예상 총액 ${money(estimate.total)}</span>
+        </div>
+        ${favoriteStayButton(stay, true)}
+      </article>`;
+    }).join("")
+    : `<div class="empty-state compact">아직 찜한 숙소가 없습니다. 숙소 목록에서 하트를 눌러 저장해보세요.</div>`;
 }
 
 function renderPointHistory() {
@@ -4014,6 +4190,43 @@ document.addEventListener("click", async (event) => {
     return;
   }
 
+  const stayShareButton = event.target.closest("[data-share-stay]");
+  if (stayShareButton) {
+    const stay = stays.find((item) => String(item.id) === String(stayShareButton.dataset.shareStay)) || state.selectedStay;
+    if (!stay) return;
+    await shareOrCopy({
+      title: `${stay.name} - moTF`,
+      text: "모티프에서 이 숙소를 같이 확인해보세요.",
+      url: stayShareUrl(stay),
+      successMessage: "숙소 공유 링크를 복사했습니다.",
+    });
+    return;
+  }
+
+  const favoriteButton = event.target.closest("[data-toggle-favorite-stay]");
+  if (favoriteButton) {
+    const stayId = favoriteButton.dataset.toggleFavoriteStay;
+    try {
+      favoriteButton.disabled = true;
+      const active = await toggleFavoriteStay(stayId);
+      toast(active ? "찜한 숙소에 추가했습니다." : "찜한 숙소에서 해제했습니다.");
+      refreshFavoriteViews();
+    } catch (error) {
+      toast(error.message || "찜 상태를 저장하지 못했습니다.");
+    } finally {
+      favoriteButton.disabled = false;
+    }
+    return;
+  }
+
+  const stayCardButton = event.target.closest("[data-stay-card-id]");
+  if (stayCardButton && !event.target.closest("button, a, input, select, textarea, label")) {
+    state.selectedStay = stays.find((stay) => String(stay.id) === String(stayCardButton.dataset.stayCardId)) || stays[0];
+    state.selectedRoom = state.selectedStay.rooms[0];
+    navigate("stayDetail");
+    return;
+  }
+
   const stayButton = event.target.closest("[data-stay-id]");
   if (stayButton) {
     state.selectedStay = stays.find((stay) => stay.id === stayButton.dataset.stayId) || stays[0];
@@ -4655,6 +4868,18 @@ document.addEventListener("click", (event) => {
     }).catch((error) => toast(error.message || "초대 링크를 만들지 못했습니다."));
     return;
   }
+  if (event.target.closest("[data-share-mt-project]")) {
+    window.motfCreateMtInvite?.().then(async (code) => {
+      const link = `${window.location.origin}/?route=myMt&invite=${encodeURIComponent(code)}`;
+      await shareOrCopy({
+        title: state.mtProject?.title || "moTF 내 MT",
+        text: "모티프에서 MT 준비 내용을 함께 확인해보세요.",
+        url: link,
+        successMessage: "7일 동안 유효한 MT 공유 링크를 복사했습니다.",
+      });
+    }).catch((error) => toast(error.message || "공유 링크를 만들지 못했습니다."));
+    return;
+  }
   const eventCardButton = event.target.closest("[data-event-id]");
   if (eventCardButton) {
     state.selectedEvent = state.platformEvents.find((item) => String(item.id) === String(eventCardButton.dataset.eventId)) || null;
@@ -4703,6 +4928,14 @@ document.addEventListener("click", (event) => {
 });
 
 document.addEventListener("keydown", (event) => {
+  const stayCard = event.target.closest?.("[data-stay-card-id]");
+  if (stayCard && !event.target.closest("button, a, input, select, textarea, label") && (event.key === "Enter" || event.key === " ")) {
+    event.preventDefault();
+    state.selectedStay = stays.find((stay) => String(stay.id) === String(stayCard.dataset.stayCardId)) || stays[0];
+    state.selectedRoom = state.selectedStay.rooms[0];
+    navigate("stayDetail");
+    return;
+  }
   const dialog = qs("#photoGalleryDialog");
   if (!dialog?.open) return;
   if (event.key === "ArrowLeft") {
@@ -4721,6 +4954,11 @@ window.addEventListener("popstate", () => {
   navigate(routeFromLocation(), { record: false, updateHistory: false });
 });
 
+window.addEventListener("motf:auth-ready", async () => {
+  await loadFavoriteStaysFromDatabase(true);
+  refreshFavoriteViews();
+});
+
 (async function boot() {
   preservePendingMtInvite();
   // DB 연결 전 데모 숙소도 1차 운영 지역인 가평 목록에 함께 표시합니다.
@@ -4730,6 +4968,8 @@ window.addEventListener("popstate", () => {
     await loadPaymentConfig();
     const handledPaymentRedirect = await handleTossRedirect();
     if (!handledPaymentRedirect) navigate(routeFromLocation(), { record: false, replace: true });
+    await loadFavoriteStaysFromDatabase(true);
+    refreshFavoriteViews();
     updateCartBadge();
     refreshIcons();
   } catch (error) {

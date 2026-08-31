@@ -448,6 +448,8 @@
     return false;
   }
 
+  window.motfRequireLogin = requireLogin;
+
   window.motfEnsureIdentityVerified = async function ensureIdentityVerified() {
     if (!session?.user) {
       requireLogin();
@@ -531,6 +533,13 @@
     await loadProfile();
     updateHeader();
     updateAccountView();
+    window.dispatchEvent(new CustomEvent("motf:auth-ready", {
+      detail: {
+        userId: session?.user?.id || "",
+        email: session?.user?.email || "",
+        profile,
+      },
+    }));
   }
 
   async function requestWelcomeEmail() {
@@ -1050,7 +1059,7 @@
     }
 
     const protectedAction = event.target.closest(
-      "[data-community-write], [data-open-recreation-form], [data-like-activity], [data-like-post], [data-focus-activity-comment], [data-focus-post-comment]",
+      "[data-community-write], [data-open-recreation-form], [data-like-activity], [data-like-post], [data-focus-activity-comment], [data-focus-post-comment], [data-toggle-favorite-stay]",
     );
     if (protectedAction) {
       event.preventDefault();

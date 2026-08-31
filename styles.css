@@ -4625,6 +4625,120 @@ h2 {
 .point-history-row .positive b { color: var(--teal-dark); }
 .point-history-row .negative b { color: #a23a32; }
 
+.favorite-stays-section {
+  margin-top: 32px;
+}
+
+.favorite-stay-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.favorite-stay-card {
+  display: grid;
+  grid-template-columns: 82px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.favorite-stay-card:hover,
+.stay-listing-card:hover {
+  border-color: #9aa88f;
+}
+
+.favorite-stay-card img {
+  width: 82px;
+  height: 68px;
+  object-fit: cover;
+  border-radius: 6px;
+}
+
+.favorite-stay-card div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.favorite-stay-card small,
+.favorite-stay-card span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.favorite-stay-card strong {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 15px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.favorite-stay-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 12px;
+  color: var(--muted);
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.favorite-stay-button svg {
+  width: 16px;
+  height: 16px;
+}
+
+.favorite-stay-button.active {
+  color: #b83255;
+  background: #fff4f6;
+  border-color: #efb8c4;
+}
+
+.favorite-stay-button.active svg {
+  fill: currentColor;
+}
+
+.favorite-stay-button.compact {
+  width: 34px;
+  min-height: 32px;
+  padding: 0;
+}
+
+.market-guide-dialog .primary-btn {
+  justify-self: stretch;
+  justify-content: center;
+}
+
+.market-guide-copy {
+  display: grid;
+  gap: 10px;
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+.market-guide-copy p {
+  margin: 0;
+}
+
+.market-guide-copy strong {
+  color: var(--teal-dark);
+}
+
+.stay-card-action-buttons {
+  grid-template-columns: 1fr 1fr 34px 34px;
+}
+
 @media (max-width: 1080px) {
   .stay-photo-layout.expanded { grid-template-columns: minmax(0, 1.25fr) minmax(320px, .95fr); min-height: 420px; }
   .stay-photo-layout.expanded .stay-main-photo { min-height: 420px; }
@@ -4653,4 +4767,8 @@ h2 {
   .point-history-section { grid-template-columns: 1fr; padding: 20px; }
   .point-balance-summary { padding: 0 0 20px; border-right: 0; border-bottom: 1px solid #dfe6da; }
   .mypage-hub { grid-template-columns: 1fr; }
+  .favorite-stay-list { grid-template-columns: 1fr; }
+  .favorite-stay-card { grid-template-columns: 74px minmax(0, 1fr) auto; }
+  .favorite-stay-card img { width: 74px; height: 62px; }
+  .stay-card-action-buttons { grid-template-columns: 1fr 1fr 36px 36px; }
 }
