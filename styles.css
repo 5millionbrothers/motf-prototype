@@ -4735,8 +4735,19 @@ h2 {
   color: var(--teal-dark);
 }
 
+.stay-listing-card .listing-body {
+  grid-template-columns: minmax(0, 1fr) 190px;
+}
+
 .stay-card-action-buttons {
-  grid-template-columns: 1fr 1fr 34px 34px;
+  grid-template-columns: minmax(58px, 1fr) minmax(58px, 1fr) 34px 34px;
+  align-items: center;
+}
+
+.stay-card-action-buttons .candidate-button,
+.stay-card-action-buttons .primary-btn {
+  padding-inline: 6px;
+  letter-spacing: -0.02em;
 }
 
 @media (max-width: 1080px) {

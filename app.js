@@ -4212,7 +4212,10 @@ document.addEventListener("click", async (event) => {
       toast(active ? "찜한 숙소에 추가했습니다." : "찜한 숙소에서 해제했습니다.");
       refreshFavoriteViews();
     } catch (error) {
-      toast(error.message || "찜 상태를 저장하지 못했습니다.");
+      const message = String(error?.message || "");
+      toast(message.includes("permission denied")
+        ? "찜 저장 권한이 아직 열리지 않았어요. Supabase 찜 SQL을 실행해주세요."
+        : message || "찜 상태를 저장하지 못했습니다.");
     } finally {
       favoriteButton.disabled = false;
     }
