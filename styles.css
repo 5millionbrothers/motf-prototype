@@ -4790,3 +4790,89 @@ h2 {
   .favorite-stay-card img { width: 74px; height: 62px; }
   .stay-card-action-buttons { grid-template-columns: 1fr 36px 36px; }
 }
+
+/* 2026-09 launch review: responsive header, payment feedback and content surfaces */
+@media (min-width: 1081px) {
+  .app-header {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 24px;
+  }
+
+  .header-context {
+    position: static;
+    transform: none;
+    justify-self: center;
+    min-width: 0;
+  }
+
+  .top-nav {
+    justify-self: end;
+    min-width: 0;
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 1480px) and (min-width: 1081px) {
+  .app-header { grid-template-columns: auto minmax(0, 1fr); column-gap: 18px; }
+  .header-context { display: none; }
+  .top-nav .nav-link { padding-inline: 9px; }
+  .top-nav { gap: 2px; }
+}
+
+@media (max-width: 1240px) and (min-width: 1081px) {
+  .nav-coming-soon { display: none; }
+  .header-point-wallet { padding-inline: 9px; }
+}
+
+.summary-line.benefit-discount strong { color: #2f6a43; }
+.benefit-adjustment-note {
+  margin: 0 0 8px;
+  padding: 9px 11px;
+  color: #32513a;
+  background: #edf4ea;
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.checkout-benefit-result.error.nonblocking { color: #694f1d; background: #fff9e9; border-color: #ead8a1; }
+.checkout-service-period { margin: 0; padding: 12px 14px; color: var(--muted); background: #f6f7f4; border: 1px solid var(--line); border-radius: 6px; font-size: 13px; line-height: 1.55; }
+.checkout-service-period strong { display: block; color: var(--ink); }
+.terms-inline-link { width: fit-content; padding: 0; color: #405a34; background: transparent; border: 0; border-bottom: 1px solid currentColor; font: inherit; font-size: 13px; font-weight: 750; cursor: pointer; }
+
+.community-operator-badge {
+  display: inline-flex;
+  width: fit-content;
+  padding: 3px 8px;
+  color: #fff;
+  background: #405a34;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 800;
+}
+.post-detail-author { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; }
+
+.event-favorite-button.active { color: #314f2b; background: #edf3e9; border-color: #aebfa5; }
+.event-favorite-button.active svg { fill: currentColor; }
+
+.launch-popup-dialog {
+  position: relative;
+  width: min(440px, calc(100% - 32px));
+  max-height: min(760px, calc(100dvh - 36px));
+  padding: 0;
+  overflow: auto;
+}
+.launch-popup-dialog .popup-image { display: block; width: 100%; max-height: 360px; object-fit: cover; }
+.launch-popup-dialog .popup-content { display: grid; gap: 14px; padding: 24px; }
+.launch-popup-dialog .popup-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.launch-popup-dialog .popup-actions > * { flex: 1 1 140px; justify-content: center; }
+.launch-popup-dialog .popup-dismiss { display: inline-flex; align-items: center; gap: 8px; width: fit-content; color: var(--muted); font-size: 13px; cursor: pointer; }
+.launch-popup-dialog .popup-dismiss input { width: 17px; height: 17px; min-width: 17px; margin: 0; padding: 0; accent-color: #405a34; }
+.launch-popup-dialog .popup-close-icon { position: absolute; z-index: 2; top: 10px; right: 10px; display: grid; place-items: center; width: 36px; height: 36px; padding: 0; color: #fff; background: rgba(20, 24, 19, .72); border: 0; border-radius: 50%; font-size: 24px; line-height: 1; cursor: pointer; }
+
+@media (max-width: 720px) {
+  .launch-popup-dialog .popup-content { padding: 20px; }
+  .launch-popup-dialog .popup-actions { display: grid; grid-template-columns: 1fr; }
+  .platform-event-actions { flex-wrap: wrap; }
+}

@@ -6,16 +6,19 @@
   let cachedSocial = {};
   let boundaryTimer = 0;
 
-  const [eventsResult, cardsResult, settingsResult, popupResult] = await Promise.all([
+  const nowIso = new Date().toISOString();
+  const [eventsResult, cardsResult, settingsResult, popupResult, recreationResult] = await Promise.all([
     client.rpc("get_public_platform_events"),
-    client.from("homepage_cards").select("*").order("sort_order").limit(12),
+    client.from("homepage_cards").select("*").eq("is_active", true).order("sort_order").limit(12),
     client.from("platform_settings").select("setting_value").eq("setting_key", "social").maybeSingle(),
-    client.from("popup_banners").select("*").order("starts_at", { ascending: false }).limit(3),
+    client.from("popup_banners").select("*").eq("is_active", true).lte("starts_at", nowIso).gte("ends_at", nowIso).order("starts_at", { ascending: false }).limit(3),
+    client.from("recreation_activities").select("*").eq("is_active", true).order("sort_order").order("created_at", { ascending: false }),
   ]);
 
   cachedCards = cardsResult.error ? [] : (cardsResult.data || []);
   cachedSocial = settingsResult.data?.setting_value || {};
   applyEvents(eventsResult.error ? [] : (eventsResult.data || []));
+  if (!recreationResult.error) window.motfApplyRecreationActivities?.(recreationResult.data || []);
   if (!popupResult.error) showPopup(popupResult.data?.[0]);
 
   async function refreshEvents() {
@@ -61,7 +64,7 @@
     if (dismissedUntil > Date.now()) return;
     const dialog = document.createElement("dialog");
     dialog.className = "launch-popup-dialog";
-    dialog.innerHTML = `${popup.image_url ? `<img src="${escapeHtml(popup.image_url)}" alt="" />` : ""}<div><strong>${escapeHtml(popup.title)}</strong>${popup.body ? `<p>${escapeHtml(popup.body)}</p>` : ""}<div class="button-row">${popup.link_url ? `<a class="primary-btn" href="${escapeHtml(popup.link_url)}">${escapeHtml(popup.link_label || "자세히 보기")}</a>` : ""}<button class="secondary-btn" type="button" data-popup-close>닫기</button></div><label><input type="checkbox" data-popup-dismiss />오늘 그만 보기</label></div>`;
+    dialog.innerHTML = `<button class="popup-close-icon" type="button" data-popup-close aria-label="팝업 닫기">×</button>${popup.image_url ? `<img class="popup-image" src="${escapeHtml(popup.image_url)}" alt="" />` : ""}<div class="popup-content"><strong>${escapeHtml(popup.title)}</strong>${popup.body ? `<p>${escapeHtml(popup.body)}</p>` : ""}<div class="popup-actions">${popup.link_url ? `<a class="primary-btn" href="${escapeHtml(popup.link_url)}">${escapeHtml(popup.link_label || "자세히 보기")}</a>` : ""}<button class="secondary-btn" type="button" data-popup-close>닫기</button></div><label class="popup-dismiss"><input type="checkbox" data-popup-dismiss /><span>오늘 그만 보기</span></label></div>`;
     document.body.appendChild(dialog);
     dialog.addEventListener("click", (event) => {
       if (!event.target.closest("[data-popup-close]")) return;

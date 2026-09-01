@@ -46,25 +46,20 @@ module.exports = async function handler(req, res) {
       return json(res, 409, { ok: false, message: "이미 가입된 이메일입니다. 로그인하거나 비밀번호 찾기를 이용해주세요." });
     }
     createdUserId = userId;
-    const savedProfiles = await supabaseRequest("/rest/v1/profiles?on_conflict=id", {
+    await supabaseRequest("/rest/v1/rpc/complete_identity_signup_profile", {
       method: "POST",
-      headers: { Prefer: "resolution=merge-duplicates,return=representation" },
       body: JSON.stringify({
-        id: userId,
-        email,
-        full_name: identity.verified_name,
-        phone: identity.verified_phone,
-        role: accountType,
-        status: accountType === "partner" ? "pending" : "approved",
-        birth_date: identity.verified_birth_date,
-        identity_provider: "kcp",
-        identity_ci_hash: identity.verified_ci_hash,
-        identity_verified_at: identity.verified_at,
-        adult_verified_at: identity.is_adult ? identity.verified_at : null,
-        password_set_at: new Date().toISOString(),
+        target_user_id: userId,
+        target_email: email,
+        target_full_name: identity.verified_name,
+        target_phone: identity.verified_phone,
+        target_birth_date: identity.verified_birth_date,
+        target_ci_hash: identity.verified_ci_hash,
+        target_verified_at: identity.verified_at,
+        target_is_adult: Boolean(identity.is_adult),
+        target_account_type: accountType,
       }),
     });
-    if (!Array.isArray(savedProfiles) || savedProfiles[0]?.id !== userId) throw new Error("회원 정보를 저장하지 못했습니다.");
     await consumeSession(identity.id, userId);
     createdUserId = "";
     return json(res, 200, { ok: true, emailConfirmationRequired: !signup.data.access_token });

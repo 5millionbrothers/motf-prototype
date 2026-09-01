@@ -331,12 +331,12 @@ const legacyDemoStores = [
 ];
 
 const activities = [
-  { id: "bingo", title: "학과 빙고", people: "20~60명", peopleGroup: "medium", space: "indoor", mood: "icebreak", time: "25분", note: "첫 만남 아이스브레이킹", media: "진행지 PDF · 예시 이미지", image: photo("photo-1529156069898-49953e39b3ac"), likes: 42, comments: ["빙고 칸에 교수님 별명 넣으면 반응 좋아요.", "새터 첫날에도 잘 먹혔습니다."], detail: "학과, 동아리, 과잠, 취미 같은 키워드를 빙고판에 넣고 서로 질문하며 칸을 채우는 게임입니다." },
-  { id: "auction", title: "팀별 미션 경매", people: "30~80명", peopleGroup: "large", space: "indoor", mood: "team", time: "45분", note: "예산 게임과 장기자랑 조합", media: "룰 설명 영상", image: photo("photo-1517048676732-d65bc937f952"), likes: 58, comments: ["진행자가 가격 조절을 잘해야 재밌어요.", "장기자랑 부담을 줄이기 좋았습니다."], detail: "팀마다 가상 예산을 주고 미션을 경매로 가져가게 한 뒤, 획득한 미션을 수행해 점수를 얻는 방식입니다." },
-  { id: "court", title: "MT 재판소", people: "15~40명", peopleGroup: "medium", space: "indoor", mood: "solo", time: "30분", note: "익명 사연으로 진행", media: "대본 템플릿", image: photo("photo-1556761175-b413da4baf72"), likes: 35, comments: ["익명 사연 검수는 꼭 필요합니다.", "분위기 풀기 좋았어요."], detail: "익명 사연을 받아 판사, 변호인, 증인 역할을 나누고 가볍게 상황극을 하는 레크레이션입니다." },
-  { id: "random-quiz", title: "랜덤 조 편성 퀴즈", people: "20~70명", peopleGroup: "large", space: "any", mood: "icebreak", time: "35분", note: "선후배 섞임 유도", media: "문제 예시", image: photo("photo-1523580846011-d3a5bc25702b"), likes: 49, comments: ["조 편성 뒤 바로 하기 좋습니다."], detail: "랜덤으로 섞인 조가 학교, 학과, MT 장소 관련 퀴즈를 풀며 자연스럽게 대화하도록 만드는 게임입니다." },
-  { id: "body-relay", title: "몸으로 말해요 릴레이", people: "20~50명", peopleGroup: "medium", space: "outdoor", mood: "team", time: "20분", note: "장비 없이 빠르게 시작", media: "제시어 카드", image: photo("photo-1517457373958-b7bdd4587205"), likes: 31, comments: ["야외에서 하면 사진도 잘 나와요."], detail: "팀원이 차례로 제시어를 몸짓으로 전달하고 마지막 사람이 정답을 맞히는 빠른 팀 대항 게임입니다." },
-  { id: "ban-word", title: "술자리 금지어 게임", people: "10~40명", peopleGroup: "small", space: "indoor", mood: "solo", time: "30분", note: "소규모 뒤풀이용", media: "카드 이미지", image: photo("photo-1543269865-cbf427effbad"), likes: 27, comments: ["술 없이 음료 벌칙으로 해도 됩니다."], detail: "각자 모르는 금지어를 머리 위에 붙이고 대화하면서 상대가 금지어를 말하게 유도하는 게임입니다." },
+  { id: "bingo", title: "학과 빙고", people: "20~60명", peopleGroup: "medium", space: "indoor", mood: "icebreak", time: "25분", note: "첫 만남 아이스브레이킹", media: "진행지 PDF · 예시 이미지", image: photo("photo-1529156069898-49953e39b3ac"), likes: 0, comments: [], detail: "학과, 동아리, 과잠, 취미 같은 키워드를 빙고판에 넣고 서로 질문하며 칸을 채우는 게임입니다." },
+  { id: "auction", title: "팀별 미션 경매", people: "30~80명", peopleGroup: "large", space: "indoor", mood: "team", time: "45분", note: "예산 게임과 장기자랑 조합", media: "룰 설명 영상", image: photo("photo-1517048676732-d65bc937f952"), likes: 0, comments: [], detail: "팀마다 가상 예산을 주고 미션을 경매로 가져가게 한 뒤, 획득한 미션을 수행해 점수를 얻는 방식입니다." },
+  { id: "court", title: "MT 재판소", people: "15~40명", peopleGroup: "medium", space: "indoor", mood: "solo", time: "30분", note: "익명 사연으로 진행", media: "대본 템플릿", image: photo("photo-1556761175-b413da4baf72"), likes: 0, comments: [], detail: "익명 사연을 받아 판사, 변호인, 증인 역할을 나누고 가볍게 상황극을 하는 레크레이션입니다." },
+  { id: "random-quiz", title: "랜덤 조 편성 퀴즈", people: "20~70명", peopleGroup: "large", space: "any", mood: "icebreak", time: "35분", note: "선후배 섞임 유도", media: "문제 예시", image: photo("photo-1523580846011-d3a5bc25702b"), likes: 0, comments: [], detail: "랜덤으로 섞인 조가 학교, 학과, MT 장소 관련 퀴즈를 풀며 자연스럽게 대화하도록 만드는 게임입니다." },
+  { id: "body-relay", title: "몸으로 말해요 릴레이", people: "20~50명", peopleGroup: "medium", space: "outdoor", mood: "team", time: "20분", note: "장비 없이 빠르게 시작", media: "제시어 카드", image: photo("photo-1517457373958-b7bdd4587205"), likes: 0, comments: [], detail: "팀원이 차례로 제시어를 몸짓으로 전달하고 마지막 사람이 정답을 맞히는 빠른 팀 대항 게임입니다." },
+  { id: "ban-word", title: "술자리 금지어 게임", people: "10~40명", peopleGroup: "small", space: "indoor", mood: "solo", time: "30분", note: "소규모 뒤풀이용", media: "카드 이미지", image: photo("photo-1543269865-cbf427effbad"), likes: 0, comments: [], detail: "각자 모르는 금지어를 머리 위에 붙이고 대화하면서 상대가 금지어를 말하게 유도하는 게임입니다." },
 ];
 
 const communityBoards = [
@@ -344,31 +344,19 @@ const communityBoards = [
     id: "market-share",
     title: "나눔장터",
     description: "남는 고기, 술, 일회용품을 같은 지역 MT 팀에게 나눔하거나 양도해요.",
-    posts: [
-      { id: "share-soju", title: "대성리 소주 8병 남아요", body: "오늘 밤 10시 이후 대성리역 근처에서 드릴 수 있어요.", likes: 18, comments: ["혹시 11시도 가능할까요?", "저희 팀 필요해요."], media: "사진 1" },
-      { id: "share-cups", title: "가평역 근처 종이컵 나눔", body: "50개 정도 남았습니다. 숙소 픽업 전 가져가세요.", likes: 9, comments: ["위치 어디쯤인가요?", "감사합니다!"], media: "사진 2" },
-      { id: "share-charcoal", title: "숯 3kg 필요하신 팀?", body: "바베큐 취소돼서 그대로 남았어요.", likes: 12, comments: ["저희 받을 수 있을까요?"], media: "" },
-    ],
+    posts: [],
   },
   {
     id: "match",
     title: "대결신청",
     description: "족구, 피구, 장기자랑, 레크레이션 대결을 같은 지역 MT 팀에게 신청해요.",
-    posts: [
-      { id: "match-footvolley", title: "강촌 족구 5:5 붙을 팀", body: "오늘 20시 이후 가능. 실력은 재미 위주입니다.", likes: 23, comments: ["저희 6명 있어요.", "장소 어디인가요?"], media: "영상 1" },
-      { id: "match-talent", title: "가평 장기자랑 교류전 구해요", body: "서로 2팀씩 나와서 가볍게 해요.", likes: 15, comments: ["재밌겠다", "시간 맞으면 갈게요"], media: "" },
-      { id: "match-dodgeball", title: "대성리 피구 대결 신청", body: "인원 12명 정도, 운동장 있는 팀이면 좋아요.", likes: 20, comments: ["여기 숙소 운동장 있어요."], media: "사진 1" },
-    ],
+    posts: [],
   },
   {
     id: "field-info",
     title: "현장 정보",
     description: "픽업, 택시, 편의점, 날씨, 소음 규칙처럼 현장에서 필요한 정보를 공유해요.",
-    posts: [
-      { id: "info-taxi", title: "가평역 택시 줄 현재 20분", body: "단체면 미리 콜 부르는 게 나아 보여요.", likes: 34, comments: ["정보 감사합니다.", "지금은 10분 정도예요."], media: "사진 1" },
-      { id: "info-ice", title: "근처 편의점 얼음 재고 있음", body: "큰 봉투 얼음 아직 넉넉합니다.", likes: 16, comments: ["어느 편의점인가요?"], media: "" },
-      { id: "info-rain", title: "대성리 비 와서 운동장 젖었어요", body: "야외 게임이면 실내 대안 준비하세요.", likes: 19, comments: ["저희도 실내로 바꿨어요."], media: "사진 2" },
-    ],
+    posts: [],
   },
 ];
 
@@ -462,8 +450,11 @@ const state = {
   selectedUsageIds: new Set(),
   pointAccount: { balance: 0, lifetimeEarned: 0, lifetimeUsed: 0 },
   pointHistory: [],
+  checkoutBenefitPreview: { stay: null, market: null },
   favoriteStayIds: loadLocalFavoriteStayIds(),
   favoriteLoadedForUser: "",
+  favoriteEventIds: new Set(),
+  favoriteEventsLoadedForUser: "",
 };
 
 window.motfApplyCatalog = function applyCatalog(nextStays, nextStores, options = {}) {
@@ -522,6 +513,10 @@ window.motfGetReservationDraft = function getReservationDraft() {
 
 window.motfApplyLaunchContent = function applyLaunchContent(events = [], cards = [], social = {}) {
   state.platformEvents = Array.isArray(events) ? events : [];
+  const requestedEventId = new URLSearchParams(window.location.search).get("event") || initialLocationParams.get("event");
+  if (requestedEventId) {
+    state.selectedEvent = state.platformEvents.find((event) => String(event.id) === String(requestedEventId)) || state.selectedEvent;
+  }
   if (state.selectedEvent) {
     state.selectedEvent = state.platformEvents.find((event) => String(event.id) === String(state.selectedEvent.id)) || state.selectedEvent;
   }
@@ -627,16 +622,23 @@ window.motfApplyPointData = function applyPointData(account = {}, ledger = []) {
   renderPointHistory();
 };
 
+window.motfApplyCheckoutBenefitPreview = function applyCheckoutBenefitPreview(kind, preview) {
+  if (!Object.prototype.hasOwnProperty.call(state.checkoutBenefitPreview, kind)) return;
+  state.checkoutBenefitPreview[kind] = preview ? { ...preview } : null;
+  if (kind === "stay" && currentRoute() === "booking") renderBooking();
+  if (kind === "market" && currentRoute() === "cart") renderCart();
+};
+
 window.motfAddCommunityPost = function addCommunityPost(post) {
   const board = communityBoards.find((item) => item.id === post.boardId) || communityBoards[0];
-  board.posts.unshift({ id: post.id, title: post.title, body: post.body, likes: 0, comments: [], media: post.media || "", authorId: post.authorId, createdAt: post.createdAt });
+  board.posts.unshift({ id: post.id, title: post.title, body: post.body, likes: 0, comments: [], media: post.media || "", authorId: post.authorId, authorName: "익명", createdAt: post.createdAt });
   state.activeBoardId = board.id;
   state.activePostId = post.id;
   renderBoardDetail();
 };
 
 window.motfApplyCommunityData = function applyCommunityData(posts, likes, comments) {
-  if (!Array.isArray(posts) || !posts.length) return;
+  if (!Array.isArray(posts)) return;
   const likeCounts = (likes || []).reduce((map, item) => map.set(item.post_id, (map.get(item.post_id) || 0) + 1), new Map());
   const commentsByPost = (comments || []).reduce((map, item) => {
     const list = map.get(item.post_id) || [];
@@ -646,13 +648,45 @@ window.motfApplyCommunityData = function applyCommunityData(posts, likes, commen
   communityBoards.forEach((board) => {
     const remote = posts.filter((post) => post.board_key === board.id).map((post) => ({
       id: post.id, title: post.title, body: post.body, authorId: post.author_id,
+      authorName: post.author_name || "익명",
       createdAt: post.created_at, media: post.media_urls?.length ? `첨부 ${post.media_urls.length}` : "",
       likes: likeCounts.get(post.id) || 0, comments: commentsByPost.get(post.id) || [],
     }));
-    if (remote.length) board.posts = remote;
+    board.posts = remote;
   });
   if (currentRoute() === "community") renderCommunity();
   if (currentRoute() === "boardDetail") renderBoardDetail();
+};
+
+window.motfApplyRecreationActivities = function applyRecreationActivities(rows = []) {
+  const next = (Array.isArray(rows) ? rows : []).map((item) => {
+    const min = Number(item.people_min || 0);
+    const max = Number(item.people_max || 0);
+    const spaces = Array.isArray(item.spaces) ? item.spaces : [];
+    const media = Array.isArray(item.media_urls) ? item.media_urls : [];
+    const peopleGroup = max && max <= 20 ? "small" : max && max <= 50 ? "medium" : "large";
+    return {
+      id: item.id,
+      title: item.title,
+      people: min && max ? `${min}~${max}명` : max ? `최대 ${max}명` : "인원 협의",
+      peopleGroup,
+      space: spaces.includes("indoor") && spaces.includes("outdoor") ? "any" : (spaces[0] || "any"),
+      mood: item.play_type || "team",
+      time: item.duration_minutes ? `${item.duration_minutes}분` : "시간 협의",
+      note: item.summary || "운영팀 추천 레크레이션",
+      media: media.length ? `자료 ${media.length}개` : "진행 안내",
+      image: media.find((url) => /\.(png|jpe?g|webp|gif)(\?|$)/i.test(url)) || photo("photo-1517048676732-d65bc937f952"),
+      mediaUrls: media,
+      scriptExample: item.script_example || "",
+      likes: 0,
+      comments: [],
+      detail: item.instructions || item.summary || "상세 진행 방법은 운영팀 안내를 확인해주세요.",
+    };
+  });
+  activities.splice(0, activities.length, ...next);
+  if (next.length && !next.some((item) => String(item.id) === String(state.activeActivityId))) state.activeActivityId = next[0].id;
+  if (currentRoute() === "recreation") renderRecreation();
+  if (currentRoute() === "activityDetail") renderActivityDetail();
 };
 
 window.motfClearUserScopedState = function clearUserScopedState() {
@@ -680,6 +714,8 @@ window.motfClearUserScopedState = function clearUserScopedState() {
   state.pendingPayment = null;
   state.favoriteStayIds = new Set();
   state.favoriteLoadedForUser = "";
+  state.favoriteEventIds = new Set();
+  state.favoriteEventsLoadedForUser = "";
   clearPendingPayment();
   if (currentRoute() === "myMt") renderMyMt();
   if (currentRoute() === "myUsage" || currentRoute() === "mypage") renderMypage();
@@ -784,6 +820,8 @@ const pathRoutes = Object.entries(routePaths).reduce((routes, [route, path]) => 
   routes[path] = route;
   return routes;
 }, { "/index.html": "home" });
+const initialLocationPath = window.location.pathname.replace(/\/+$/, "") || "/";
+const initialLocationParams = new URLSearchParams(window.location.search);
 
 const legacyRouteAliases = {
   mySupport: "mypage",
@@ -891,6 +929,41 @@ async function toggleFavoriteStay(stayId) {
   return nextFavorite;
 }
 
+async function loadFavoriteEventsFromDatabase(force = false) {
+  const userId = window.motfCurrentUserId || "";
+  const client = window.motfSupabase;
+  if (!userId || !client) {
+    state.favoriteEventIds = new Set();
+    state.favoriteEventsLoadedForUser = "";
+    return;
+  }
+  if (!force && state.favoriteEventsLoadedForUser === userId) return;
+  const { data, error } = await client.from("user_favorite_events").select("event_id").eq("user_id", userId);
+  if (error) {
+    console.warn("MOriginal 즐겨찾기를 불러오지 못했습니다.", error);
+    return;
+  }
+  state.favoriteEventIds = new Set((data || []).map((item) => String(item.event_id)));
+  state.favoriteEventsLoadedForUser = userId;
+}
+
+async function toggleFavoriteEvent(eventId) {
+  const userId = window.motfCurrentUserId || "";
+  const client = window.motfSupabase;
+  if (!userId || !client) throw new Error("로그인 후 즐겨찾기할 수 있어요.");
+  await loadFavoriteEventsFromDatabase();
+  const key = String(eventId);
+  const active = state.favoriteEventIds.has(key);
+  const query = active
+    ? client.from("user_favorite_events").delete().eq("user_id", userId).eq("event_id", key)
+    : client.from("user_favorite_events").insert({ user_id: userId, event_id: key });
+  const { error } = await query;
+  if (error) throw error;
+  if (active) state.favoriteEventIds.delete(key);
+  else state.favoriteEventIds.add(key);
+  return !active;
+}
+
 function favoriteStayButton(stay, compact = false) {
   const active = isFavoriteStay(stay.id);
   return `<button class="favorite-stay-button ${active ? "active" : ""} ${compact ? "compact" : ""}" type="button" data-toggle-favorite-stay="${stay.id}" aria-pressed="${active}" aria-label="${escapeHtml(stay.name)} ${active ? "찜 해제" : "찜하기"}"><i data-lucide="heart"></i>${compact ? "" : `<span>${active ? "찜 해제" : "찜하기"}</span>`}</button>`;
@@ -919,7 +992,9 @@ function stayShareUrl(stay) {
 }
 
 function applyRouteSelection(route) {
-  const params = new URLSearchParams(window.location.search);
+  const currentParams = new URLSearchParams(window.location.search);
+  const routePath = routePaths[route] || "/";
+  const params = currentParams.toString() || (initialLocationPath === routePath ? initialLocationParams : currentParams);
   if (route === "stayDetail") {
     const stayId = params.get("stay");
     if (stayId) {
@@ -929,6 +1004,17 @@ function applyRouteSelection(route) {
         state.selectedRoom = sharedStay.rooms?.[0] || null;
       }
     }
+  }
+  if (route === "roomDetail") {
+    const stayId = params.get("stay");
+    const roomId = params.get("room");
+    const stay = stays.find((item) => String(item.id) === String(stayId));
+    const room = stay?.rooms?.find((item) => String(item.id) === String(roomId));
+    if (stay && room) { state.selectedStay = stay; state.selectedRoom = room; }
+  }
+  if (route === "eventDetail") {
+    const eventId = params.get("event");
+    if (eventId) state.selectedEvent = state.platformEvents.find((item) => String(item.id) === String(eventId)) || state.selectedEvent;
   }
 }
 
@@ -960,7 +1046,17 @@ function routeFromLocation() {
 
 function routeUrl(route) {
   const path = routePaths[route] || "/";
-  return `${window.location.origin}${path}`;
+  const params = new URLSearchParams();
+  const currentPath = window.location.pathname.replace(/\/+$/, "") || "/";
+  const initialParam = (name) => initialLocationPath === path && currentPath === path ? initialLocationParams.get(name) : "";
+  if (route === "stayDetail" && (initialParam("stay") || state.selectedStay?.id)) params.set("stay", initialParam("stay") || state.selectedStay.id);
+  if (route === "roomDetail" && state.selectedStay?.id && state.selectedRoom?.id) {
+    params.set("stay", initialParam("stay") || state.selectedStay.id);
+    params.set("room", initialParam("room") || state.selectedRoom.id);
+  }
+  if (route === "eventDetail" && (initialParam("event") || state.selectedEvent?.id)) params.set("event", initialParam("event") || state.selectedEvent.id);
+  const query = params.toString();
+  return `${window.location.origin}${path}${query ? `?${query}` : ""}`;
 }
 
 function preservePendingMtInvite() {
@@ -1123,6 +1219,7 @@ function safeExternalUrl(value) {
 function eventCard(event, featured = false) {
   const status = effectiveEventStatus(event);
   const formUrl = status === "open" ? safeExternalUrl(event.google_form_url) : "";
+  const favorite = state.favoriteEventIds.has(String(event.id));
   return `<article class="platform-event-card event-card-${status} ${featured ? "featured" : ""}">
     <button class="platform-event-main" type="button" data-event-id="${event.id}" aria-label="${escapeHtml(event.title)} 상세 보기">
       <span class="platform-event-media"><img src="${event.poster_url}" alt="${escapeHtml(event.title)} 포스터" /><b class="event-status ${status}">${eventStatusLabel(status)}</b></span>
@@ -1130,7 +1227,7 @@ function eventCard(event, featured = false) {
     </button>
     <span class="platform-event-actions">${formUrl
       ? `<a class="event-card-apply" href="${escapeHtml(formUrl)}" target="_blank" rel="noopener noreferrer"><i data-lucide="external-link"></i>신청 중 · 바로 신청</a>`
-      : `<span class="event-card-state ${status}">${status === "scheduled" ? `${formatEventDate(event.application_opens_at)} 오픈` : eventStatusLabel(status)}</span>`}<button type="button" data-event-id="${event.id}">상세보기</button></span>
+      : `<span class="event-card-state ${status}">${status === "scheduled" ? `${formatEventDate(event.application_opens_at)} 오픈` : eventStatusLabel(status)}</span>`}<button type="button" class="event-favorite-button ${favorite ? "active" : ""}" data-toggle-favorite-event="${event.id}" aria-pressed="${favorite}"><i data-lucide="bookmark"></i>${favorite ? "저장됨" : "관심 저장"}</button><button type="button" data-event-id="${event.id}">상세보기</button></span>
   </article>`;
 }
 
@@ -1148,8 +1245,9 @@ function renderHomeCardNews() {
   const section = qs(".home-card-news");
   const container = qs("#homeCardNews");
   if (!section || !container) return;
-  section.hidden = !state.homepageCards.length;
-  container.innerHTML = state.homepageCards.map((card) => `<a class="home-news-card" href="${escapeHtml(card.link_url || "#")}" ${card.link_url ? 'target="_blank" rel="noopener noreferrer"' : ""}><img src="${card.image_url}" alt="" /><span><small>${escapeHtml(card.placement === "promotion" ? "프로모션" : "CARD NEWS")}</small><strong>${escapeHtml(card.title)}</strong><b>${escapeHtml(card.subtitle || card.link_label || "자세히 보기")}</b></span></a>`).join("");
+  const cards = state.homepageCards.filter((card) => ["card_news", "promotion"].includes(card.placement));
+  section.hidden = !cards.length;
+  container.innerHTML = cards.map((card) => `<a class="home-news-card" href="${escapeHtml(card.link_url || "#")}" ${card.link_url ? 'target="_blank" rel="noopener noreferrer"' : ""}><img src="${card.image_url}" alt="" /><span><small>${escapeHtml(card.placement === "promotion" ? "프로모션" : "CARD NEWS")}</small><strong>${escapeHtml(card.title)}</strong><b>${escapeHtml(card.subtitle || card.link_label || "자세히 보기")}</b></span></a>`).join("");
 }
 
 function renderEvents() {
@@ -1172,9 +1270,10 @@ function renderEventDetail() {
   const formUrl = status === "open" ? safeExternalUrl(event.google_form_url) : "";
   const promoVideoUrl = safeExternalUrl(event.promo_video_url);
   const canApply = Boolean(formUrl);
+  const favorite = state.favoriteEventIds.has(String(event.id));
   const timeline = Array.isArray(event.timeline) ? event.timeline : [];
   const highlights = Array.isArray(event.highlights) ? event.highlights : [];
-  container.innerHTML = `<article class="event-detail-hero"><img src="${event.poster_url}" alt="${escapeHtml(event.title)} 포스터" /><div><span class="event-status ${status}">${eventStatusLabel(status)}</span><p class="eyebrow">moTF ORIGINAL</p><h1>${escapeHtml(event.title)}</h1><p>${escapeHtml(event.description || event.short_description)}</p><dl><div><dt>일정</dt><dd>${formatEventDate(event.starts_at)}</dd></div><div><dt>장소</dt><dd>${escapeHtml(event.venue_name || "공개 예정")}</dd></div><div><dt>참가비</dt><dd>${money(event.price_per_person)} / 1인</dd></div><div><dt>정원</dt><dd>${event.application_count || 0} / ${event.capacity}명</dd></div></dl><div class="event-detail-actions">${canApply ? `<a class="primary-btn event-apply-button" href="${escapeHtml(formUrl)}" target="_blank" rel="noopener noreferrer"><i data-lucide="external-link"></i>신청 중 · 구글폼 열기</a>` : `<button class="primary-btn event-apply-button" disabled>${status === "scheduled" ? `${formatEventDate(event.application_opens_at)} 오픈` : eventStatusLabel(status)}</button>`}${promoVideoUrl ? `<a class="secondary-btn event-video-button" href="${escapeHtml(promoVideoUrl)}" target="_blank" rel="noopener noreferrer"><i data-lucide="play-circle"></i>홍보 영상 보기</a>` : ""}</div></div></article>
+  container.innerHTML = `<article class="event-detail-hero"><img src="${event.poster_url}" alt="${escapeHtml(event.title)} 포스터" /><div><span class="event-status ${status}">${eventStatusLabel(status)}</span><p class="eyebrow">moTF ORIGINAL</p><h1>${escapeHtml(event.title)}</h1><p>${escapeHtml(event.description || event.short_description)}</p><dl><div><dt>일정</dt><dd>${formatEventDate(event.starts_at)}</dd></div><div><dt>장소</dt><dd>${escapeHtml(event.venue_name || "공개 예정")}</dd></div><div><dt>참가비</dt><dd>${money(event.price_per_person)} / 1인</dd></div><div><dt>정원</dt><dd>${event.application_count || 0} / ${event.capacity}명</dd></div></dl><div class="event-detail-actions"><button type="button" class="secondary-btn event-favorite-button ${favorite ? "active" : ""}" data-toggle-favorite-event="${event.id}" aria-pressed="${favorite}"><i data-lucide="bookmark"></i>${favorite ? "관심 일정 저장됨" : "관심 일정 저장"}</button>${canApply ? `<a class="primary-btn event-apply-button" href="${escapeHtml(formUrl)}" target="_blank" rel="noopener noreferrer"><i data-lucide="external-link"></i>신청 중 · 구글폼 열기</a>` : `<button class="primary-btn event-apply-button" disabled>${status === "scheduled" ? `${formatEventDate(event.application_opens_at)} 오픈` : eventStatusLabel(status)}</button>`}${promoVideoUrl ? `<a class="secondary-btn event-video-button" href="${escapeHtml(promoVideoUrl)}" target="_blank" rel="noopener noreferrer"><i data-lucide="play-circle"></i>홍보 영상 보기</a>` : ""}</div></div></article>
     ${highlights.length ? `<section class="event-detail-section"><p class="eyebrow">HIGHLIGHT</p><h2>이번 MT에서 만날 것들</h2><div class="event-highlight-list">${highlights.map((item) => `<span>${escapeHtml(item)}</span>`).join("")}</div></section>` : ""}
     ${timeline.length ? `<section class="event-detail-section"><p class="eyebrow">TIMELINE</p><h2>진행 일정</h2><ol class="event-timeline">${timeline.map((item) => `<li><time>${escapeHtml(item.time || "")}</time><div><strong>${escapeHtml(item.title || "")}</strong><span>${escapeHtml(item.description || "")}</span></div></li>`).join("")}</ol></section>` : ""}`;
   refreshIcons();
@@ -1226,15 +1325,17 @@ function renderHomePicks() {
 function renderHomeStories() {
   const container = qs("#homeStoryGrid");
   if (!container) return;
-  container.innerHTML = homeStories.map((story) => `
-    <button class="home-story-card ${story.featured ? "featured" : ""}" type="button" data-route="${story.route}" ${story.section ? `data-community-section="${story.section}"` : ""}>
+  const pick = state.homepageCards.find((card) => card.is_active !== false && card.placement === "hero");
+  const stories = homeStories.map((story, index) => index || !pick ? story : ({ ...story, title: pick.title || story.title, summary: pick.subtitle || story.summary, image: pick.image_url || story.image, externalUrl: safeExternalUrl(pick.link_url) }));
+  container.innerHTML = stories.map((story) => `
+    <${story.externalUrl ? "a" : "button"} class="home-story-card ${story.featured ? "featured" : ""}" ${story.externalUrl ? `href="${escapeHtml(story.externalUrl)}" target="_blank" rel="noopener noreferrer"` : `type="button" data-route="${story.route}" ${story.section ? `data-community-section="${story.section}"` : ""}`}>
       <img src="${story.image}" alt="" />
       <span class="home-story-copy">
         <small>${escapeHtml(story.category)}</small>
         <strong>${escapeHtml(story.title)}</strong>
         <span>${escapeHtml(story.summary)}</span>
       </span>
-    </button>
+    </${story.externalUrl ? "a" : "button"}>
   `).join("");
   refreshIcons();
 }
@@ -2075,16 +2176,22 @@ function renderBooking() {
   const update = () => {
     applyStaySearchField("people", qs("#bookingPeople").value);
     const amount = bookingAmount();
+    const benefit = state.checkoutBenefitPreview.stay;
+    const couponDiscount = Number(benefit?.applied_coupon_discount || 0);
+    const pointsUsed = Number(benefit?.applied_points || 0);
+    const payableAmount = benefit ? Number(benefit.payable_amount ?? amount.total) : amount.total;
     qs("#bookingSummary").innerHTML = `
       <div class="summary-line"><span>${stay.name}</span><strong>${room.name}</strong></div>
       <div class="summary-line"><span>숙박일</span><strong>${stayDateRangeLabel().replace("숙박일 ", "")}</strong></div>
       <div class="summary-line"><span>예약 인원</span><strong>${qs("#bookingPeople").value}명</strong></div>
       <div class="summary-line"><span>기본 숙박비</span><strong>${money(amount.roomFee)}</strong></div>
+      ${couponDiscount ? `<div class="summary-line benefit-discount"><span>${escapeHtml(benefit.coupon_name || "할인코드")}</span><strong>-${money(couponDiscount)}</strong></div>` : ""}
+      ${pointsUsed ? `<div class="summary-line benefit-discount"><span>포인트 사용</span><strong>-${pointsUsed.toLocaleString("ko-KR")}P</strong></div>` : ""}
       ${amount.extraPeople ? `<div class="summary-line"><span>추가 인원 ${amount.extraPeople}명</span><strong>숙소 현장 결제</strong></div>` : ""}
       <div class="summary-line"><span>부대시설 이용금</span><strong>숙소 현장 결제</strong></div>
       ${unavailable ? `<div class="summary-line"><span>예약 가능 여부</span><strong>선택 날짜 품절</strong></div>` : ""}
       <div class="separate-charge-note"><i data-lucide="info"></i><span>모티프에서는 객실 기본금만 결제합니다. 추가 인원과 바베큐 등 부대시설 요금은 이용 당일 숙소에 직접 결제해주세요.</span></div>
-      <div class="summary-line total"><span>지금 결제할 금액</span><strong>${money(amount.total)}</strong></div>
+      <div class="summary-line total"><span>지금 결제할 금액</span><strong>${money(payableAmount)}</strong></div>
     `;
     const submitButton = qs('#bookingForm [type="submit"]');
     if (submitButton) {
@@ -2364,9 +2471,15 @@ function renderCart() {
         .join("")
     : `<div class="empty-state">장바구니가 비어 있습니다. 장보기에서 상품을 담아보세요.</div>`;
   const total = cartTotal();
+  const benefit = state.checkoutBenefitPreview.market;
+  const couponDiscount = Number(benefit?.applied_coupon_discount || 0);
+  const pointsUsed = Number(benefit?.applied_points || 0);
+  const payableAmount = benefit ? Number(benefit.payable_amount ?? total) : total;
   qs("#cartSummary").innerHTML = `
     <div class="summary-line"><span>상품 금액</span><strong>${money(total)}</strong></div>
-    <div class="summary-line total"><span>총 결제 금액</span><strong>${money(total)}</strong></div>
+    ${couponDiscount ? `<div class="summary-line benefit-discount"><span>${escapeHtml(benefit.coupon_name || "할인코드")}</span><strong>-${money(couponDiscount)}</strong></div>` : ""}
+    ${pointsUsed ? `<div class="summary-line benefit-discount"><span>포인트 사용</span><strong>-${pointsUsed.toLocaleString("ko-KR")}P</strong></div>` : ""}
+    <div class="summary-line total"><span>총 결제 금액</span><strong>${money(payableAmount)}</strong></div>
   `;
   refreshIcons();
 }
@@ -3246,7 +3359,7 @@ function communityActorId() {
 }
 
 function relativeTime(value) {
-  if (!value) return "방금 전";
+  if (!value) return "시간 정보 없음";
   const seconds = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 1000));
   if (seconds < 60) return "방금 전";
   if (seconds < 3600) return `${Math.floor(seconds / 60)}분 전`;
@@ -3285,12 +3398,12 @@ function renderBoardDetail() {
     </div>
     <button class="primary-btn board-compose-button" type="button" data-community-write><i data-lucide="square-pen"></i>글쓰기</button>
   `;
-  qs("#boardPostList").innerHTML = board.posts
+  qs("#boardPostList").innerHTML = board.posts.length ? board.posts
     .map(
       (post) => `
       <button class="anonymous-post interactive-card" type="button" data-post-id="${post.id}">
         <div class="post-topline">
-          <strong>익명</strong>
+          <strong class="${post.authorName === "운영팀" ? "community-operator-badge" : ""}">${post.authorName === "운영팀" ? "운영팀" : "익명"}</strong>
           <span>${relativeTime(post.createdAt)}</span>
         </div>
         <h3>${escapeHtml(post.title)}</h3>
@@ -3302,7 +3415,7 @@ function renderBoardDetail() {
       </button>
     `
     )
-    .join("");
+    .join("") : '<div class="empty-state"><strong>아직 등록된 글이 없습니다.</strong><span>첫 글을 작성해 현장 정보를 나눠보세요.</span></div>';
   qs("#boardPostBoard").value = board.id;
   qs("#boardPostTitle").value = "";
   qs("#boardPostBody").value = "";
@@ -3346,6 +3459,11 @@ function ensureMarketBundleProducts(store) {
 
 function renderActivityDetail() {
   const activity = activeActivity();
+  if (!activity) {
+    qs("#activityDetailContent").innerHTML = '<div class="empty-state">레크레이션 정보를 찾을 수 없습니다.</div>';
+    qs("#activityCommentList").innerHTML = "";
+    return;
+  }
   qs("#activityDetailContent").innerHTML = `
     <img class="post-detail-media" src="${activity.image}" alt="${escapeHtml(activity.title)}" />
     <div class="post-detail-body">
@@ -3357,7 +3475,7 @@ function renderActivityDetail() {
         <span class="pill">${activity.space === "indoor" ? "실내" : activity.space === "outdoor" ? "야외" : "공간 무관"}</span>
       </div>
       <div class="activity-resource-links">
-        <a class="media-chip activity-media-chip" href="https://www.youtube.com/results?search_query=${encodeURIComponent(activity.title + " 레크레이션 진행")}" target="_blank" rel="noopener"><i data-lucide="play-circle"></i>예시 영상 보기</a>
+        <a class="media-chip activity-media-chip" href="${escapeHtml(activity.mediaUrls?.[0] || `https://www.youtube.com/results?search_query=${encodeURIComponent(activity.title + " 레크레이션 진행")}`)}" target="_blank" rel="noopener"><i data-lucide="play-circle"></i>예시 영상 보기</a>
         <button class="media-chip activity-media-chip" type="button" data-download-activity-script><i data-lucide="file-down"></i>진행 대본 받기</button>
       </div>
       <div class="post-actions">
@@ -3373,9 +3491,15 @@ function renderActivityDetail() {
 function renderPostDetail() {
   const board = activeBoard();
   const post = activePost();
+  if (!post) {
+    qs("#postDetailContent").innerHTML = '<div class="empty-state">게시글을 찾을 수 없습니다.</div>';
+    qs("#postCommentList").innerHTML = "";
+    return;
+  }
   qs("#postDetailContent").innerHTML = `
     <div class="post-detail-body">
       <p class="eyebrow">${board.title}</p>
+      <div class="post-detail-author"><strong class="${post.authorName === "운영팀" ? "community-operator-badge" : ""}">${post.authorName === "운영팀" ? "운영팀" : "익명"}</strong><span>${relativeTime(post.createdAt)}</span></div>
       <h1>${escapeHtml(post.title)}</h1>
       <p>${escapeHtml(post.body)}</p>
       ${post.media ? `<div class="post-media-placeholder"><i data-lucide="image"></i>${post.media} 첨부 영역</div>` : ""}
@@ -4611,7 +4735,7 @@ document.addEventListener("submit", (event) => {
   navigate("stays");
 });
 
-document.addEventListener("click", (event) => {
+document.addEventListener("click", async (event) => {
   const closeButton = event.target.closest("[data-close-motf-dialog]");
   if (closeButton) closeButton.closest("dialog")?.close();
 });
@@ -4833,7 +4957,7 @@ function updatePhotoGallery() {
   }
 }
 
-document.addEventListener("click", (event) => {
+document.addEventListener("click", async (event) => {
   const mtFilter = event.target.closest("[data-mt-directory-filter]");
   if (mtFilter) {
     state.mtDirectoryFilter = mtFilter.dataset.mtDirectoryFilter;
@@ -4869,6 +4993,22 @@ document.addEventListener("click", (event) => {
         successMessage: "7일 동안 유효한 MT 공유 링크를 복사했습니다.",
       });
     }).catch((error) => toast(error.message || "공유 링크를 만들지 못했습니다."));
+    return;
+  }
+  const favoriteEventButton = event.target.closest("[data-toggle-favorite-event]");
+  if (favoriteEventButton) {
+    favoriteEventButton.disabled = true;
+    try {
+      const active = await toggleFavoriteEvent(favoriteEventButton.dataset.toggleFavoriteEvent);
+      toast(active ? "관심 MOriginal에 저장했습니다." : "관심 MOriginal에서 해제했습니다.");
+      renderHomeEvents();
+      renderEvents();
+      if (currentRoute() === "eventDetail") renderEventDetail();
+    } catch (error) {
+      toast(error.message || "즐겨찾기를 저장하지 못했습니다.");
+    } finally {
+      favoriteEventButton.disabled = false;
+    }
     return;
   }
   const eventCardButton = event.target.closest("[data-event-id]");
@@ -4946,8 +5086,10 @@ window.addEventListener("popstate", () => {
 });
 
 window.addEventListener("motf:auth-ready", async () => {
-  await loadFavoriteStaysFromDatabase(true);
+  await Promise.all([loadFavoriteStaysFromDatabase(true), loadFavoriteEventsFromDatabase(true)]);
   refreshFavoriteViews();
+  if (currentRoute() === "events") renderEvents();
+  if (currentRoute() === "eventDetail") renderEventDetail();
 });
 
 (async function boot() {
@@ -4959,7 +5101,7 @@ window.addEventListener("motf:auth-ready", async () => {
     await loadPaymentConfig();
     const handledPaymentRedirect = await handleTossRedirect();
     if (!handledPaymentRedirect) navigate(routeFromLocation(), { record: false, replace: true });
-    await loadFavoriteStaysFromDatabase(true);
+    await Promise.all([loadFavoriteStaysFromDatabase(true), loadFavoriteEventsFromDatabase(true)]);
     refreshFavoriteViews();
     updateCartBadge();
     refreshIcons();

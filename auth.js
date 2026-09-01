@@ -402,6 +402,15 @@
     document.querySelector("#authTitle").textContent = "기본 정보 입력";
     document.querySelector("#profileCompletePhone").value = formatPhone(profile?.phone || "");
     document.querySelector("#profileCompleteOrganization").value = profile?.organization || "";
+    const identityComplete = Boolean(profile?.identity_verified_at);
+    const identityButton = profileCompleteForm.querySelector('[data-identity-verify="profile_upgrade"]');
+    const identityHelper = profileCompleteForm.querySelector(".auth-helper-text");
+    const identityResult = document.querySelector("#profileIdentityResult");
+    if (identityButton) identityButton.hidden = identityComplete;
+    if (identityHelper) identityHelper.textContent = identityComplete
+      ? "최초 본인인증은 완료되었습니다. 남은 기본 정보만 입력해주세요."
+      : "안전한 예약과 성인 상품 확인을 위해 최초 1회 휴대폰 본인인증이 필요합니다.";
+    if (identityResult && identityComplete) identityResult.hidden = true;
     const needsPassword = (session.user.app_metadata?.providers || []).includes("kakao") && !profile?.password_set_at;
     const passwordFields = document.querySelector("#kakaoPasswordFields");
     passwordFields.hidden = !needsPassword;

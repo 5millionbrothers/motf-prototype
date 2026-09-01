@@ -79,11 +79,19 @@
     const requested = Number(pointsInput?.value || 0);
     const balance = Math.max(0, Number(window.motfPointBalance || 0));
     const points = Number.isFinite(requested) ? Math.max(0, Math.min(requested, balance)) : 0;
-    if (pointsInput && Number(pointsInput.value || 0) !== points) pointsInput.value = String(points);
+    const adjusted = Boolean(pointsInput && Number(pointsInput.value || 0) !== points);
+    if (adjusted) pointsInput.value = String(points);
     return {
       points,
       coupon: document.querySelector(fields.coupon)?.value.trim().toUpperCase() || "",
+      adjusted,
+      requested,
+      balance,
     };
+  }
+
+  function publishBenefitPreview(kind, preview = null) {
+    window.motfApplyCheckoutBenefitPreview?.(kind, preview);
   }
 
   function syncPointControls(balanceValue = 0) {
@@ -116,6 +124,7 @@
 
   function invalidateBenefitPreview(kind) {
     benefitPreviews[kind] = null;
+    publishBenefitPreview(kind, null);
     const result = document.querySelector(benefitFields[kind].result);
     if (result) {
       result.className = "checkout-benefit-result";
@@ -144,12 +153,13 @@
       const preview = Array.isArray(data) ? data[0] : data;
       if (!preview) throw new Error("혜택 적용 결과를 확인하지 못했습니다.");
       benefitPreviews[kind] = { ...preview, signature: benefitSignature(kind, context, input) };
+      publishBenefitPreview(kind, benefitPreviews[kind]);
       const result = document.querySelector(benefitFields[kind].result);
       if (result) {
         const coupon = Number(preview.applied_coupon_discount || 0);
         const points = Number(preview.applied_points || 0);
         result.className = "checkout-benefit-result applied";
-        result.innerHTML = `<div><span>상품 금액</span><b>${Number(preview.original_amount).toLocaleString("ko-KR")}원</b></div>${coupon ? `<div><span>${preview.coupon_name || "할인코드"}</span><b>-${coupon.toLocaleString("ko-KR")}원</b></div>` : ""}${points ? `<div><span>포인트 사용</span><b>-${points.toLocaleString("ko-KR")}P</b></div>` : ""}<div class="final"><span>최종 결제금액</span><strong>${Number(preview.payable_amount).toLocaleString("ko-KR")}원</strong></div>`;
+        result.innerHTML = `${input.adjusted ? `<p class="benefit-adjustment-note">보유 포인트에 맞춰 ${input.points.toLocaleString("ko-KR")}P로 조정했습니다.</p>` : ""}<div><span>상품 금액</span><b>${Number(preview.original_amount).toLocaleString("ko-KR")}원</b></div>${coupon ? `<div><span>${preview.coupon_name || "할인코드"}</span><b>-${coupon.toLocaleString("ko-KR")}원</b></div>` : ""}${points ? `<div><span>포인트 사용</span><b>-${points.toLocaleString("ko-KR")}P</b></div>` : ""}<div class="final"><span>최종 결제금액</span><strong>${Number(preview.payable_amount).toLocaleString("ko-KR")}원</strong></div>`;
       }
       return preview;
     } finally {
@@ -171,9 +181,23 @@
         signature,
       };
       benefitPreviews[kind] = preview;
+      publishBenefitPreview(kind, preview);
       return preview;
     }
     return previewBenefits(kind);
+  }
+
+  async function ensureCheckoutBenefits(kind) {
+    try {
+      return await ensureBenefitPreview(kind);
+    } catch (error) {
+      const couponInput = document.querySelector(benefitFields[kind].coupon);
+      if (!couponInput?.value.trim()) throw error;
+      couponInput.value = "";
+      benefitPreviews[kind] = null;
+      window.motfToast?.("사용할 수 없는 할인코드는 제외했습니다. 다른 혜택만 반영해 결제를 계속합니다.");
+      return ensureBenefitPreview(kind);
+    }
   }
 
   async function loadMyTransactions() {
@@ -297,7 +321,7 @@
       try {
         const verified = await window.motfEnsureIdentityVerified?.();
         if (verified === false) throw new Error("휴대폰 본인인증을 완료해주세요.");
-        await ensureBenefitPreview("stay");
+        await ensureCheckoutBenefits("stay");
         const requestedPoints = benefitInput("stay").points;
         const { data, error } = await client.rpc("prepare_stay_checkout", {
           target_business_id: draft.business_id,
@@ -342,7 +366,7 @@
       try {
         const verified = await window.motfEnsureIdentityVerified?.();
         if (verified === false) throw new Error("휴대폰 본인인증을 완료해주세요.");
-        await ensureBenefitPreview("market");
+        await ensureCheckoutBenefits("market");
         const requestedPoints = benefitInput("market").points;
         const { data, error } = await client.rpc("prepare_market_checkout", {
           target_business_id: draft.business_id,
@@ -388,8 +412,20 @@
     if (previewButton) {
       try { await previewBenefits(previewButton.dataset.previewBenefits, previewButton); }
       catch (error) {
-        const result = document.querySelector(benefitFields[previewButton.dataset.previewBenefits].result);
-        if (result) { result.className = "checkout-benefit-result error"; result.textContent = error.message || "혜택을 적용하지 못했습니다."; }
+        const kind = previewButton.dataset.previewBenefits;
+        const fields = benefitFields[kind];
+        const couponInput = document.querySelector(fields.coupon);
+        const hadCoupon = Boolean(couponInput?.value.trim());
+        if (hadCoupon) couponInput.value = "";
+        benefitPreviews[kind] = null;
+        publishBenefitPreview(kind, null);
+        const result = document.querySelector(fields.result);
+        if (result) {
+          result.className = "checkout-benefit-result error nonblocking";
+          result.textContent = hadCoupon
+            ? `${error.message || "할인코드를 적용하지 못했습니다."} 쿠폰은 제외했으며 바로 결제할 수 있습니다.`
+            : (error.message || "혜택을 적용하지 못했습니다.");
+        }
       }
       return;
     }

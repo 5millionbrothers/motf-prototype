@@ -9,11 +9,13 @@
       if (input._flatpickr) return;
       const initialValue = input.value;
       const dialog = input.closest("dialog");
+      const isStayDate = input.matches("[data-stay-search-field], #stayCheckInDate, #stayCheckOutDate");
       flatpickr(input, {
         dateFormat: "Y-m-d",
         altInput: true,
         altFormat: "Y년 m월 d일",
         minDate: input.id?.includes("usage") ? null : "today",
+        maxDate: isStayDate ? new Date().fp_incr(90) : null,
         disableMobile: true,
         monthSelectorType: "static",
         position: dialog ? "above left" : "below left",
@@ -135,9 +137,9 @@
 
   async function loadCommunityData() {
     const client = window.motfSupabase;
-    if (!client || !window.motfCurrentUserId) return;
+    if (!client) return;
     const [posts, likes, comments] = await Promise.all([
-      client.from("community_posts").select("id,author_id,board_key,title,body,media_urls,created_at").eq("is_hidden", false).order("created_at", { ascending: false }).limit(200),
+      client.from("community_posts").select("id,author_id,author_name,board_key,title,body,media_urls,created_at").eq("is_hidden", false).order("created_at", { ascending: false }).limit(200),
       client.from("community_post_likes").select("post_id,user_id"),
       client.from("community_comments").select("id,post_id,user_id,parent_comment_id,body,created_at").order("created_at"),
     ]);
