@@ -1720,13 +1720,19 @@ function stayGalleryImages(stay) {
 
 function roomGalleryImages(_stay, room) {
   return uniqueImages([
-    room.image,
-    ...(room.images || []),
+    room?.image,
+    ...safeArray(room?.images),
   ]);
 }
 
 function dashList(items) {
   return `<ul class="dash-list">${items.map((item) => `<li>${item}</li>`).join("")}</ul>`;
+}
+
+function safeArray(value) {
+  if (Array.isArray(value)) return value;
+  if (typeof value === "string" && value.trim()) return value.split(/[,\n]/).map((item) => item.trim()).filter(Boolean);
+  return [];
 }
 
 function renderStayPagination(total, pageCount) {
@@ -1797,16 +1803,17 @@ function amenityChecklist(stay, room = null) {
 
 function roomCapacityMax(room) {
   if (Number(room?.maxPeople) > 0) return Number(room.maxPeople);
-  const match = room.capacity.match(/(\d+)\D*$/);
+  const match = String(room?.capacity || "").match(/(\d+)\D*$/);
   return match ? Number(match[1]) : 0;
 }
 
 function roomDetailFacts(stay, room) {
+  const features = safeArray(room?.features);
   return [
-    ["정원", room.capacity],
-    ["객실 금액", money(room.price)],
-    ["숙소 위치", `${stay.region} · ${stay.distance}`],
-    ["공간 구성", room.features.join(" · ")],
+    ["정원", room?.capacity || "확인 필요"],
+    ["객실 금액", money(room?.price || 0)],
+    ["숙소 위치", `${stay?.region || "지역 확인 필요"} · ${stay?.distance || "거리 확인 필요"}`],
+    ["공간 구성", features.length ? features.join(" · ") : "객실 구성은 예약 전 사장님에게 확인해주세요."],
   ];
 }
 
@@ -1825,6 +1832,7 @@ function renderStayGallery(images, alt, expanded = false) {
 
 function roomOptionCard(room, index, stay) {
   const unavailable = isRoomUnavailable(room);
+  const features = safeArray(room?.features);
   return `
     <article class="room-option-card ${unavailable ? "sold-out" : ""}">
       <img src="${room.image}" alt="${room.name} 사진" />
@@ -1846,7 +1854,7 @@ function roomOptionCard(room, index, stay) {
             )
             .join("")}
         </div>
-        <div class="detail-meta">${room.features.map((feature) => `<span class="pill">${feature}</span>`).join("")}</div>
+        <div class="detail-meta">${features.map((feature) => `<span class="pill">${feature}</span>`).join("")}</div>
         <button class="primary-btn" ${unavailable ? "disabled" : `data-room-index="${index}"`}><i data-lucide="${unavailable ? "ban" : "door-open"}"></i>${unavailable ? "품절" : "객실 자세히 보기"}</button>
       </div>
     </article>
@@ -1892,6 +1900,17 @@ function stayReviewPreviewCard(review) {
 function renderStayDetail() {
   ensureStayAvailability();
   const stay = state.selectedStay;
+  if (!stay) {
+    qs("#stayDetailContent").innerHTML = `
+      <div class="empty-state">
+        <h2>숙소 정보를 불러오지 못했습니다</h2>
+        <p>목록에서 숙소를 다시 선택해주세요.</p>
+        <button class="secondary-btn" type="button" data-route="stays">숙소 목록으로</button>
+      </div>
+    `;
+    refreshIcons();
+    return;
+  }
   const gallery = stayGalleryImages(stay);
   state.gallery = { images: gallery, index: 0, alt: stay.name };
   const insight = stayReviewInsight(stay);
@@ -2059,6 +2078,19 @@ function renderRoomDetail() {
   ensureStayAvailability();
   const stay = state.selectedStay;
   const room = state.selectedRoom;
+  if (!stay || !room) {
+    qs("#roomDetailContent").innerHTML = `
+      <div class="empty-state">
+        <h2>객실 정보를 불러오지 못했습니다</h2>
+        <p>숙소 상세 화면에서 객실을 다시 선택해주세요.</p>
+        <button class="secondary-btn" type="button" data-route="stays">숙소 목록으로</button>
+      </div>
+    `;
+    refreshIcons();
+    return;
+  }
+  const roomFeatures = safeArray(room.features);
+  const stayFees = safeArray(stay.fees);
   const unavailable = isRoomUnavailable(room);
   const gallery = roomGalleryImages(stay, room);
   state.gallery = { images: gallery, index: 0, alt: `${stay.name} ${room.name}` };
@@ -2069,7 +2101,7 @@ function renderRoomDetail() {
       <div>
         <p class="eyebrow">${stay.name}</p>
         <h1 class="room-detail-title">${room.name}</h1>
-        <p>${room.capacity}${room.features.length ? ` · ${room.features.slice(0, 3).join(" · ")}` : ""}</p>
+        <p>${room.capacity || "정원 확인 필요"}${roomFeatures.length ? ` · ${roomFeatures.slice(0, 3).join(" · ")}` : ""}</p>
       </div>
       <aside class="room-reserve-card">
         <span>선택 일정 기본 숙박비</span>
@@ -2094,7 +2126,7 @@ function renderRoomDetail() {
           `정원 ${room.capacity}`,
           `선택 일정 기본 숙박비 ${money(selectedBasePrice)}`,
           `객실 내 화장실 ${room.bathroomCount || 0}개${room.bathroomGenderSeparated ? " · 남녀 구분" : ""}${room.bathroomNote ? ` · ${room.bathroomNote}` : ""}`,
-          room.features.length ? `객실 장점: ${room.features.slice(0, 3).join(" · ")}` : "객실 구성은 예약 전 사장님에게 확인해주세요.",
+          roomFeatures.length ? `객실 장점: ${roomFeatures.slice(0, 3).join(" · ")}` : "객실 구성은 예약 전 사장님에게 확인해주세요.",
           "체크인 15:00 이후, 체크아웃 11:00 이전",
         ])}
       </section>
@@ -2112,7 +2144,7 @@ function renderRoomDetail() {
       </section>
       <section class="info-panel">
         <h2>추가요금 및 환불</h2>
-        ${dashList([...stay.fees.slice(0, 3), ...STANDARD_REFUND_POLICY])}
+        ${dashList([...stayFees.slice(0, 3), ...STANDARD_REFUND_POLICY])}
       </section>
     </div>
   `;
@@ -2927,7 +2959,7 @@ window.motfApplyMtProject = function applyMtProject(project, candidates = []) {
         stationDistanceM: candidate.business?.station_distance_m ?? catalogStay?.stationDistanceM,
         detailTags: catalogStay?.detailTags || [],
         rooms: [room],
-        images: room.images || [],
+        images: safeArray(room.images),
         amenities: catalogStay?.amenities || [],
         fees: catalogStay?.fees || [],
         extraFees: catalogStay?.extraFees || [],
