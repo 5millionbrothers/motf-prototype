@@ -459,6 +459,9 @@ const state = {
 
 window.motfApplyCatalog = function applyCatalog(nextStays, nextStores, options = {}) {
   if (Array.isArray(nextStays)) {
+    const currentParams = new URLSearchParams(window.location.search);
+    const requestedStayId = currentParams.get("stay") || initialLocationParams.get("stay") || state.selectedStay?.id || "";
+    const requestedRoomId = currentParams.get("room") || initialLocationParams.get("room") || state.selectedRoom?.id || "";
     stays = nextStays.map((stay) => ({
       ...stay,
       region: normalizeStayRegion(stay.region, stay.distance),
@@ -469,8 +472,8 @@ window.motfApplyCatalog = function applyCatalog(nextStays, nextStores, options =
       regionSelect.innerHTML = regions.map((region) => `<option value="${escapeHtml(region)}">${escapeHtml(region)}</option>`).join("");
       regionSelect.value = regions.includes(DEFAULT_STAY_REGION) ? DEFAULT_STAY_REGION : (regions[0] || "");
     }
-    state.selectedStay = stays[0] || null;
-    state.selectedRoom = stays[0]?.rooms?.[0] || null;
+    state.selectedStay = stays.find((stay) => String(stay.id) === String(requestedStayId)) || stays[0] || null;
+    state.selectedRoom = state.selectedStay?.rooms?.find((room) => String(room.id) === String(requestedRoomId)) || state.selectedStay?.rooms?.[0] || null;
   }
   if (Array.isArray(nextStores)) {
     stores = nextStores.length
@@ -486,6 +489,7 @@ window.motfApplyCatalog = function applyCatalog(nextStays, nextStores, options =
   if (route === "home") renderHome();
   if (route === "stays") renderStays();
   if (route === "stayDetail") renderStayDetail();
+  if (route === "roomDetail") renderRoomDetail();
   if (route === "market") renderStores();
   if (route === "storeDetail") renderStoreDetail();
 };
@@ -994,7 +998,9 @@ function stayShareUrl(stay) {
 function applyRouteSelection(route) {
   const currentParams = new URLSearchParams(window.location.search);
   const routePath = routePaths[route] || "/";
-  const params = currentParams.toString() || (initialLocationPath === routePath ? initialLocationParams : currentParams);
+  const params = currentParams.toString()
+    ? currentParams
+    : (initialLocationPath === routePath ? initialLocationParams : currentParams);
   if (route === "stayDetail") {
     const stayId = params.get("stay");
     if (stayId) {
@@ -1044,17 +1050,21 @@ function routeFromLocation() {
   return pathRoutes[normalizedPath] || "home";
 }
 
-function routeUrl(route) {
+function routeUrl(route, optionParams = null) {
   const path = routePaths[route] || "/";
-  const params = new URLSearchParams();
+  const params = optionParams instanceof URLSearchParams
+    ? new URLSearchParams(optionParams)
+    : new URLSearchParams();
   const currentPath = window.location.pathname.replace(/\/+$/, "") || "/";
   const initialParam = (name) => initialLocationPath === path && currentPath === path ? initialLocationParams.get(name) : "";
-  if (route === "stayDetail" && (initialParam("stay") || state.selectedStay?.id)) params.set("stay", initialParam("stay") || state.selectedStay.id);
-  if (route === "roomDetail" && state.selectedStay?.id && state.selectedRoom?.id) {
-    params.set("stay", initialParam("stay") || state.selectedStay.id);
-    params.set("room", initialParam("room") || state.selectedRoom.id);
+  const selectedStayId = initialParam("stay") || state.selectedStay?.id || "";
+  const selectedRoomId = initialParam("room") || state.selectedRoom?.id || "";
+  if (route === "stayDetail" && !params.has("stay") && selectedStayId) params.set("stay", selectedStayId);
+  if (route === "roomDetail") {
+    if (!params.has("stay") && selectedStayId) params.set("stay", selectedStayId);
+    if (!params.has("room") && selectedRoomId) params.set("room", selectedRoomId);
   }
-  if (route === "eventDetail" && (initialParam("event") || state.selectedEvent?.id)) params.set("event", initialParam("event") || state.selectedEvent.id);
+  if (route === "eventDetail" && !params.has("event") && (initialParam("event") || state.selectedEvent?.id)) params.set("event", initialParam("event") || state.selectedEvent.id);
   const query = params.toString();
   return `${window.location.origin}${path}${query ? `?${query}` : ""}`;
 }
@@ -1067,7 +1077,7 @@ function preservePendingMtInvite() {
 function updateBrowserRoute(route, options = {}) {
   if (options.updateHistory === false) return;
   const method = options.replace ? "replaceState" : "pushState";
-  window.history[method]({ route }, "", routeUrl(route));
+  window.history[method]({ route }, "", routeUrl(route, options.params));
   if (!options.replace) appHistoryDepth += 1;
 }
 
@@ -4384,13 +4394,22 @@ document.addEventListener("click", async (event) => {
 
   const roomButton = event.target.closest("[data-room-index]");
   if (roomButton) {
-    const room = state.selectedStay.rooms[Number(roomButton.dataset.roomIndex)];
+    const rooms = safeArray(state.selectedStay?.rooms);
+    const room = rooms[Number(roomButton.dataset.roomIndex)];
+    if (!state.selectedStay || !room) {
+      toast("객실 정보를 다시 불러오고 있습니다. 숙소를 다시 선택해주세요.");
+      navigate("stays");
+      return;
+    }
     if (isRoomUnavailable(room)) {
       toast("선택한 날짜에는 이미 품절된 객실입니다.");
       return;
     }
     state.selectedRoom = room;
-    navigate("roomDetail");
+    const params = new URLSearchParams();
+    params.set("stay", state.selectedStay.id);
+    params.set("room", room.id);
+    navigate("roomDetail", { params });
     return;
   }
 
