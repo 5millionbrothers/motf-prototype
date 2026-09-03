@@ -402,7 +402,8 @@
       window.setTimeout(() => {
         form.reportValidity();
         invalid?.focus();
-        if (invalid?.id === "bookingTerms") window.motfToast?.("환불·취소 정책과 시설 이용 규칙에 동의해주세요.");
+        if (invalid?.id === "bookingTerms") window.motfToast?.("예약 필수 약관과 개인정보 제공 동의가 필요합니다.");
+        if (invalid?.id === "orderTerms") window.motfToast?.("주문 필수 약관과 개인정보 제공 동의가 필요합니다.");
       }, 0);
     }
   }, true);
