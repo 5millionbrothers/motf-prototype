@@ -1315,7 +1315,7 @@ function renderHomePicks() {
           <span class="home-stay-features">${Array.from({ length: 3 }, (_, index) => highlights[index]
             ? `<b>${escapeHtml(highlights[index])}</b>`
             : '<b class="feature-placeholder" aria-hidden="true">&nbsp;</b>').join("")}</span>
-          <span>${estimate.people}명 예상 총액 ${money(estimate.total)}</span>
+          <span class="home-card-price">${estimate.people}명 예상 총액 ${money(estimate.total)}</span>
         </span>
       </button>
       <button class="home-stay-review-link" type="button" data-stay-review-id="${stay.id}" aria-label="${escapeHtml(stay.name)} 리뷰 바로 보기">
@@ -1372,7 +1372,7 @@ function renderHomeMarketPicks() {
           <b>${product.isBundle ? `${product.bundleProductIds?.length || 1}종 구성` : escapeHtml(product.origin || "원산지 상세 확인")}</b>
           <b>${product.isAlcohol ? "성인 인증 필요" : "장바구니 주문"}</b>
         </span>
-        <span>${money(product.price)}</span>
+        <span class="home-card-price">${money(product.price)}</span>
       </span>
     </button>
   `).join("");
@@ -2384,11 +2384,12 @@ function productCard(product) {
         <span class="pill ${product.isBundle ? "success" : ""}">${product.isBundle ? "moTF 전용 패키지" : product.category}</span>
         <h3>${product.name}</h3>
         <p>${product.unit} · ${product.origin}</p>
+        <p class="product-review-summary">후기 없음</p>
         <p class="price">${money(product.price)}</p>
-        <div class="button-row">
-          <button class="primary-btn" data-product-id="${product.id}"><i data-lucide="search"></i>상세</button>
-          <button class="ghost-btn" data-add-product="${product.id}"><i data-lucide="plus"></i>담기</button>
-          <button class="ghost-btn" data-add-mt-shopping="${product.id}"><i data-lucide="folder-plus"></i>내 MT에 담기</button>
+        <div class="product-card-actions">
+          <button class="icon-action" data-product-id="${product.id}" aria-label="${escapeHtml(product.name)} 상세 보기" title="상세 보기"><i data-lucide="search"></i></button>
+          <button class="icon-action" data-add-product="${product.id}" aria-label="${escapeHtml(product.name)} 장바구니 담기" title="장바구니 담기"><i data-lucide="shopping-cart"></i></button>
+          <button class="icon-action" data-add-mt-shopping="${product.id}" aria-label="${escapeHtml(product.name)} 내 MT에 담기" title="내 MT에 담기"><i data-lucide="folder-plus"></i></button>
         </div>
       </div>
     </article>
