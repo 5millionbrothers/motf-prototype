@@ -451,6 +451,7 @@ const state = {
   pointAccount: { balance: 0, lifetimeEarned: 0, lifetimeUsed: 0 },
   pointHistory: [],
   checkoutBenefitPreview: { stay: null, market: null },
+  checkoutBenefitContext: { stay: "", market: "" },
   favoriteStayIds: loadLocalFavoriteStayIds(),
   favoriteLoadedForUser: "",
   favoriteEventIds: new Set(),
@@ -629,6 +630,7 @@ window.motfApplyPointData = function applyPointData(account = {}, ledger = []) {
 window.motfApplyCheckoutBenefitPreview = function applyCheckoutBenefitPreview(kind, preview) {
   if (!Object.prototype.hasOwnProperty.call(state.checkoutBenefitPreview, kind)) return;
   state.checkoutBenefitPreview[kind] = preview ? { ...preview } : null;
+  state.checkoutBenefitContext[kind] = preview ? checkoutPreviewContextKey(kind) : "";
   if (kind === "stay" && currentRoute() === "booking") renderBooking();
   if (kind === "market" && currentRoute() === "cart") renderCart();
 };
@@ -2189,6 +2191,29 @@ function bookingBaseRoomFee(stay, room) {
   return total;
 }
 
+function bookingNightCount() {
+  const start = new Date(`${qs("#stayCheckInDate")?.value || ""}T12:00:00`);
+  const end = new Date(`${qs("#stayCheckOutDate")?.value || ""}T12:00:00`);
+  const nights = Math.round((end.getTime() - start.getTime()) / 86400000);
+  return Number.isFinite(nights) && nights > 0 ? nights : 1;
+}
+
+function checkoutPreviewContextKey(kind) {
+  if (kind === "stay") {
+    return [
+      state.selectedStay?.id || "",
+      state.selectedRoom?.id || "",
+      qs("#stayCheckInDate")?.value || "",
+      qs("#stayCheckOutDate")?.value || "",
+      Math.max(1, Number(qs("#bookingPeople")?.value || selectedStayPeople())),
+    ].join("|");
+  }
+  return state.cart
+    .map((item) => `${item.productId}:${Math.max(1, Number(item.qty || 1))}`)
+    .sort()
+    .join("|");
+}
+
 function bookingAmount() {
   const stay = state.selectedStay;
   const room = state.selectedRoom;
@@ -2199,6 +2224,7 @@ function bookingAmount() {
   const roomFee = bookingBaseRoomFee(stay, room);
   return {
     roomFee,
+    nights: bookingNightCount(),
     extraPeople,
     extraPersonTotal,
     total: roomFee,
@@ -2218,7 +2244,9 @@ function renderBooking() {
   const update = () => {
     applyStaySearchField("people", qs("#bookingPeople").value);
     const amount = bookingAmount();
-    const benefit = state.checkoutBenefitPreview.stay;
+    const benefit = state.checkoutBenefitContext.stay === checkoutPreviewContextKey("stay")
+      ? state.checkoutBenefitPreview.stay
+      : null;
     const couponDiscount = Number(benefit?.applied_coupon_discount || 0);
     const pointsUsed = Number(benefit?.applied_points || 0);
     const payableAmount = benefit ? Number(benefit.payable_amount ?? amount.total) : amount.total;
@@ -2226,7 +2254,7 @@ function renderBooking() {
       <div class="summary-line"><span>${stay.name}</span><strong>${room.name}</strong></div>
       <div class="summary-line"><span>숙박일</span><strong>${stayDateRangeLabel().replace("숙박일 ", "")}</strong></div>
       <div class="summary-line"><span>예약 인원</span><strong>${qs("#bookingPeople").value}명</strong></div>
-      <div class="summary-line"><span>기본 숙박비</span><strong>${money(amount.roomFee)}</strong></div>
+      <div class="summary-line"><span>기본 숙박비 (${amount.nights}박)</span><strong>${money(amount.roomFee)}</strong></div>
       ${couponDiscount ? `<div class="summary-line benefit-discount"><span>${escapeHtml(benefit.coupon_name || "할인코드")}</span><strong>-${money(couponDiscount)}</strong></div>` : ""}
       ${pointsUsed ? `<div class="summary-line benefit-discount"><span>포인트 사용</span><strong>-${pointsUsed.toLocaleString("ko-KR")}P</strong></div>` : ""}
       ${amount.extraPeople ? `<div class="summary-line"><span>추가 인원 ${amount.extraPeople}명</span><strong>숙소 현장 결제</strong></div>` : ""}
@@ -2514,7 +2542,9 @@ function renderCart() {
         .join("")
     : `<div class="empty-state">장바구니가 비어 있습니다. 장보기에서 상품을 담아보세요.</div>`;
   const total = cartTotal();
-  const benefit = state.checkoutBenefitPreview.market;
+  const benefit = state.checkoutBenefitContext.market === checkoutPreviewContextKey("market")
+    ? state.checkoutBenefitPreview.market
+    : null;
   const couponDiscount = Number(benefit?.applied_coupon_discount || 0);
   const pointsUsed = Number(benefit?.applied_points || 0);
   const payableAmount = benefit ? Number(benefit.payable_amount ?? total) : total;
