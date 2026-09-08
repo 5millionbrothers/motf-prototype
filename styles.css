@@ -4895,3 +4895,14 @@ h2 {
 .checkout-consent-checkbox span { display: block; color: var(--muted); font-size: 13px; }
 .checkout-consent-checkbox strong { color: var(--teal-dark); }
 .checkout-legal-actions { display: flex; flex-wrap: wrap; gap: 10px 14px; margin-top: -4px; }
+.home-news-card.is-card-news small {
+  color: #49623c;
+}
+
+.home-news-card.is-promotion small {
+  color: #b45a2a;
+}
+
+.home-news-card.is-promotion {
+  border-color: rgba(180, 90, 42, 0.28);
+}

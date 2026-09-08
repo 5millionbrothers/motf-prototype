@@ -73,8 +73,8 @@
     const shortIntro = text(business.short_description || String(business.description || "").slice(0, 140) || "단체 행사 이용이 가능한 제휴 숙소입니다.");
     return {
       id: business.id,
-      displayOrder: Number(business.display_order) || 100,
-      discoveryWeight: Math.max(0, Number(business.discovery_weight) || 100),
+      displayOrder: Number.isFinite(Number(business.display_order)) ? Number(business.display_order) : 3,
+      discoveryWeight: Math.max(0, Math.min(3, Number.isFinite(Number(business.discovery_weight)) ? Number(business.discovery_weight) : 1)),
       isFeatured: Boolean(business.is_featured),
       name: text(business.business_name),
       region: regionOf(business),
@@ -133,8 +133,8 @@
     }));
     return {
       id: business.id,
-      displayOrder: Number(business.display_order) || 100,
-      discoveryWeight: Math.max(0, Number(business.discovery_weight) || 100),
+      displayOrder: Number.isFinite(Number(business.display_order)) ? Number(business.display_order) : 3,
+      discoveryWeight: Math.max(0, Math.min(3, Number.isFinite(Number(business.discovery_weight)) ? Number(business.discovery_weight) : 1)),
       isFeatured: Boolean(business.is_featured),
       name: text(business.business_name),
       region: regionOf(business),
@@ -163,6 +163,7 @@
     return [...items].sort((left, right) => {
       if (left.isFeatured !== right.isFeatured) return left.isFeatured ? -1 : 1;
       if (left.displayOrder !== right.displayOrder) return left.displayOrder - right.displayOrder;
+      if ((left.discoveryWeight === 0) !== (right.discoveryWeight === 0)) return left.discoveryWeight === 0 ? 1 : -1;
       return stableDailyScore(right.id, right.discoveryWeight) - stableDailyScore(left.id, left.discoveryWeight);
     });
   }

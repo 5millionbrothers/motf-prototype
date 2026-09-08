@@ -684,6 +684,8 @@ window.motfApplyRecreationActivities = function applyRecreationActivities(rows =
       image: media.find((url) => /\.(png|jpe?g|webp|gif)(\?|$)/i.test(url)) || photo("photo-1517048676732-d65bc937f952"),
       mediaUrls: media,
       scriptExample: item.script_example || "",
+      exampleVideoUrl: item.example_video_url || media.find((url) => /\.(mp4|webm|mov)(\?|$)/i.test(url)) || "",
+      scriptFileUrl: item.script_file_url || "",
       likes: 0,
       comments: [],
       detail: item.instructions || item.summary || "상세 진행 방법은 운영팀 안내를 확인해주세요.",
@@ -1259,7 +1261,7 @@ function renderHomeCardNews() {
   if (!section || !container) return;
   const cards = state.homepageCards.filter((card) => ["card_news", "promotion"].includes(card.placement));
   section.hidden = !cards.length;
-  container.innerHTML = cards.map((card) => `<a class="home-news-card" href="${escapeHtml(card.link_url || "#")}" ${card.link_url ? 'target="_blank" rel="noopener noreferrer"' : ""}><img src="${card.image_url}" alt="" /><span><small>${escapeHtml(card.placement === "promotion" ? "프로모션" : "CARD NEWS")}</small><strong>${escapeHtml(card.title)}</strong><b>${escapeHtml(card.subtitle || card.link_label || "자세히 보기")}</b></span></a>`).join("");
+  container.innerHTML = cards.map((card) => `<a class="home-news-card ${card.placement === "promotion" ? "is-promotion" : "is-card-news"}" href="${escapeHtml(card.link_url || "#")}" ${card.link_url ? 'target="_blank" rel="noopener noreferrer"' : ""}><img src="${card.image_url}" alt="" /><span><small>${escapeHtml(card.placement === "promotion" ? "프로모션" : "CARD NEWS")}</small><strong>${escapeHtml(card.title)}</strong><b>${escapeHtml(card.subtitle || card.link_label || "자세히 보기")}</b></span></a>`).join("");
 }
 
 function renderEvents() {
@@ -1337,8 +1339,12 @@ function renderHomePicks() {
 function renderHomeStories() {
   const container = qs("#homeStoryGrid");
   if (!container) return;
-  const pick = state.homepageCards.find((card) => card.is_active !== false && card.placement === "hero");
-  const stories = homeStories.map((story, index) => index || !pick ? story : ({ ...story, title: pick.title || story.title, summary: pick.subtitle || story.summary, image: pick.image_url || story.image, externalUrl: safeExternalUrl(pick.link_url) }));
+  const picks = state.homepageCards.filter((card) => card.is_active !== false && card.placement === "hero");
+  const legacyPick = picks.find((card) => !card.home_slot);
+  const stories = homeStories.map((story, index) => {
+    const pick = picks.find((card) => Number(card.home_slot) === index + 1) || (index === 0 ? legacyPick : null);
+    return pick ? { ...story, title:pick.title||story.title, summary:pick.subtitle||story.summary, image:pick.image_url||story.image, externalUrl:safeExternalUrl(pick.link_url) } : story;
+  });
   container.innerHTML = stories.map((story) => `
     <${story.externalUrl ? "a" : "button"} class="home-story-card ${story.featured ? "featured" : ""}" ${story.externalUrl ? `href="${escapeHtml(story.externalUrl)}" target="_blank" rel="noopener noreferrer"` : `type="button" data-route="${story.route}" ${story.section ? `data-community-section="${story.section}"` : ""}`}>
       <img src="${story.image}" alt="" />
@@ -3548,8 +3554,8 @@ function renderActivityDetail() {
         <span class="pill">${activity.space === "indoor" ? "실내" : activity.space === "outdoor" ? "야외" : "공간 무관"}</span>
       </div>
       <div class="activity-resource-links">
-        <a class="media-chip activity-media-chip" href="${escapeHtml(activity.mediaUrls?.[0] || `https://www.youtube.com/results?search_query=${encodeURIComponent(activity.title + " 레크레이션 진행")}`)}" target="_blank" rel="noopener"><i data-lucide="play-circle"></i>예시 영상 보기</a>
-        <button class="media-chip activity-media-chip" type="button" data-download-activity-script><i data-lucide="file-down"></i>진행 대본 받기</button>
+        ${activity.exampleVideoUrl ? `<a class="media-chip activity-media-chip" href="${escapeHtml(activity.exampleVideoUrl)}" target="_blank" rel="noopener noreferrer"><i data-lucide="play-circle"></i>예시 영상 보기</a>` : '<button class="media-chip activity-media-chip" type="button" data-unavailable-resource="등록된 예시 영상이 없습니다."><i data-lucide="play-circle"></i>예시 영상 없음</button>'}
+        ${activity.scriptFileUrl ? `<a class="media-chip activity-media-chip" href="${escapeHtml(activity.scriptFileUrl)}" target="_blank" rel="noopener noreferrer"><i data-lucide="file-down"></i>진행 대본 받기</a>` : activity.scriptExample ? '<button class="media-chip activity-media-chip" type="button" data-download-activity-script><i data-lucide="file-down"></i>진행 대본 받기</button>' : '<button class="media-chip activity-media-chip" type="button" data-unavailable-resource="등록된 진행 대본이 없습니다."><i data-lucide="file-down"></i>진행 대본 없음</button>'}
       </div>
       <div class="post-actions">
         <button class="secondary-btn" type="button" data-like-activity><i data-lucide="heart"></i>공감 ${activity.likes}</button>
@@ -4577,11 +4583,18 @@ document.addEventListener("click", async (event) => {
 
   if (event.target.closest("[data-download-activity-script]")) {
     const activity = activeActivity();
-    const script = `${activity.title}\n\n추천 인원: ${activity.people}\n진행 시간: ${activity.time}\n\n진행 방법\n${activity.detail}\n\n준비 및 주의사항\n${activity.note}`;
+    if (!activity?.scriptExample) return toast("등록된 진행 대본이 없습니다.");
+    const script = `${activity.title}\n\n추천 인원: ${activity.people}\n진행 시간: ${activity.time}\n\n진행 방법\n${activity.detail}\n\n진행 대본\n${activity.scriptExample}\n\n준비 및 주의사항\n${activity.note}`;
     const url = URL.createObjectURL(new Blob([script], { type: "text/plain;charset=utf-8" }));
     const link = document.createElement("a");
     link.href = url; link.download = `${activity.title}-진행대본.txt`; link.click();
     URL.revokeObjectURL(url);
+    return;
+  }
+
+  const unavailableResource = event.target.closest("[data-unavailable-resource]");
+  if (unavailableResource) {
+    toast(unavailableResource.dataset.unavailableResource);
     return;
   }
 
