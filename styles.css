@@ -1665,8 +1665,11 @@ input[type="range"] {
 .product-detail img {
   width: 100%;
   min-height: 440px;
-  object-fit: cover;
-  border-radius: 8px;
+  object-fit: contain;
+  padding: clamp(24px, 4vw, 56px);
+  background: #f4f5f1;
+  border: 1px solid var(--line);
+  border-radius: 6px;
 }
 
 .quantity-control {
@@ -3168,8 +3171,9 @@ input[type="range"] {
 .product-information-section { margin-top: 48px; padding: 34px 0 80px; border-top: 1px solid var(--line); }
 .product-spec-table { border-top: 2px solid #30362e; }
 .product-spec-table > div { display: grid; grid-template-columns: 190px 1fr; border-bottom: 1px solid var(--line); }
-.product-spec-table dt, .product-spec-table dd { margin: 0; padding: 16px 18px; }
+.product-spec-table dt, .product-spec-table dd { margin: 0; padding: 16px 18px; line-height: 1.65; }
 .product-spec-table dt { background: #f5f6f3; font-weight: 700; }
+.product-spec-table dd { color: #3e433c; overflow-wrap: anywhere; }
 .pill.danger { color: #9a3f32; background: #fff0ed; border-color: #efc9c2; }
 
 .comments-below { grid-template-columns: 1fr; max-width: 880px; margin-inline: auto; }

@@ -2413,11 +2413,11 @@ function renderStoreDetail() {
 function productCard(product) {
   return `
     <article class="product-card ${product.isBundle ? "bundle-product-card" : ""}">
-      <img src="${product.image}" alt="${product.name} 사진" />
+      <img src="${product.image}" alt="${product.name} 사진" loading="lazy" decoding="async" />
       <div>
         <span class="pill ${product.isBundle ? "success" : ""}">${product.isBundle ? "moTF 전용 패키지" : product.category}</span>
         <h3>${product.name}</h3>
-        <p>${product.unit} · ${product.origin}</p>
+        <p>${product.unit}${product.manufacturer ? ` · ${product.manufacturer}` : ` · ${product.origin}`}</p>
         <p class="product-review-summary">후기 없음</p>
         <p class="price">${money(product.price)}</p>
         <div class="product-card-actions">
@@ -2450,7 +2450,7 @@ function renderProductDetail() {
         <h1>${product.name}</h1>
         <div class="product-meta">
           <span class="pill">${product.unit}</span>
-          <span class="pill success">${product.origin}</span>
+          <span class="pill success">${product.manufacturer || product.origin}</span>
           ${product.isBundle ? '<span class="pill">세트 구성 상품</span>' : ""}
           <span class="pill warning">수령 전 변경 가능</span>
           ${alcoholProduct ? '<span class="pill danger">성인 인증 필수</span>' : ""}
@@ -2469,15 +2469,22 @@ function renderProductDetail() {
         </div>
       </section>
     </div>
-    ${alcoholProduct ? '<aside class="adult-purchase-notice"><i data-lucide="badge-alert"></i><div><strong>주류는 성인 인증 후 주문할 수 있습니다.</strong><p>배송 또는 픽업 시 대표자의 신분증을 확인하며, 성인 확인이 되지 않으면 상품을 전달하지 않습니다.</p></div></aside>' : ""}
+    ${alcoholProduct ? '<aside class="adult-purchase-notice"><i data-lucide="badge-alert"></i><div><strong>주류는 성인 본인만 현장수령할 수 있습니다.</strong><p>주문자 본인이 판매 영업장에 방문해 신분증 확인을 마쳐야 하며, 배송·대리수령은 불가합니다.</p></div></aside>' : ""}
     <section class="product-information-section">
       <h2>상품 상세 정보</h2>
       <dl class="product-spec-table">
         <div><dt>상품명</dt><dd>${escapeHtml(product.name)}</dd></div>
+        <div><dt>제조사</dt><dd>${escapeHtml(product.manufacturer || product.detailSections?.manufacturer || "상품 포장지 표기 참조")}</dd></div>
         <div><dt>용량·단위</dt><dd>${escapeHtml(product.unit)}</dd></div>
+        ${product.detailSections?.productType ? `<div><dt>식품 유형</dt><dd>${escapeHtml(product.detailSections.productType)}</dd></div>` : ""}
+        ${product.detailSections?.alcohol ? `<div><dt>알코올</dt><dd>${escapeHtml(product.detailSections.alcohol)}</dd></div>` : ""}
         <div><dt>원산지</dt><dd>${escapeHtml(product.origin)}</dd></div>
+        <div><dt>원재료</dt><dd>${escapeHtml(product.detailSections?.ingredients || "상품 포장지 표기 참조")}</dd></div>
+        <div><dt>알레르기</dt><dd>${escapeHtml(product.detailSections?.allergens || "상품 포장지 표기 참조")}</dd></div>
         <div><dt>보관 방법</dt><dd>${escapeHtml(product.detailSections?.storage || "상품 표기 및 마트 안내에 따릅니다.")}</dd></div>
-        <div><dt>영양 정보</dt><dd>${escapeHtml(Object.entries(product.nutritionInfo || {}).map(([key, value]) => `${key} ${value}`).join(" · ") || "상품 포장지의 영양정보를 확인해주세요.")}</dd></div>
+        <div><dt>소비기한</dt><dd>${escapeHtml(product.detailSections?.expiry || "수령 상품의 포장지에서 확인해주세요.")}</dd></div>
+        <div><dt>영양 정보</dt><dd>${escapeHtml(product.nutritionInfo?.description || Object.entries(product.nutritionInfo || {}).map(([key, value]) => `${key} ${value}`).join(" · ") || "상품 포장지의 영양정보를 확인해주세요.")}</dd></div>
+        ${product.detailSections?.cautions ? `<div><dt>주의사항</dt><dd>${escapeHtml(product.detailSections.cautions)}</dd></div>` : ""}
         <div><dt>판매자 안내</dt><dd>${escapeHtml(product.detailSections?.sellerNote || product.detail)}</dd></div>
       </dl>
     </section>

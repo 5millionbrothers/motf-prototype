@@ -123,6 +123,7 @@
       unit: text(item.unit || "1개"),
       price: Number(item.price) || 0,
       origin: text(item.origin || "업체 제공 상품"),
+      manufacturer: text(item.detail_sections?.manufacturer || ""),
       image: imageUrl(item.image_url || business.cover_image_url, productFallback),
       images: (item.image_urls || []).map((url) => imageUrl(url, productFallback)),
       detail: text(item.description || "상세 내용은 마트에 문의해주세요."),

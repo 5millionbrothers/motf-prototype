@@ -41,7 +41,12 @@ button, input, select, textarea { font-size: 13px; }
 
 .product-grid { grid-template-columns: repeat(auto-fill, minmax(166px, 1fr)); gap: 14px; }
 .product-card { background: #fff; }
-.product-card img { height: 118px; }
+.product-card img {
+  height: 148px;
+  padding: 14px;
+  object-fit: contain;
+  background: #f4f5f1;
+}
 .product-card > div { gap: 5px; padding: 10px; }
 .product-card .pill { min-height: 20px; padding: 2px 6px; font-size: 9px; }
 .product-card h3 { margin: 0; font-size: 14px; font-weight: 650; line-height: 1.35; }
@@ -68,7 +73,7 @@ button, input, select, textarea { font-size: 13px; }
   .header-left { min-width: 43px; }
   .brand { width: 43px; }
   .product-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-  .product-card img { height: auto; aspect-ratio: 4 / 3; }
+  .product-card img { height: auto; aspect-ratio: 1 / 1; padding: 12px; }
   .home-curation h2,
   .home-market-feature h2,
   .home-stories h2 { font-size: 21px; }
