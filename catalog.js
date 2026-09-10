@@ -124,12 +124,18 @@
       price: Number(item.price) || 0,
       origin: text(item.origin || "업체 제공 상품"),
       manufacturer: text(item.detail_sections?.manufacturer || ""),
+      groupKey: text(item.detail_sections?.productGroupKey || ""),
+      variantLabel: text(item.detail_sections?.variantLabel || item.unit || "1개"),
       image: imageUrl(item.image_url || business.cover_image_url, productFallback),
       images: (item.image_urls || []).map((url) => imageUrl(url, productFallback)),
       detail: text(item.description || "상세 내용은 마트에 문의해주세요."),
       detailSections: item.detail_sections && typeof item.detail_sections === "object" ? item.detail_sections : {},
       nutritionInfo: item.nutrition_info && typeof item.nutrition_info === "object" ? item.nutrition_info : {},
       isAlcohol: Boolean(item.is_alcohol),
+      isCutout: Boolean(
+        String(item.detail_sections?.importSource || "").startsWith("google-sheet:")
+        && String(item.image_url || "").includes("/assets/market/daesung/")
+      ),
       stockQuantity: item.stock_quantity == null ? null : Number(item.stock_quantity),
     }));
     return {

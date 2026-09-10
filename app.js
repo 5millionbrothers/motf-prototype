@@ -1363,7 +1363,7 @@ function renderHomeMarketPicks() {
   if (!container) return;
   const picks = stores.flatMap((store) => {
     ensureMarketBundleProducts(store);
-    return store.products.map((product) => ({ product, store }));
+    return groupProductVariants(store.products).map((product) => ({ product, store }));
   }).slice(0, 8);
   if (!picks.length) {
     container.innerHTML = `<div class="empty-state compact catalog-error"><strong>제휴 마트 상품을 준비하고 있어요.</strong><span>상품이 공개되면 이곳에서 바로 확인할 수 있습니다.</span></div>`;
@@ -1371,16 +1371,16 @@ function renderHomeMarketPicks() {
   }
   container.innerHTML = picks.map(({ product, store }) => `
     <button class="home-stay-pick home-market-pick" type="button" data-product-id="${product.id}">
-      <img src="${product.image}" alt="${escapeHtml(product.name)}" />
+      <img class="${productImageClass(product)}" src="${product.image}" alt="${escapeHtml(product.name)}" />
       <span class="home-stay-pick-body home-market-pick-body">
-        <small>${escapeHtml(store.name)} · ${escapeHtml(product.unit || "상품")}</small>
+        <small>${escapeHtml(store.name)} · ${product.variants.length > 1 ? `${product.variants.length}개 옵션` : escapeHtml(product.unit || "상품")}</small>
         <strong>${escapeHtml(product.name)}</strong>
         <span class="home-stay-features">
           <b>${escapeHtml(product.category || "기타")}</b>
           <b>${product.isBundle ? `${product.bundleProductIds?.length || 1}종 구성` : escapeHtml(product.origin || "원산지 상세 확인")}</b>
           <b>${product.isAlcohol ? "성인 인증 필요" : "장바구니 주문"}</b>
         </span>
-        <span class="home-card-price">${money(product.price)}</span>
+        <span class="home-card-price">${productPriceLabel(product)}</span>
       </span>
     </button>
   `).join("");
@@ -2303,6 +2303,7 @@ function renderStores() {
   const products = state.activeCategory === "전체"
     ? store.products
     : store.products.filter((product) => product.category === state.activeCategory);
+  const productGroups = groupProductVariants(products);
   const people = Number(qs("#marketPeople")?.value || 32);
   const porkKg = Math.ceil(people * 0.35);
   intro.innerHTML = `
@@ -2330,13 +2331,13 @@ function renderStores() {
   productSection.innerHTML = `
     <div class="section-toolbar">
       <div><p class="eyebrow">제휴 마트 등록 상품</p><h2>상품 둘러보기</h2></div>
-      <span>${products.length}개 상품</span>
+      <span>${productCatalogCountLabel(products)}</span>
     </div>
     <div class="category-tabs">
       ${categories.map((cat) => `<button class="category-tab ${cat === state.activeCategory ? "active" : ""}" data-category="${cat}">${cat}</button>`).join("")}
     </div>
     <div class="product-grid">
-      ${products.length ? products.map(productCard).join("") : `<div class="empty-state catalog-error"><strong>${state.activeCategory === "전체" ? "등록된 상품이 아직 없습니다." : "이 분류에 등록된 상품이 없습니다."}</strong><span>마트 사장님이 상품을 공개하면 바로 주문할 수 있습니다.</span></div>`}
+      ${productGroups.length ? productGroups.map(productCard).join("") : `<div class="empty-state catalog-error"><strong>${state.activeCategory === "전체" ? "등록된 상품이 아직 없습니다." : "이 분류에 등록된 상품이 없습니다."}</strong><span>마트 사장님이 상품을 공개하면 바로 주문할 수 있습니다.</span></div>`}
     </div>
   `;
   updateCartBadge();
@@ -2361,7 +2362,7 @@ function storeCard(store) {
           <p class="muted">${people}명 기준 고기 추천량 약 ${porkKg}kg</p>
         </div>
         <div class="listing-actions">
-          <span class="price">상품 ${store.products.length}개</span>
+          <span class="price">${productCatalogCountLabel(store.products)}</span>
           <button class="primary-btn" data-store-id="${store.id}"><i data-lucide="shopping-bag"></i>상품 보기</button>
           <button class="ghost-btn" data-open-chat="${store.name}"><i data-lucide="message-circle"></i>문의</button>
         </div>
@@ -2382,6 +2383,7 @@ function renderStoreDetail() {
   const products = state.activeCategory === "전체"
     ? store.products
     : store.products.filter((product) => product.category === state.activeCategory);
+  const productGroups = groupProductVariants(products);
   qs("#storeDetailContent").innerHTML = `
     <div class="store-header">
       <img src="${store.image}" alt="${store.name} 매장 사진" />
@@ -2404,26 +2406,81 @@ function renderStoreDetail() {
       ${categories.map((cat) => `<button class="category-tab ${cat === state.activeCategory ? "active" : ""}" data-category="${cat}">${cat}</button>`).join("")}
     </div>
     <div class="product-grid">
-      ${products.length ? products.map(productCard).join("") : `<div class="empty-state catalog-error"><strong>등록된 상품이 아직 없습니다.</strong><span>상품이 공개되면 바로 주문할 수 있습니다.</span></div>`}
+      ${productGroups.length ? productGroups.map(productCard).join("") : `<div class="empty-state catalog-error"><strong>등록된 상품이 아직 없습니다.</strong><span>상품이 공개되면 바로 주문할 수 있습니다.</span></div>`}
     </div>
   `;
   refreshIcons();
 }
 
+function normalizedProductGroupToken(value) {
+  return String(value || "").trim().toLocaleLowerCase("ko-KR").replace(/\s+/g, " ");
+}
+
+function productGroupIdentity(product) {
+  if (product.isBundle) return `bundle:${product.id}`;
+  if (product.groupKey) return `configured:${normalizedProductGroupToken(product.groupKey)}`;
+  return `catalog:${normalizedProductGroupToken(product.name)}:${normalizedProductGroupToken(product.manufacturer)}`;
+}
+
+function groupProductVariants(products = []) {
+  const grouped = new Map();
+  products.forEach((product) => {
+    const key = productGroupIdentity(product);
+    if (!grouped.has(key)) grouped.set(key, []);
+    grouped.get(key).push(product);
+  });
+  return [...grouped.values()].map((variants) => ({ ...variants[0], variants }));
+}
+
+function productVariants(product) {
+  if (!product) return [];
+  if (Array.isArray(product.variants) && product.variants.length) return product.variants;
+  const source = state.selectedStore?.products || findProduct(product.id)?.store?.products || [];
+  const key = productGroupIdentity(product);
+  const variants = source.filter((item) => productGroupIdentity(item) === key);
+  return variants.length ? variants : [product];
+}
+
+function productCatalogCountLabel(products = []) {
+  const groups = groupProductVariants(products);
+  return groups.length === products.length ? `상품 ${groups.length}개` : `상품 ${groups.length}종 · ${products.length}개 옵션`;
+}
+
+function productPriceLabel(product) {
+  const variants = productVariants(product);
+  const prices = variants.map((item) => Number(item.price) || 0);
+  const minimum = Math.min(...prices);
+  const maximum = Math.max(...prices);
+  return minimum === maximum ? money(minimum) : `${money(minimum)}부터`;
+}
+
+function productImageClass(product) {
+  return product?.isCutout ? "product-cutout-image" : "";
+}
+
 function productCard(product) {
+  const variants = productVariants(product);
+  const hasVariants = variants.length > 1;
+  const optionSummary = hasVariants
+    ? `${variants.length}개 옵션 · ${variants.slice(0, 2).map((item) => item.variantLabel || item.unit).join(" / ")}${variants.length > 2 ? " 외" : ""}`
+    : `${product.unit}${product.manufacturer ? ` · ${product.manufacturer}` : ` · ${product.origin}`}`;
   return `
-    <article class="product-card ${product.isBundle ? "bundle-product-card" : ""}">
-      <img src="${product.image}" alt="${product.name} 사진" loading="lazy" decoding="async" />
+    <article class="product-card ${product.isBundle ? "bundle-product-card" : ""} ${hasVariants ? "has-variants" : ""}">
+      <button class="product-card-image-button" type="button" data-product-id="${product.id}" aria-label="${escapeHtml(product.name)} 상세 보기">
+        <img class="${productImageClass(product)}" src="${product.image}" alt="${product.name} 사진" loading="lazy" decoding="async" />
+      </button>
       <div>
         <span class="pill ${product.isBundle ? "success" : ""}">${product.isBundle ? "moTF 전용 패키지" : product.category}</span>
         <h3>${product.name}</h3>
-        <p>${product.unit}${product.manufacturer ? ` · ${product.manufacturer}` : ` · ${product.origin}`}</p>
+        <p class="product-option-summary">${optionSummary}</p>
         <p class="product-review-summary">후기 없음</p>
-        <p class="price">${money(product.price)}</p>
+        <p class="price">${productPriceLabel(product)}</p>
         <div class="product-card-actions">
-          <button class="icon-action" data-product-id="${product.id}" aria-label="${escapeHtml(product.name)} 상세 보기" title="상세 보기"><i data-lucide="search"></i></button>
-          <button class="icon-action" data-add-product="${product.id}" aria-label="${escapeHtml(product.name)} 장바구니 담기" title="장바구니 담기"><i data-lucide="shopping-cart"></i></button>
-          <button class="icon-action" data-add-mt-shopping="${product.id}" aria-label="${escapeHtml(product.name)} 내 MT에 담기" title="내 MT에 담기"><i data-lucide="folder-plus"></i></button>
+          ${hasVariants
+            ? `<button class="product-option-button" type="button" data-product-id="${product.id}">옵션 선택<i data-lucide="chevron-right"></i></button>`
+            : `<button class="icon-action" data-product-id="${product.id}" aria-label="${escapeHtml(product.name)} 상세 보기" title="상세 보기"><i data-lucide="search"></i></button>
+               <button class="icon-action" data-add-product="${product.id}" aria-label="${escapeHtml(product.name)} 장바구니 담기" title="장바구니 담기"><i data-lucide="shopping-cart"></i></button>
+               <button class="icon-action" data-add-mt-shopping="${product.id}" aria-label="${escapeHtml(product.name)} 내 MT에 담기" title="내 MT에 담기"><i data-lucide="folder-plus"></i></button>`}
         </div>
       </div>
     </article>
@@ -2442,9 +2499,10 @@ function renderProductDetail() {
     return;
   }
   const alcoholProduct = isAlcoholProduct(product);
+  const variants = productVariants(product);
   qs("#productDetailContent").innerHTML = `
     <div class="product-detail">
-      <img src="${product.image}" alt="${product.name} 사진" />
+      <img class="${productImageClass(product)}" src="${product.image}" alt="${product.name} 사진" />
       <section class="info-panel">
         <p class="eyebrow">${product.isBundle ? "moTF 전용 할인 패키지" : product.category}</p>
         <h1>${product.name}</h1>
@@ -2456,6 +2514,19 @@ function renderProductDetail() {
           ${alcoholProduct ? '<span class="pill danger">성인 인증 필수</span>' : ""}
         </div>
         <p>${product.detail}</p>
+        ${variants.length > 1 ? `
+          <fieldset class="product-variant-fieldset">
+            <legend>용량·구성 선택</legend>
+            <div class="product-variant-options" role="radiogroup" aria-label="${escapeHtml(product.name)} 용량과 구성">
+              ${variants.map((variant) => `
+                <button class="product-variant-option ${variant.id === product.id ? "active" : ""}" type="button" role="radio" aria-checked="${variant.id === product.id}" data-product-variant-id="${variant.id}">
+                  <span>${escapeHtml(variant.variantLabel || variant.unit)}</span>
+                  <strong>${money(variant.price)}</strong>
+                </button>
+              `).join("")}
+            </div>
+          </fieldset>
+        ` : ""}
         <p class="price">${money(product.price)}</p>
         <div class="quantity-control">
           <button type="button" data-qty-change="-1">-</button>
@@ -4625,6 +4696,17 @@ document.addEventListener("click", async (event) => {
   const addButton = event.target.closest("[data-add-product]");
   if (addButton) {
     addToCart(addButton.dataset.addProduct, 1);
+    return;
+  }
+
+  const productVariantButton = event.target.closest("[data-product-variant-id]");
+  if (productVariantButton) {
+    const found = findProduct(productVariantButton.dataset.productVariantId);
+    if (found) {
+      state.selectedProduct = found.product;
+      state.selectedStore = found.store;
+      renderProductDetail();
+    }
     return;
   }
 
