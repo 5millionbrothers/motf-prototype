@@ -1,5 +1,7 @@
 const { json, requireEnv, supabaseRequest, tossRequest } = require("./_server");
 
+const MAX_SINGLE_PAYMENT_AMOUNT = 10_000_000;
+
 module.exports = async function handler(req, res) {
   if (req.method !== "POST") return json(res, 405, { ok: false });
   try {
@@ -13,10 +15,29 @@ module.exports = async function handler(req, res) {
     const payment = await tossRequest(`/v1/payments/${encodeURIComponent(paymentKey)}`);
     const orderId = String(payment.orderId || hintedOrderId || "");
     const intents = await supabaseRequest(
-      `/rest/v1/payment_intents?select=id,order_id,customer_id,status&order_id=eq.${encodeURIComponent(orderId)}&provider=eq.toss&limit=1`,
+      `/rest/v1/payment_intents?select=id,order_id,customer_id,amount,original_amount,status&order_id=eq.${encodeURIComponent(orderId)}&provider=eq.toss&limit=1`,
     );
     const intent = intents?.[0];
     if (!intent) return json(res, 200, { ok: true, ignored: true });
+
+    const paidAmount = Number(payment.totalAmount || payment.balanceAmount || 0);
+    if (payment.status === "DONE" && (paidAmount > MAX_SINGLE_PAYMENT_AMOUNT
+      || Number(intent.amount) > MAX_SINGLE_PAYMENT_AMOUNT
+      || Number(intent.original_amount || intent.amount) > MAX_SINGLE_PAYMENT_AMOUNT)) {
+      const cancelledPayment = await tossRequest(`/v1/payments/${encodeURIComponent(paymentKey)}/cancel`, {
+        method: "POST",
+        headers: { "TossPayments-Idempotency-Key": `motf-limit-cancel-${intent.id}` },
+        body: JSON.stringify({ cancelReason: "단건 결제 한도 초과 자동 취소" }),
+      });
+      await supabaseRequest(`/rest/v1/payment_intents?id=eq.${encodeURIComponent(intent.id)}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: "cancelled", provider_status: "CANCELED", payment_response: cancelledPayment }),
+      });
+      return json(res, 200, { ok: true, cancelled: true, reason: "PAYMENT_AMOUNT_LIMIT_EXCEEDED" });
+    }
+    if (payment.status === "DONE" && paidAmount !== Number(intent.amount)) {
+      throw Object.assign(new Error("토스 결제 금액과 주문 금액이 일치하지 않습니다."), { statusCode: 409 });
+    }
 
     if (payment.status === "DONE" && intent.status !== "confirmed") {
       await supabaseRequest("/rest/v1/rpc/finalize_toss_payment_intent", {

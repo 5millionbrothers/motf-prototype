@@ -1,5 +1,7 @@
 (function connectUserTransactions() {
   const client = window.motfSupabase;
+  const MAX_SINGLE_PAYMENT_AMOUNT = 10_000_000;
+  const PAYMENT_LIMIT_MESSAGE = "단건 결제는 10,000,000원까지 가능합니다. 숙박 일정이나 주문 수량을 조정해주세요.";
   if (!client) {
     console.error("예약 연결에 필요한 로그인 설정을 불러오지 못했습니다.");
     return;
@@ -321,6 +323,8 @@
       try {
         const verified = await window.motfEnsureIdentityVerified?.();
         if (verified === false) throw new Error("휴대폰 본인인증을 완료해주세요.");
+        const checkoutAmount = Number(window.motfGetCheckoutPreviewContext?.("stay")?.originalAmount || 0);
+        if (checkoutAmount > MAX_SINGLE_PAYMENT_AMOUNT) throw new Error(PAYMENT_LIMIT_MESSAGE);
         await ensureCheckoutBenefits("stay");
         const requestedPoints = benefitInput("stay").points;
         const { data, error } = await client.rpc("prepare_stay_checkout", {
@@ -366,6 +370,8 @@
       try {
         const verified = await window.motfEnsureIdentityVerified?.();
         if (verified === false) throw new Error("휴대폰 본인인증을 완료해주세요.");
+        const checkoutAmount = Number(window.motfGetCheckoutPreviewContext?.("market")?.originalAmount || 0);
+        if (checkoutAmount > MAX_SINGLE_PAYMENT_AMOUNT) throw new Error(PAYMENT_LIMIT_MESSAGE);
         await ensureCheckoutBenefits("market");
         const requestedPoints = benefitInput("market").points;
         const { data, error } = await client.rpc("prepare_market_checkout", {

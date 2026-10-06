@@ -4897,6 +4897,14 @@ h2 {
 }
 
 .summary-line.benefit-discount strong { color: #2f6a43; }
+.summary-line.payment-limit-warning {
+  color: #a13b2b;
+  background: #fff4f1;
+  margin-inline: -10px;
+  padding-inline: 10px;
+  border-radius: 6px;
+}
+.summary-line.payment-limit-warning strong { color: #a13b2b; }
 .benefit-adjustment-note {
   margin: 0 0 8px;
   padding: 9px 11px;

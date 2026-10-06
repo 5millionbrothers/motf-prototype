@@ -39,6 +39,8 @@ window.motfEscapeHtml = escapeHtml;
 let TOSS_CLIENT_KEY = window.MOTF_CONFIG?.TOSS_CLIENT_KEY?.trim() || "";
 let activeTossPaymentWindow = null;
 const PENDING_PAYMENT_STORAGE_KEY = "motf.pendingPayment";
+const MAX_SINGLE_PAYMENT_AMOUNT = 10_000_000;
+const PAYMENT_LIMIT_MESSAGE = "단건 결제는 10,000,000원까지 가능합니다. 숙박 일정이나 주문 수량을 조정해주세요.";
 const DEFAULT_STAY_REGION = "가평";
 const DEFAULT_STAY_PEOPLE = 10;
 const LAUNCH_STAY_REGION = "가평";
@@ -575,6 +577,9 @@ window.motfStartPreparedPayment = function startPreparedPayment(intent, draft) {
   const isExtraCharge = type === "extra_charge";
   const amount = Number(intent.amount);
   const originalAmount = Number(intent.original_amount || intent.amount);
+  if (!Number.isInteger(amount) || amount <= 0 || amount > MAX_SINGLE_PAYMENT_AMOUNT || originalAmount > MAX_SINGLE_PAYMENT_AMOUNT) {
+    throw new Error(PAYMENT_LIMIT_MESSAGE);
+  }
   const pointsUsed = Number(intent.points_used || 0);
   const couponDiscount = Number(intent.coupon_discount || 0);
   state.pendingPayment = {
@@ -2256,6 +2261,7 @@ function renderBooking() {
     const couponDiscount = Number(benefit?.applied_coupon_discount || 0);
     const pointsUsed = Number(benefit?.applied_points || 0);
     const payableAmount = benefit ? Number(benefit.payable_amount ?? amount.total) : amount.total;
+    const exceedsPaymentLimit = amount.total > MAX_SINGLE_PAYMENT_AMOUNT || payableAmount > MAX_SINGLE_PAYMENT_AMOUNT;
     qs("#bookingSummary").innerHTML = `
       <div class="summary-line"><span>${stay.name}</span><strong>${room.name}</strong></div>
       <div class="summary-line"><span>숙박일</span><strong>${stayDateRangeLabel().replace("숙박일 ", "")}</strong></div>
@@ -2266,13 +2272,18 @@ function renderBooking() {
       ${amount.extraPeople ? `<div class="summary-line"><span>추가 인원 ${amount.extraPeople}명</span><strong>숙소 현장 결제</strong></div>` : ""}
       <div class="summary-line"><span>부대시설 이용금</span><strong>숙소 현장 결제</strong></div>
       ${unavailable ? `<div class="summary-line"><span>예약 가능 여부</span><strong>선택 날짜 품절</strong></div>` : ""}
+      ${exceedsPaymentLimit ? `<div class="summary-line payment-limit-warning"><span>결제 한도</span><strong>최대 ${money(MAX_SINGLE_PAYMENT_AMOUNT)}</strong></div>` : ""}
       <div class="separate-charge-note"><i data-lucide="info"></i><span>모티프에서는 객실 기본금만 결제합니다. 추가 인원과 바베큐 등 부대시설 요금은 이용 당일 숙소에 직접 결제해주세요.</span></div>
       <div class="summary-line total"><span>지금 결제할 금액</span><strong>${money(payableAmount)}</strong></div>
     `;
     const submitButton = qs('#bookingForm [type="submit"]');
     if (submitButton) {
-      submitButton.disabled = unavailable;
-      submitButton.innerHTML = unavailable ? '<i data-lucide="ban"></i>선택 날짜 품절' : '<i data-lucide="credit-card"></i>결제하기';
+      submitButton.disabled = unavailable || exceedsPaymentLimit;
+      submitButton.innerHTML = unavailable
+        ? '<i data-lucide="ban"></i>선택 날짜 품절'
+        : exceedsPaymentLimit
+          ? '<i data-lucide="ban"></i>1천만 원 결제 한도 초과'
+          : '<i data-lucide="credit-card"></i>결제하기';
       refreshIcons();
     }
   };
@@ -2632,12 +2643,21 @@ function renderCart() {
   const couponDiscount = Number(benefit?.applied_coupon_discount || 0);
   const pointsUsed = Number(benefit?.applied_points || 0);
   const payableAmount = benefit ? Number(benefit.payable_amount ?? total) : total;
+  const exceedsPaymentLimit = total > MAX_SINGLE_PAYMENT_AMOUNT || payableAmount > MAX_SINGLE_PAYMENT_AMOUNT;
   qs("#cartSummary").innerHTML = `
     <div class="summary-line"><span>상품 금액</span><strong>${money(total)}</strong></div>
     ${couponDiscount ? `<div class="summary-line benefit-discount"><span>${escapeHtml(benefit.coupon_name || "할인코드")}</span><strong>-${money(couponDiscount)}</strong></div>` : ""}
     ${pointsUsed ? `<div class="summary-line benefit-discount"><span>포인트 사용</span><strong>-${pointsUsed.toLocaleString("ko-KR")}P</strong></div>` : ""}
+    ${exceedsPaymentLimit ? `<div class="summary-line payment-limit-warning"><span>결제 한도</span><strong>최대 ${money(MAX_SINGLE_PAYMENT_AMOUNT)}</strong></div>` : ""}
     <div class="summary-line total"><span>총 결제 금액</span><strong>${money(payableAmount)}</strong></div>
   `;
+  const submitButton = qs('#orderForm [type="submit"]');
+  if (submitButton) {
+    submitButton.disabled = !state.cart.length || exceedsPaymentLimit;
+    submitButton.innerHTML = exceedsPaymentLimit
+      ? '<i data-lucide="ban"></i>1천만 원 결제 한도 초과'
+      : '<i data-lucide="credit-card"></i>결제하기';
+  }
   refreshIcons();
 }
 
@@ -3253,6 +3273,8 @@ function renderPayment() {
     qs("#paymentSummary").innerHTML = `<div class="empty-state">결제할 내역이 없습니다.</div>`;
     return;
   }
+  const exceedsPaymentLimit = Number(payment.amount) > MAX_SINGLE_PAYMENT_AMOUNT
+    || Number(payment.originalAmount || payment.amount) > MAX_SINGLE_PAYMENT_AMOUNT;
   routeParents.payment = payment.type === "stay" ? "stays" : payment.type === "extra_charge" ? "myUsage" : "market";
   qs("#paymentSummary").innerHTML = `
     <div class="summary-line"><span>결제 대상</span><strong>${payment.title}</strong></div>
@@ -3261,7 +3283,15 @@ function renderPayment() {
     <div class="summary-line"><span>주문번호</span><strong>${payment.orderId}</strong></div>
     <div class="summary-line total"><span>총 결제 금액</span><strong>${money(payment.amount)}</strong></div>
   `;
-  renderTossWidgets(payment);
+  if (exceedsPaymentLimit) {
+    const paymentMethods = qs("#tossPaymentMethods");
+    if (paymentMethods) paymentMethods.innerHTML = `<div class="empty-state">${PAYMENT_LIMIT_MESSAGE}</div>`;
+    const paymentButton = qs("[data-toss-payment]");
+    if (paymentButton) paymentButton.disabled = true;
+    setTossWidgetStatus(PAYMENT_LIMIT_MESSAGE, true);
+  } else {
+    renderTossWidgets(payment);
+  }
   refreshIcons();
 }
 
@@ -3845,6 +3875,9 @@ async function confirmPaymentOnServer(payment, params = new URLSearchParams()) {
 async function requestTossPayment() {
   const payment = state.pendingPayment;
   if (!payment) return toast("결제할 내역이 없습니다.");
+  if (Number(payment.amount) > MAX_SINGLE_PAYMENT_AMOUNT || Number(payment.originalAmount || payment.amount) > MAX_SINGLE_PAYMENT_AMOUNT) {
+    return toast(PAYMENT_LIMIT_MESSAGE);
+  }
   if (activeTossPaymentWindow) return toast("이미 토스페이먼츠 결제창이 열려 있습니다.");
   if (!TOSS_CLIENT_KEY) {
     state.paymentResult = {

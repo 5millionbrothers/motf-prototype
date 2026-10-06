@@ -7,6 +7,9 @@ const {
   tossRequest,
 } = require("./_server");
 
+const MAX_SINGLE_PAYMENT_AMOUNT = 10_000_000;
+const PAYMENT_LIMIT_MESSAGE = "단건 결제는 10,000,000원까지 가능합니다.";
+
 module.exports = async function handler(req, res) {
   if (req.method !== "POST") return json(res, 405, { ok: false, message: "POST 요청만 사용할 수 있습니다." });
 
@@ -22,12 +25,18 @@ module.exports = async function handler(req, res) {
     if (!paymentKey || !orderId || !Number.isInteger(amount) || amount <= 0) {
       return json(res, 400, { ok: false, message: "결제 승인 정보가 올바르지 않습니다." });
     }
+    if (amount > MAX_SINGLE_PAYMENT_AMOUNT) {
+      return json(res, 422, { ok: false, code: "PAYMENT_AMOUNT_LIMIT_EXCEEDED", message: PAYMENT_LIMIT_MESSAGE });
+    }
 
     const intents = await supabaseRequest(
-      `/rest/v1/payment_intents?select=id,order_id,customer_id,amount,status,provider&order_id=eq.${encodeURIComponent(orderId)}&limit=1`,
+      `/rest/v1/payment_intents?select=id,order_id,customer_id,amount,original_amount,status,provider&order_id=eq.${encodeURIComponent(orderId)}&limit=1`,
     );
     const intent = intents?.[0];
     if (!intent || intent.customer_id !== user.id) return json(res, 404, { ok: false, message: "결제 준비 내역을 찾을 수 없습니다." });
+    if (Number(intent.amount) > MAX_SINGLE_PAYMENT_AMOUNT || Number(intent.original_amount || intent.amount) > MAX_SINGLE_PAYMENT_AMOUNT) {
+      return json(res, 422, { ok: false, code: "PAYMENT_AMOUNT_LIMIT_EXCEEDED", message: PAYMENT_LIMIT_MESSAGE });
+    }
     if (Number(intent.amount) !== amount) return json(res, 409, { ok: false, message: "결제 금액이 변경되었습니다. 주문을 다시 준비해주세요." });
 
     let payment;
