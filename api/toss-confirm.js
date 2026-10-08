@@ -2,6 +2,7 @@ const {
   json,
   env,
   requireEnv,
+  requireTossSecret,
   authenticatedUser,
   supabaseRequest,
   tossRequest,
@@ -14,7 +15,7 @@ module.exports = async function handler(req, res) {
   if (req.method !== "POST") return json(res, 405, { ok: false, message: "POST 요청만 사용할 수 있습니다." });
 
   try {
-    requireEnv(["SUPABASE_URL", "SUPABASE_PUBLISHABLE_KEY", "SUPABASE_SERVICE_ROLE_KEY", "TOSS_SECRET_KEY"]);
+    requireEnv(["SUPABASE_URL", "SUPABASE_PUBLISHABLE_KEY", "SUPABASE_SERVICE_ROLE_KEY"]);
     const user = await authenticatedUser(req.headers.authorization || "");
     if (!user?.id) return json(res, 401, { ok: false, message: "로그인이 만료되었습니다. 다시 로그인해주세요." });
 
@@ -30,7 +31,7 @@ module.exports = async function handler(req, res) {
     }
 
     const intents = await supabaseRequest(
-      `/rest/v1/payment_intents?select=id,order_id,customer_id,amount,original_amount,status,provider&order_id=eq.${encodeURIComponent(orderId)}&limit=1`,
+      `/rest/v1/payment_intents?select=id,order_id,customer_id,kind,amount,original_amount,status,provider&order_id=eq.${encodeURIComponent(orderId)}&limit=1`,
     );
     const intent = intents?.[0];
     if (!intent || intent.customer_id !== user.id) return json(res, 404, { ok: false, message: "결제 준비 내역을 찾을 수 없습니다." });
@@ -38,16 +39,18 @@ module.exports = async function handler(req, res) {
       return json(res, 422, { ok: false, code: "PAYMENT_AMOUNT_LIMIT_EXCEEDED", message: PAYMENT_LIMIT_MESSAGE });
     }
     if (Number(intent.amount) !== amount) return json(res, 409, { ok: false, message: "결제 금액이 변경되었습니다. 주문을 다시 준비해주세요." });
+    const merchantKind = intent.kind === "market" ? "market" : "stay";
+    const tossSecret = requireTossSecret(merchantKind);
 
     let payment;
     if (intent.status === "confirmed") {
-      payment = await tossRequest(`/v1/payments/${encodeURIComponent(paymentKey)}`);
+      payment = await tossRequest(`/v1/payments/${encodeURIComponent(paymentKey)}`, {}, tossSecret);
     } else {
       payment = await tossRequest("/v1/payments/confirm", {
         method: "POST",
         headers: { "TossPayments-Idempotency-Key": `motf-confirm-${intent.id}` },
         body: JSON.stringify({ paymentKey, orderId, amount }),
-      });
+      }, tossSecret);
     }
 
     const finalized = await supabaseRequest("/rest/v1/rpc/finalize_toss_payment_intent", {

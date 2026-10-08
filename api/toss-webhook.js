@@ -1,24 +1,30 @@
-const { json, requireEnv, supabaseRequest, tossRequest } = require("./_server");
+const { json, requireEnv, requireTossSecret, supabaseRequest, tossRequest } = require("./_server");
 
 const MAX_SINGLE_PAYMENT_AMOUNT = 10_000_000;
 
 module.exports = async function handler(req, res) {
   if (req.method !== "POST") return json(res, 405, { ok: false });
   try {
-    requireEnv(["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "TOSS_SECRET_KEY"]);
+    requireEnv(["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"]);
     const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
     const paymentKey = String(body?.data?.paymentKey || body.paymentKey || "").trim();
     const hintedOrderId = String(body?.data?.orderId || body.orderId || "").trim();
-    if (!paymentKey) return json(res, 200, { ok: true, ignored: true });
+    if (!paymentKey || !hintedOrderId) return json(res, 200, { ok: true, ignored: true });
 
-    // Webhook payloads are never trusted directly. Re-fetch the payment with the Toss secret key.
-    const payment = await tossRequest(`/v1/payments/${encodeURIComponent(paymentKey)}`);
-    const orderId = String(payment.orderId || hintedOrderId || "");
     const intents = await supabaseRequest(
-      `/rest/v1/payment_intents?select=id,order_id,customer_id,amount,original_amount,status&order_id=eq.${encodeURIComponent(orderId)}&provider=eq.toss&limit=1`,
+      `/rest/v1/payment_intents?select=id,order_id,customer_id,kind,amount,original_amount,status&order_id=eq.${encodeURIComponent(hintedOrderId)}&provider=eq.toss&limit=1`,
     );
     const intent = intents?.[0];
     if (!intent) return json(res, 200, { ok: true, ignored: true });
+    const merchantKind = intent.kind === "market" ? "market" : "stay";
+    const tossSecret = requireTossSecret(merchantKind);
+
+    // Webhook payloads are never trusted directly. Re-fetch with the secret paired to the intent's MID.
+    const payment = await tossRequest(`/v1/payments/${encodeURIComponent(paymentKey)}`, {}, tossSecret);
+    const orderId = String(payment.orderId || "");
+    if (orderId !== intent.order_id) {
+      throw Object.assign(new Error("토스 결제 주문번호와 결제 원장이 일치하지 않습니다."), { statusCode: 409 });
+    }
 
     const paidAmount = Number(payment.totalAmount || payment.balanceAmount || 0);
     if (payment.status === "DONE" && (paidAmount > MAX_SINGLE_PAYMENT_AMOUNT
@@ -28,7 +34,7 @@ module.exports = async function handler(req, res) {
         method: "POST",
         headers: { "TossPayments-Idempotency-Key": `motf-limit-cancel-${intent.id}` },
         body: JSON.stringify({ cancelReason: "단건 결제 한도 초과 자동 취소" }),
-      });
+      }, tossSecret);
       await supabaseRequest(`/rest/v1/payment_intents?id=eq.${encodeURIComponent(intent.id)}`, {
         method: "PATCH",
         body: JSON.stringify({ status: "cancelled", provider_status: "CANCELED", payment_response: cancelledPayment }),

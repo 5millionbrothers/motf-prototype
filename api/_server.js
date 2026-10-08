@@ -67,15 +67,33 @@ async function authenticatedUser(authorization) {
   return result.ok ? result.data : null;
 }
 
-function tossAuthorization() {
-  return `Basic ${Buffer.from(`${env("TOSS_SECRET_KEY")}:`).toString("base64")}`;
+function tossSecretKey(kind = "stay") {
+  if (kind === "market") return env("TOSS_MARKET_SECRET_KEY");
+  return env("TOSS_STAY_SECRET_KEY") || env("TOSS_SECRET_KEY");
 }
 
-async function tossRequest(path, options = {}) {
+function requireTossSecret(kind = "stay") {
+  const secretKey = tossSecretKey(kind);
+  if (!secretKey) {
+    const variableName = kind === "market"
+      ? "TOSS_MARKET_SECRET_KEY"
+      : "TOSS_STAY_SECRET_KEY 또는 TOSS_SECRET_KEY";
+    const error = new Error(`환경변수가 없습니다: ${variableName}`);
+    error.statusCode = 503;
+    throw error;
+  }
+  return secretKey;
+}
+
+function tossAuthorization(secretKey) {
+  return `Basic ${Buffer.from(`${secretKey}:`).toString("base64")}`;
+}
+
+async function tossRequest(path, options = {}, secretKey = requireTossSecret("stay")) {
   const result = await requestJson(`https://api.tosspayments.com${path}`, {
     ...options,
     headers: {
-      Authorization: tossAuthorization(),
+      Authorization: tossAuthorization(secretKey),
       "Content-Type": "application/json",
       ...(options.headers || {}),
     },
@@ -97,5 +115,7 @@ module.exports = {
   requestJson,
   supabaseRequest,
   authenticatedUser,
+  tossSecretKey,
+  requireTossSecret,
   tossRequest,
 };

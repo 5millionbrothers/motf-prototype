@@ -36,7 +36,10 @@ const escapeHtml = (value) => String(value ?? "").replace(/[&<>'"]/g, (character
 }[character]));
 window.motfEscapeHtml = escapeHtml;
 
-let TOSS_CLIENT_KEY = window.MOTF_CONFIG?.TOSS_CLIENT_KEY?.trim() || "";
+const TOSS_CLIENT_KEYS = {
+  stay: window.MOTF_CONFIG?.TOSS_STAY_CLIENT_KEY?.trim() || window.MOTF_CONFIG?.TOSS_CLIENT_KEY?.trim() || "",
+  market: window.MOTF_CONFIG?.TOSS_MARKET_CLIENT_KEY?.trim() || "",
+};
 let activeTossPaymentWindow = null;
 const PENDING_PAYMENT_STORAGE_KEY = "motf.pendingPayment";
 const MAX_SINGLE_PAYMENT_AMOUNT = 10_000_000;
@@ -3260,7 +3263,10 @@ async function loadPaymentConfig() {
     const response = await fetch("/api/payment-config", { cache: "no-store", signal: controller.signal });
     if (!response.headers.get("content-type")?.includes("application/json")) return;
     const data = await response.json();
-    if (response.ok && data.tossClientKey) TOSS_CLIENT_KEY = data.tossClientKey;
+    if (response.ok) {
+      TOSS_CLIENT_KEYS.stay = data.tossClientKeys?.stay || data.tossClientKey || TOSS_CLIENT_KEYS.stay;
+      TOSS_CLIENT_KEYS.market = data.tossClientKeys?.market || TOSS_CLIENT_KEYS.market;
+    }
     if (response.ok && data.naverMapKeyId) NAVER_MAP_KEY_ID = data.naverMapKeyId;
   } catch (error) {
     console.warn("토스 결제 공개 설정을 불러오지 못했습니다.", error);
@@ -3879,10 +3885,15 @@ async function requestTossPayment() {
     return toast(PAYMENT_LIMIT_MESSAGE);
   }
   if (activeTossPaymentWindow) return toast("이미 토스페이먼츠 결제창이 열려 있습니다.");
-  if (!TOSS_CLIENT_KEY) {
+  const merchantKind = payment.type === "market" ? "market" : "stay";
+  const tossClientKey = TOSS_CLIENT_KEYS[merchantKind];
+  if (!tossClientKey) {
+    const variableName = merchantKind === "market"
+      ? "TOSS_MARKET_CLIENT_KEY"
+      : "TOSS_STAY_CLIENT_KEY 또는 TOSS_CLIENT_KEY";
     state.paymentResult = {
       status: "fail", type: payment.type, eyebrow: "결제 설정 필요", title: "토스 결제키가 설정되지 않았습니다",
-      text: "Vercel 환경변수 TOSS_CLIENT_KEY를 등록한 뒤 다시 시도해주세요.", icon: "key-round", className: "fail",
+      text: `Vercel 환경변수 ${variableName}를 등록한 뒤 다시 시도해주세요.`, icon: "key-round", className: "fail",
       orderId: payment.orderId, itemName: payment.itemName, amount: payment.amount, backRoute: paymentBackRoute(),
     };
     return navigate("paymentResult");
@@ -3931,7 +3942,7 @@ async function requestTossPayment() {
     const activeSession = sessionData.session;
     if (!activeSession?.user) throw new Error("로그인이 만료되었습니다. 다시 로그인해주세요.");
     savePendingPayment(payment);
-    const tossPayments = window.TossPayments(TOSS_CLIENT_KEY);
+    const tossPayments = window.TossPayments(tossClientKey);
     const widgets = tossPayments.widgets({ customerKey: activeSession.user.id });
     await widgets.setAmount({ currency: "KRW", value: Number(payment.amount) });
     const tossRequest = {

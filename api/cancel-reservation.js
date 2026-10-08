@@ -1,6 +1,7 @@
 const {
   json,
   requireEnv,
+  requireTossSecret,
   authenticatedUser,
   supabaseRequest,
   tossRequest,
@@ -29,7 +30,8 @@ function refundPercentFor(reservation, policy) {
 module.exports = async function handler(req, res) {
   if (req.method !== "POST") return json(res, 405, { ok: false, message: "POST 요청만 사용할 수 있습니다." });
   try {
-    requireEnv(["SUPABASE_URL", "SUPABASE_PUBLISHABLE_KEY", "SUPABASE_SERVICE_ROLE_KEY", "TOSS_SECRET_KEY"]);
+    requireEnv(["SUPABASE_URL", "SUPABASE_PUBLISHABLE_KEY", "SUPABASE_SERVICE_ROLE_KEY"]);
+    requireTossSecret("stay");
     const user = await authenticatedUser(req.headers.authorization || "");
     if (!user?.id) return json(res, 401, { ok: false, message: "로그인이 만료되었습니다." });
     const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});

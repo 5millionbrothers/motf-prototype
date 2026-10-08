@@ -10,8 +10,12 @@ module.exports = async function handler(req, res) {
     service: "motf-prototype",
     paymentProvider: "toss",
     paymentConfigured: Boolean(
-      process.env.TOSS_CLIENT_KEY &&
-      process.env.TOSS_SECRET_KEY,
+      (process.env.TOSS_STAY_CLIENT_KEY || process.env.TOSS_CLIENT_KEY) &&
+      (process.env.TOSS_STAY_SECRET_KEY || process.env.TOSS_SECRET_KEY),
+    ),
+    marketPaymentConfigured: Boolean(
+      process.env.TOSS_MARKET_CLIENT_KEY &&
+      process.env.TOSS_MARKET_SECRET_KEY,
     ),
   });
 };

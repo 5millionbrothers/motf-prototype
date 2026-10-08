@@ -33,8 +33,10 @@ SUPABASE_URL=https://프로젝트.supabase.co
 SUPABASE_PUBLISHABLE_KEY=Supabase publishable key
 SUPABASE_SERVICE_ROLE_KEY=Supabase service_role key
 
-TOSS_CLIENT_KEY=토스 주문서형·결제창형 클라이언트 키
-TOSS_SECRET_KEY=위 클라이언트 키와 같은 쌍의 주문서형·결제창형 시크릿 키
+TOSS_CLIENT_KEY=숙소 MID의 주문서형·결제창형 클라이언트 키(기존 변수명, 계속 사용 가능)
+TOSS_SECRET_KEY=숙소 MID의 클라이언트 키와 같은 쌍의 시크릿 키(기존 변수명, 계속 사용 가능)
+TOSS_MARKET_CLIENT_KEY=장보기 MID의 주문서형·결제창형 클라이언트 키
+TOSS_MARKET_SECRET_KEY=장보기 MID의 클라이언트 키와 같은 쌍의 시크릿 키
 
 KCP_CERT_SITE_CODE=KCP 본인확인 사이트코드
 KCP_CERT_WEB_SITE_ID=KCP 웹사이트 ID(발급된 경우)
@@ -45,7 +47,7 @@ IDENTITY_HASH_PEPPER=CI/DI 해시에 추가할 긴 임의 비밀값
 NAVER_MAP_KEY_ID=네이버 지도 API Key ID
 ```
 
-`TOSS_SECRET_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `KCP_CERT_ADAPTER_SECRET`, `IDENTITY_HASH_PEPPER`는 브라우저 코드, `config.js`, GitHub에 넣지 않습니다.
+`TOSS_SECRET_KEY`, `TOSS_MARKET_SECRET_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `KCP_CERT_ADAPTER_SECRET`, `IDENTITY_HASH_PEPPER`는 브라우저 코드, `config.js`, GitHub에 넣지 않습니다.
 
 가상계좌를 여는 시점에는 토스페이먼츠 어드민의 결제창 설정에서 가상계좌를 활성화하고 계약 상태를 확인합니다. 이용자는 moTF 화면이 아니라 토스 안전결제창에서 현재 가능한 결제수단을 선택합니다.
 
@@ -53,7 +55,7 @@ NAVER_MAP_KEY_ID=네이버 지도 API Key ID
 
 1. `motf-database/supabase/57`, `58`, `59` SQL을 번호순으로 Supabase SQL Editor에서 실행합니다.
 2. Toss·KCP·Supabase 환경변수를 Vercel Production/Preview에 등록합니다.
-3. 토스 웹훅을 `https://motf.co.kr/api/toss-webhook`으로 등록합니다.
+3. 숙소 MID와 장보기 MID 양쪽의 토스 웹훅을 모두 `https://motf.co.kr/api/toss-webhook`으로 등록합니다.
 4. KCP 어댑터를 준비하고 `docs/kcp-identity-adapter.md` 계약대로 연결합니다.
 5. 이용자와 사장님 저장소를 배포한 뒤 아래 시나리오를 검증합니다.
 
